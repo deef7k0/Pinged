@@ -183,7 +183,7 @@ export default function LogGameScreen() {
     // The form runs on the game's colour — it is one of the four screens that
     // are about a single game, so the save button and the status picker take
     // that game's hue rather than the house blue.
-    <AccentProvider artwork={game.data.coverUrl ?? game.data.heroUrl} genres={game.data.genres}>
+    <AccentProvider artwork={game.data.heroUrl ?? game.data.coverUrl} genres={game.data.genres}>
       {/* Keying on the log id lets the form initialise its state from props on
           mount, instead of syncing it in an effect after the query resolves.
           The draft's timestamp joins the key so discarding one remounts the

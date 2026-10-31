@@ -6,7 +6,7 @@ import Animated from 'react-native-reanimated';
 import { Palette, withAlpha } from '@/constants/theme';
 import type { ArtworkMeshImages } from '@/hooks/use-artwork-mesh';
 import { MESH_SCRIM } from '@/lib/artwork-mesh';
-import { smoothScrimStops } from '@/lib/immersive-color';
+import { smoothScrimStops } from '@/lib/scrim';
 
 /** How long a mesh takes to come in over the page colour: the reference's 900 is a skip's; this is a first paint. */
 const MESH_IN_MS = 320;

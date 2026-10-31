@@ -78,28 +78,6 @@ export type ScreenProps = {
    */
   background?: string;
   /**
-   * The page's colour, read from its own artwork — the Apple Music pages: a
-   * game, a studio, a collection (§ Apple Music's hero).
-   *
-   * **One colour, from the top of the page to its foot**, which darkens as the
-   * page is read: `bright` at rest, `dark` once the artwork has reached the
-   * bar, crossed over the artwork's own `header` height. It is the page's fill
-   * and its wash, and every other layer that has to paint the page's colour —
-   * the hero's foot fade, the veil under a synopsis — reads the same tone off
-   * the chrome, so none of them can disagree.
-   *
-   * `bright` may be null while the colour is being read, or for artwork whose
-   * colour cannot be read: the page is then `dark` throughout, and takes its
-   * bright tone over 600ms when one arrives. Supersedes `background`.
-   */
-  tone?: { bright: string | null; dark: string; header: number };
-  /**
-   * The page is one flat colour read from its artwork (`background`), and its
-   * cards and selected tabs wear the filled colour — the review button's,
-   * exactly (`useCardMaterial`, `<TabBar>`). A game, a studio, a collection.
-   */
-  artColoured?: boolean;
-  /**
    * Whether this page makes room for the mini player while music is being kept
    * playing. On by default, and a page almost never says otherwise.
    *
@@ -127,8 +105,6 @@ export function Screen({
   topBar,
   modal = false,
   background,
-  tone,
-  artColoured = false,
   miniPlayer = true,
 }: ScreenProps) {
   const theme = useTheme();
@@ -146,10 +122,6 @@ export function Screen({
    * The band is in the page's own colour — the padding is inside the fill
    * below — so on a game's page the bar rests on that game's tone.
    */
-  /* The page's fill is its dark tone: what the bar is washed with, and what
-     the bright tone is laid over and fades back to. */
-  const fill = tone?.dark ?? background ?? theme.background;
-
   const tabClearance = useTabBarClearance();
   const miniPlayerActive = useMiniPlayerActive();
   const miniPlayerRoom =
@@ -160,10 +132,8 @@ export function Screen({
   return (
     <ScreenChromeProvider
       modal={modal}
-      background={fill}
-      insetHeader={insetHeader}
-      artColoured={artColoured}
-      tone={tone}>
+      background={background ?? theme.background}
+      insetHeader={insetHeader}>
       {({ blurTargetRef }) => (
         <View style={styles.flex}>
           {/*
@@ -184,7 +154,9 @@ export function Screen({
             `backdrop` is for; `SafeAreaView` stays transparent and does insets
             and nothing else.
           */}
-          <BlurTargetView ref={blurTargetRef} style={[styles.flex, { backgroundColor: fill }]}>
+          <BlurTargetView
+            ref={blurTargetRef}
+            style={[styles.flex, { backgroundColor: background ?? theme.background }]}>
             {backdrop}
 
             <SafeAreaView style={styles.flex} edges={edges}>

@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet } from 'react-native';
 
+import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { TapTarget } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
@@ -81,7 +82,8 @@ export function IconButton({
       onPress={onPress}
       disabled={disabled}
       hitSlop={hitSlop}
-      scaleTo={0.9}
+      /* Light: the glyph is what answers (`<PressGlyph>`, Convx's wobble). */
+      scaleTo={0.96}
       pressedColor={plain ? theme.pressed : active ? accent.ring : theme.controlPressed}
       focusRing={accent.ring}
       style={StyleSheet.flatten([
@@ -90,7 +92,9 @@ export function IconButton({
         { backgroundColor: fill, borderColor: edge },
         disabled && styles.inert,
       ])}>
-      <Ionicons name={icon} size={glyph} color={color} />
+      <PressGlyph pop={active}>
+        <Ionicons name={icon} size={glyph} color={color} />
+      </PressGlyph>
     </PressableScale>
   );
 }

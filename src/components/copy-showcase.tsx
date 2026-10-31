@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { memo, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, memo, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Platform, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -28,6 +28,7 @@ import { CopyCaseFront } from '@/components/copy-case-front';
 import { CopyCaseLeaf, CopyCaseTray, caseContents } from '@/components/copy-case-inside';
 import { StageFace, StageLight } from '@/components/copy-stage-face';
 import { CopyStageFloor } from '@/components/copy-stage-floor';
+import { CopyStageSheet, type StageSnapshots } from '@/components/copy-stage-sheet';
 import { StageTilt } from '@/components/copy-stage-tilt';
 import { caseHeightFor } from '@/components/game-case';
 import {
@@ -56,8 +57,11 @@ import { platformKeyForStored } from '@/constants/platform-family';
 import { formatPartialDate } from '@/constants/progress';
 import { PosterAspectRatio } from '@/constants/theme';
 import { ARRIVAL_OBJECT, useLandingArrival } from '@/hooks/use-arrival';
+import { useCopyStage3d } from '@/hooks/use-copy-stage-3d';
 import type { CopyWithRelations } from '@/lib/api';
 import { NO_COPY_ART, type CopyArt } from '@/lib/api/copy-art';
+import type { ScenePose } from '@/lib/copy-scene/scene';
+import { STAGE_3D_AVAILABLE } from '@/lib/copy-stage-3d';
 import {
   HIDDEN_FACE,
   STAGE_CAMERA,
@@ -77,6 +81,11 @@ import {
 } from '@/lib/stage-geometry';
 
 const RAD = Math.PI / 180;
+
+const CopyStageGL = lazy(() => import('@/components/copy-stage-gl'));
+
+/** The flat stage and the 3D one crossing over, once the 3D one has drawn. */
+const STAGE_CROSSFADE_MS = 320;
 
 /*
  * How each movement weighs.
@@ -312,6 +321,35 @@ export const CopyShowcase = memo(function CopyShowcase({
   }, []);
 
   const still = reduceMotion || screenReader;
+
+  /* The 3D stage: loading behind the flat one, drawn over it, or not at all
+     — not in this build, switched off in Settings (off by default on a
+     32-bit phone), or it could not be drawn. The flat faces are unmounted
+     once the crossfade is over. */
+  const copyStage3d = useCopyStage3d();
+  const want3d = STAGE_3D_AVAILABLE && copyStage3d.ready && copyStage3d.on;
+  const [depth3d, setDepth3d] = useState<'loading' | 'ready' | 'off'>(want3d ? 'loading' : 'off');
+  const [flatGone, setFlatGone] = useState(false);
+  const [snapshots, setSnapshots] = useState<StageSnapshots | null>(null);
+  /* The switch flipped (or the stored choice arrived): start over from the
+     flat stage — loading afresh if it is now on. Adjusted while rendering,
+     as React has it for state that follows a value, not in an effect. */
+  const [wanted, setWanted] = useState(want3d);
+  if (wanted !== want3d) {
+    setWanted(want3d);
+    setDepth3d(want3d ? 'loading' : 'off');
+    setFlatGone(false);
+  }
+  const stageReady = () => {
+    setDepth3d('ready');
+    setTimeout(() => setFlatGone(true), STAGE_CROSSFADE_MS + 80);
+  };
+  /* A stage switched off before its crossfade ended must not hide the flat one. */
+  const flatHidden = flatGone && depth3d === 'ready';
+  const stageFailed = () => {
+    setDepth3d('off');
+    setFlatGone(false);
+  };
 
   const { platform, opens, sealed } = stage;
   const { caseWidth, caseHeight, depth, disc, centreY } = stage;
@@ -688,6 +726,29 @@ export const CopyShowcase = memo(function CopyShowcase({
      place when they change over. */
   const seat = useAnimatedStyle(() => ({ opacity: out.get() > SEATED ? 0 : 1 }));
 
+  /* The same numbers for the 3D stage, in one small object a frame: where the
+     case and the disc are, as the flat faces are placed from them. */
+  const scenePose = useDerivedValue<ScenePose>(() => {
+    const f = frame.get();
+    const d = discFrame.get();
+    return {
+      theta: f.theta,
+      scale: f.scale,
+      shift: f.shift,
+      drop: caseDrop.get(),
+      swing: f.swing,
+      here: f.here,
+      discShown: d.shown,
+      discX: d.x,
+      discZ: d.z,
+      discAngle: d.angle,
+      discScale: d.scale,
+      discDrop: discDrop.get(),
+      tiltX: tiltX.get(),
+      tiltY: tiltY.get(),
+    };
+  });
+
   // -------------------------------------------------------------------------
   // The light on each face
   // -------------------------------------------------------------------------
@@ -909,6 +970,33 @@ export const CopyShowcase = memo(function CopyShowcase({
   const gloss = sealed ? 1.5 : 1;
   const face = { centreX, centreY };
   const stood = { ...face, drop: caseDrop };
+  /* What the printed faces' pictures were taken of: retaken when it changes. */
+  const barcode = copy.release?.barcodes[0]?.barcode ?? copy.contribution?.barcode ?? null;
+  const snapshotKey = [
+    copy.id,
+    title,
+    edition,
+    copy.region,
+    copy.edition,
+    copy.completeness,
+    copy.condition,
+    copy.acquired_on,
+    copy.notes,
+    barcode,
+    platform,
+    caseWidth,
+    caseHeight,
+    depth,
+    art.back ? 'scan' : 'printed',
+  ].join('|');
+  const crossfade = {
+    transitionProperty: 'opacity',
+    transitionDuration: reduceMotion ? 0 : STAGE_CROSSFADE_MS,
+    transitionTimingFunction: 'ease-in-out',
+  } as const;
+  /* The 3D stage is alive exactly when the idle turn is: otherwise it draws
+     only when something is moved by hand. */
+  const alive3d = active && !still;
 
   return (
     <GestureDetector gesture={gesture}>
@@ -941,6 +1029,25 @@ export const CopyShowcase = memo(function CopyShowcase({
           style={StyleSheet.absoluteFill}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants">
+          {depth3d !== 'off' && snapshots?.key !== snapshotKey && (
+            <CopyStageSheet
+              copy={copy}
+              platform={platform}
+              caseWidth={caseWidth}
+              caseHeight={caseHeight}
+              depth={depth}
+              title={title}
+              edition={edition}
+              printedBack={!art.back}
+              left={centreX - half}
+              top={centreY - caseHeight / 2}
+              pageColor={pageColor}
+              snapshotKey={snapshotKey}
+              onCaptured={setSnapshots}
+              onFail={stageFailed}
+            />
+          )}
+
           <CopyStageFloor
             centreX={centreX}
             centreY={centreY}
@@ -956,133 +1063,191 @@ export const CopyShowcase = memo(function CopyShowcase({
           <Animated.View
             pointerEvents="none"
             style={[StyleSheet.absoluteFill, arriving, settled && styles.landed]}>
-            {/* Back to front. The faces of a shut box never overlap, so their
+            {!flatHidden && (
+              <Animated.View
+                style={[
+                  StyleSheet.absoluteFill,
+                  crossfade,
+                  { opacity: depth3d === 'ready' ? 0 : 1 },
+                ]}>
+                {/* Back to front. The faces of a shut box never overlap, so their
                 order among themselves is free; what matters is that the cover
                 is over the tray it shuts on, and the disc over all of it once
                 it is out. */}
-            <StageFace pose={backPose} width={caseWidth} height={caseHeight} {...stood}>
-              <CopyCaseBack
-                copy={copy}
-                platform={platform}
-                width={caseWidth}
-                height={caseHeight}
-                scan={art.back}
-              />
-              <StageLight
-                width={caseWidth}
-                height={caseHeight}
-                gloss={gloss}
-                shade={backLight.shade}
-                glint={backLight.glint}
-              />
-            </StageFace>
-
-            <StageFace pose={spinePose} width={depth} height={caseHeight} {...stood}>
-              <CopyCaseSpine
-                platform={platform}
-                depth={depth}
-                height={caseHeight}
-                caseWidth={caseWidth}
-                title={title}
-              />
-              <StageLight width={depth} height={caseHeight} shade={spineLight.shade} />
-            </StageFace>
-
-            <StageFace pose={lipPose} width={depth} height={caseHeight} {...stood}>
-              <CopyCaseLip
-                platform={platform}
-                depth={depth}
-                height={caseHeight}
-                caseWidth={caseWidth}
-              />
-              <StageLight width={depth} height={caseHeight} shade={lipLight.shade} />
-            </StageFace>
-
-            {opens && (
-              <StageFace pose={trayPose} width={caseWidth} height={caseHeight} {...stood}>
-                <CopyCaseTray
-                  coverUrl={coverUrl}
-                  heroUrl={heroUrl}
-                  title={title}
-                  platform={platform}
-                  width={caseWidth}
-                  height={caseHeight}
-                  disc={disc}
-                  discLabelUrl={discLabel}
-                  seatStyle={seat}
-                />
-                <StageLight
-                  width={caseWidth}
-                  height={caseHeight}
-                  shade={trayLight.shade}
-                  glint={trayLight.glint}
-                />
-              </StageFace>
-            )}
-
-            {opens && (
-              <StageFace pose={leafPose} width={caseWidth} height={caseHeight} {...stood}>
-                <CopyCaseLeaf
-                  coverUrl={coverUrl}
-                  heroUrl={heroUrl}
-                  width={caseWidth}
-                  height={caseHeight}
-                  manual={contents.manual}
-                  inserts={contents.inserts}
-                />
-                <StageLight width={caseWidth} height={caseHeight} shade={leafLight.shade} />
-              </StageFace>
-            )}
-
-            <StageFace pose={coverPose} width={caseWidth} height={caseHeight} {...stood}>
-              <CopyCaseFront
-                coverUrl={coverUrl}
-                heroUrl={heroUrl}
-                title={title}
-                edition={edition}
-                platform={platform}
-                width={caseWidth}
-                height={caseHeight}
-              />
-              <StageLight
-                width={caseWidth}
-                height={caseHeight}
-                gloss={gloss}
-                shade={coverLight.shade}
-                glint={coverLight.glint}
-              />
-            </StageFace>
-
-            {opens && (
-              <>
-                <StageFace pose={mirrorPose} width={disc} height={disc} drop={discDrop} {...face}>
-                  <CdDiscUnderside size={disc} holeColor={pageColor} light={mirrorLight} />
-                  <View style={[StyleSheet.absoluteFill, styles.round]}>
-                    <StageLight width={disc} height={disc} shade={mirrorShade} depth={0.35} />
-                  </View>
+                <StageFace pose={backPose} width={caseWidth} height={caseHeight} {...stood}>
+                  <CopyCaseBack
+                    copy={copy}
+                    platform={platform}
+                    width={caseWidth}
+                    height={caseHeight}
+                    scan={art.back}
+                  />
+                  <StageLight
+                    width={caseWidth}
+                    height={caseHeight}
+                    gloss={gloss}
+                    shade={backLight.shade}
+                    glint={backLight.glint}
+                  />
                 </StageFace>
 
-                <StageFace pose={labelPose} width={disc} height={disc} drop={discDrop} {...face}>
-                  <CdDisc
+                <StageFace pose={spinePose} width={depth} height={caseHeight} {...stood}>
+                  <CopyCaseSpine
+                    platform={platform}
+                    depth={depth}
+                    height={caseHeight}
+                    caseWidth={caseWidth}
+                    title={title}
+                  />
+                  <StageLight width={depth} height={caseHeight} shade={spineLight.shade} />
+                </StageFace>
+
+                <StageFace pose={lipPose} width={depth} height={caseHeight} {...stood}>
+                  <CopyCaseLip
+                    platform={platform}
+                    depth={depth}
+                    height={caseHeight}
+                    caseWidth={caseWidth}
+                  />
+                  <StageLight width={depth} height={caseHeight} shade={lipLight.shade} />
+                </StageFace>
+
+                {opens && (
+                  <StageFace pose={trayPose} width={caseWidth} height={caseHeight} {...stood}>
+                    <CopyCaseTray
+                      coverUrl={coverUrl}
+                      heroUrl={heroUrl}
+                      title={title}
+                      platform={platform}
+                      width={caseWidth}
+                      height={caseHeight}
+                      disc={disc}
+                      discLabelUrl={discLabel}
+                      seatStyle={seat}
+                    />
+                    <StageLight
+                      width={caseWidth}
+                      height={caseHeight}
+                      shade={trayLight.shade}
+                      glint={trayLight.glint}
+                    />
+                  </StageFace>
+                )}
+
+                {opens && (
+                  <StageFace pose={leafPose} width={caseWidth} height={caseHeight} {...stood}>
+                    <CopyCaseLeaf
+                      coverUrl={coverUrl}
+                      heroUrl={heroUrl}
+                      width={caseWidth}
+                      height={caseHeight}
+                      manual={contents.manual}
+                      inserts={contents.inserts}
+                    />
+                    <StageLight width={caseWidth} height={caseHeight} shade={leafLight.shade} />
+                  </StageFace>
+                )}
+
+                <StageFace pose={coverPose} width={caseWidth} height={caseHeight} {...stood}>
+                  <CopyCaseFront
                     coverUrl={coverUrl}
                     heroUrl={heroUrl}
                     title={title}
+                    edition={edition}
                     platform={platform}
-                    size={disc}
-                    holeColor={pageColor}
-                    labelUrl={discLabel}
+                    width={caseWidth}
+                    height={caseHeight}
                   />
-                  <View style={[StyleSheet.absoluteFill, styles.round]}>
-                    <StageLight
+                  <StageLight
+                    width={caseWidth}
+                    height={caseHeight}
+                    gloss={gloss}
+                    shade={coverLight.shade}
+                    glint={coverLight.glint}
+                  />
+                </StageFace>
+
+                {opens && (
+                  <>
+                    <StageFace
+                      pose={mirrorPose}
                       width={disc}
                       height={disc}
-                      shade={labelShade}
-                      glint={labelGlint}
-                      depth={0.35}
-                    />
-                  </View>
-                </StageFace>
-              </>
+                      drop={discDrop}
+                      {...face}>
+                      <CdDiscUnderside size={disc} holeColor={pageColor} light={mirrorLight} />
+                      <View style={[StyleSheet.absoluteFill, styles.round]}>
+                        <StageLight width={disc} height={disc} shade={mirrorShade} depth={0.35} />
+                      </View>
+                    </StageFace>
+
+                    <StageFace
+                      pose={labelPose}
+                      width={disc}
+                      height={disc}
+                      drop={discDrop}
+                      {...face}>
+                      <CdDisc
+                        coverUrl={coverUrl}
+                        heroUrl={heroUrl}
+                        title={title}
+                        platform={platform}
+                        size={disc}
+                        holeColor={pageColor}
+                        labelUrl={discLabel}
+                      />
+                      <View style={[StyleSheet.absoluteFill, styles.round]}>
+                        <StageLight
+                          width={disc}
+                          height={disc}
+                          shade={labelShade}
+                          glint={labelGlint}
+                          depth={0.35}
+                        />
+                      </View>
+                    </StageFace>
+                  </>
+                )}
+              </Animated.View>
+            )}
+
+            {/* The 3D stage, over the flat one: nothing drawn until it is
+                built, then fading in as the flat faces fade out. Never fully
+                transparent while it loads — a canvas that is never drawn on
+                Android may never be given its surface. */}
+            {depth3d !== 'off' && (
+              <Animated.View
+                style={[
+                  StyleSheet.absoluteFill,
+                  crossfade,
+                  { opacity: depth3d === 'ready' ? 1 : 0.02 },
+                ]}>
+                <Suspense fallback={null}>
+                  <CopyStageGL
+                    platform={platform}
+                    coverUrl={coverUrl}
+                    heroUrl={heroUrl}
+                    art={art}
+                    width={width}
+                    height={stage.stageHeight}
+                    centreY={centreY}
+                    caseWidth={caseWidth}
+                    caseHeight={caseHeight}
+                    depth={depth}
+                    disc={disc}
+                    cased={stage.cased}
+                    opens={opens}
+                    sealed={sealed}
+                    completeness={copy.completeness}
+                    snapshots={snapshots}
+                    pose={scenePose}
+                    active={alive3d}
+                    rocking={alive3d}
+                    onReady={stageReady}
+                    onFail={stageFailed}
+                  />
+                </Suspense>
+              </Animated.View>
             )}
           </Animated.View>
         </View>

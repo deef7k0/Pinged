@@ -4,6 +4,7 @@ import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
 
+import { ReportFlag } from '@/components/report-flag';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { PressableScale } from '@/components/ui/pressable-scale';
@@ -322,6 +323,17 @@ function CommentRow({
           style={StyleSheet.flatten(styles.delete)}>
           <Ionicons name="trash-outline" size={15} color={theme.textMuted} />
         </PressableScale>
+      )}
+      {/* Somebody else's: the flag where your own has its bin. It draws
+          nothing when signed out. */}
+      {!canDelete && (
+        <View style={styles.delete}>
+          <ReportFlag
+            target={{ kind: 'comment', targetId: comment.id, authorId: comment.user_id }}
+            authorId={comment.user_id}
+            label={`Report ${name}’s comment`}
+          />
+        </View>
       )}
     </View>
   );

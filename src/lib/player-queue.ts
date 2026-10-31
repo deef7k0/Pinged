@@ -179,6 +179,8 @@ export const MINI_PLAYER_HIDDEN_ROUTES: ReadonlySet<string> = new Set([
   'edit-profile',
   'welcome',
   'onboarding',
+  /* The terms and the privacy policy: readable signed out too. */
+  'legal',
 ]);
 
 /** Whether the mini player stays off the route these segments name. */

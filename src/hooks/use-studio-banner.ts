@@ -14,9 +14,10 @@ const bannerKey = (companyId: number) => ['studio-banner', companyId] as const;
  * The banner is chosen from the catalogue, and the page colour is read from the
  * banner, so on every visit both waited for two IGDB requests — and on a cold
  * start, for the whole catalogue again. The URL is all it takes to skip that:
- * the art is in expo-image's disk cache and its colour in
- * `extractDominantColor`'s store, so a studio opened before paints its banner
- * and its colour from the device while the catalogue refreshes behind them.
+ * the art is in expo-image's disk cache and its Material 3 seed in the
+ * extractor's store (`useAlbumArtColor`), so a studio opened before paints its
+ * banner and its colour from the device while the catalogue refreshes behind
+ * them.
  *
  * A first visit has nothing remembered and waits, as before. A catalogue whose
  * choice has moved on — a new release out-reviewing the old banner — replaces

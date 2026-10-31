@@ -64,3 +64,15 @@ export function barShare(count: number, counts: readonly number[]): number {
   const most = Math.max(0, ...counts);
   return most > 0 ? count / most : 0;
 }
+
+/**
+ * The rows that are drawn: only the bands that hold a score, highest first,
+ * with their counts. The owner's (2026-10-28): "only the bars that have
+ * ratings should be displayed. So if there is no rating with a 0-9, dont
+ * display it."
+ */
+export function shownBands(counts: readonly number[]): { band: DistributionBand; count: number }[] {
+  return DISTRIBUTION_BANDS.map((band, index) => ({ band, count: counts[index] ?? 0 })).filter(
+    (row) => row.count > 0
+  );
+}

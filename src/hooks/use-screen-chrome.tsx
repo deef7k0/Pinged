@@ -1,10 +1,6 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
-import { Platform, type View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useDerivedValue, useSharedValue, type SharedValue } from 'react-native-reanimated';
-
-import { TOP_BAR_ROW, revealOffset } from '@/constants/top-bar';
-import { darkenOpacity, heroProgress } from '@/lib/scroll-motion';
+import type { View } from 'react-native';
+import { useSharedValue, type SharedValue } from 'react-native-reanimated';
 
 /**
  * What a floating top bar needs to know about the page underneath it.
@@ -64,45 +60,16 @@ export type ScreenChrome = {
   layout: SharedValue<number>;
   /** The page's fill. */
   background: string;
-  /**
-   * The page's two tones and how far it has crossed between them, when its
-   * colour is read from its own artwork (`<Screen tone>`): the Apple Music
-   * pages — a game, a studio, a collection. Null on every other page.
-   *
-   * **One colour, from the top of the page to its foot.** Every layer that has
-   * to paint the page's colour reads this and nothing else — the wash behind
-   * the page, the hero's foot fade, the veil under the synopsis — so none of
-   * them can disagree about what colour the page is.
-   */
-  tone: ScreenTone | null;
   /** The page reserves the bar's row at its top. */
   insetHeader: boolean;
-  /**
-   * The page is one flat colour from its artwork, and its cards and selected
-   * tabs wear the filled colour — the review button's (`<Screen artColoured>`,
-   * `useCardMaterial`, `<TabBar>`): a game, a studio, a collection.
-   */
-  artColoured: boolean;
 };
 
 const ScreenChromeContext = createContext<ScreenChrome | null>(null);
-
-export type ScreenTone = {
-  /** The page's colour at rest: the artwork's key colour, toned for the room. */
-  bright: string | null;
-  /** The page's colour once the artwork has gone. Also `background`. */
-  dark: string;
-  /** 0 at rest, 1 once the artwork has reached the bar. On the UI thread. */
-  darkening: SharedValue<number>;
-};
 
 export type ScreenChromeProviderProps = {
   modal?: boolean;
   background: string;
   insetHeader?: boolean;
-  artColoured?: boolean;
-  /** The page's own tones, and how tall the artwork they were read from is. */
-  tone?: { bright: string | null; dark: string; header: number };
   children: (chrome: ScreenChrome & { blurTargetRef: { current: View | null } }) => ReactNode;
 };
 
@@ -118,31 +85,11 @@ export function ScreenChromeProvider({
   modal = false,
   background,
   insetHeader = false,
-  artColoured = false,
-  tone,
   children,
 }: ScreenChromeProviderProps) {
   const [target, setTarget] = useState<View | null>(null);
   const scrollY = useSharedValue(0);
   const layout = useSharedValue(0);
-
-  /*
-   * How far the page has crossed from its bright tone to its dark one: the
-   * same distance the hero's own motion runs over — rest to the artwork's foot
-   * reaching the foot of the bar — so the page has finished darkening exactly
-   * as the bar comes in over it.
-   */
-  const insets = useSafeAreaInsets();
-  const topInset = modal && Platform.OS === 'ios' ? 0 : insets.top;
-  const barHeight = topInset + TOP_BAR_ROW;
-  const distance = revealOffset(tone?.header ?? 0, barHeight);
-  const darkening = useDerivedValue(() => darkenOpacity(heroProgress(scrollY.get(), distance)));
-  const bright = tone?.bright ?? null;
-  const dark = tone?.dark ?? null;
-  const tones = useMemo<ScreenTone | null>(
-    () => (dark ? { bright, dark, darkening } : null),
-    [bright, dark, darkening]
-  );
 
   /*
    * A ref object that is also a subscription.
@@ -181,10 +128,8 @@ export function ScreenChromeProvider({
       layout,
       background,
       insetHeader,
-      artColoured,
-      tone: tones,
     }),
-    [target, modal, scrollY, layout, background, insetHeader, artColoured, tones]
+    [target, modal, scrollY, layout, background, insetHeader]
   );
 
   return (

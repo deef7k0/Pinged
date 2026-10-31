@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useLocalSearchParams } from 'expo-router';
+import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
+import { useCanReport, reportHref } from '@/components/report-flag';
 import { Avatar } from '@/components/ui/avatar';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
 import { PageFlatList } from '@/components/ui/page-scroll';
@@ -238,6 +239,8 @@ function CommentRow({
   onDelete: () => void;
 }) {
   const theme = useTheme();
+  const router = useRouter();
+  const canReport = useCanReport(comment.user_id);
 
   return (
     <View style={styles.commentRow}>
@@ -272,6 +275,20 @@ function CommentRow({
           {canDelete && (
             <Text variant="caption" style={{ color: theme.danger }} onPress={onDelete}>
               Delete
+            </Text>
+          )}
+          {canReport && (
+            <Text
+              variant="caption"
+              color="textMuted"
+              accessibilityRole="button"
+              accessibilityLabel={`Report ${displayNameFor(comment.profile)}’s comment`}
+              onPress={() =>
+                router.push(
+                  reportHref({ kind: 'comment', targetId: comment.id, authorId: comment.user_id })
+                )
+              }>
+              Report
             </Text>
           )}
         </View>

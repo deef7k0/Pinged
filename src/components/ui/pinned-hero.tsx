@@ -1,16 +1,20 @@
 import { Image, type ImageContentPosition } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { memo, useMemo, useState, type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import { lazy, memo, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
+import { StyleSheet, TurboModuleRegistry, View, useWindowDimensions } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+} from 'react-native-reanimated';
 
 import { BLUR_RADIUS } from '@/components/ui/hero-art';
-import type { FootFade } from '@/components/ui/key-color-hero';
+import { DISSOLVE_STOPS } from '@/constants/game-masthead';
 import { Palette, withAlpha } from '@/constants/theme';
-import { smoothScrimStops } from '@/lib/immersive-color';
 import { usePulse } from '@/hooks/use-pulse';
 import { useScreenChrome } from '@/hooks/use-screen-chrome';
 import { useSteamArtwork } from '@/hooks/use-steam-artwork';
+import { TAIL, washStops } from '@/lib/progressive-blur';
 import {
   PINNED_HERO,
   pinnedBlur,
@@ -18,6 +22,33 @@ import {
   pinnedDrift,
   pinnedStretch,
 } from '@/lib/scroll-motion';
+import type { FootFade } from '@/lib/scrim';
+
+/*
+ * Convx's row-by-row blur (`<ProgressiveBlur>`, `lib/progressive-blur`), where
+ * the build has Skia. Asked of the module registry before anything is
+ * imported: Skia's entry calls `getEnforcing('RNSkiaModule')` as it loads, so
+ * a build made without it would throw on the import — there, and on the web,
+ * the hero keeps its one blurred copy.
+ */
+const ProgressiveBlur = TurboModuleRegistry.get('RNSkiaModule')
+  ? lazy(() => import('@/components/ui/progressive-blur'))
+  : null;
+
+/** expo-image's `contentPosition`, as the 0–1 anchors the blur's canvas draws by. */
+function anchorsOf(position: ImageContentPosition | undefined): { x: number; y: number } {
+  const share = (value: unknown, fallback: number) =>
+    typeof value === 'string' && value.endsWith('%') ? parseFloat(value) / 100 : fallback;
+  if (!position || typeof position !== 'object') return { x: 0.5, y: 0.5 };
+  const place = position as { top?: unknown; left?: unknown };
+  return { x: share(place.left, 0.5), y: share(place.top, 0.5) };
+}
+
+/**
+ * Convx's wash (`artistWashStops`), over the art and its mirrored tail: the
+ * hero's foot fade wherever the row-by-row blur is drawn.
+ */
+const HERO_WASH: FootFade = washStops();
 
 /** A gradient's colours and stops, which its types insist are at least two. */
 type Colours = readonly [string, string, ...string[]];
@@ -27,11 +58,16 @@ const colours = (fade: FootFade, page: string) =>
   fade.alphas.map((alpha) => withAlpha(page, alpha)) as unknown as Colours;
 const locations = (fade: FootFade) => fade.locations as unknown as Stops;
 
-/** The page's colour easing to nothing under the art, over the field (`over="field"`). */
-const HOLD = smoothScrimStops(12);
-const holdColours = (page: string) =>
-  HOLD.alphas.map((alpha) => withAlpha(page, 1 - alpha)) as unknown as Colours;
-const HOLD_STOPS = HOLD.locations as unknown as Stops;
+/**
+ * The game page's own fade: the owner's soft dissolve (`dissolveAt`, measured
+ * off their reference), turned round — what was the art's alpha going is the
+ * page's alpha coming. Over a flat page the two are the same picture; as a fade
+ * *to a colour* it needs no mask, which a video cannot be drawn inside.
+ */
+export const MASTHEAD_FADE: FootFade = {
+  locations: DISSOLVE_STOPS.map((stop) => stop.at),
+  alphas: DISSOLVE_STOPS.map((stop) => 1 - stop.alpha),
+};
 
 export type PinnedHeroProps = {
   /** The art. IGDB's, unless a Steam hero takes its place (`steamAppId`). */
@@ -67,14 +103,16 @@ export type PinnedHeroProps = {
   /** The loaded image's size, for a caller that has to reject art it cannot use. */
   onLoad?: (size: { width: number; height: number }) => void;
   /**
-   * What is behind the hero. `page` (the default): the page's flat colour, and
-   * the art drains into it. `field`: the colour field (`<ArtworkField>`) — the
-   * art's foot still dissolves into the page's colour, which then eases to
-   * nothing over `PINNED_HERO.fieldHold` so the field comes up out of it, and
-   * instead of draining the whole hero dissolves, so what is left once it is
-   * gone is the field.
+   * Convx's foot (2026-10-31): the art running on into its own mirrored
+   * reflection, and Convx's wash in place of `fade` — wherever the row-by-row
+   * blur is drawn. **The game page's alone**, because only its masthead is
+   * transparent below the art, which is where a tail is seen. A studio's and
+   * a collection's solid part starts at the art's foot and would cover it,
+   * and their names stand higher in the art than the game's title, where
+   * Convx's wash has hardly begun: they would sit on 80–95% of the art, for
+   * a tail nobody sees (measured: `scripts/progressive-blur-render.mjs`).
    */
-  over?: 'page' | 'field';
+  tail?: boolean;
 };
 
 /**
@@ -97,8 +135,18 @@ export type PinnedHeroProps = {
  *   drain             the page's colour over all of it, once it is blurred
  * ```
  *
- * The blur is a blurred copy whose opacity moves — a radius that moved would
- * be a new bitmap a frame. It is the full-size file, mounted once the sharp
+ * **The blur is Convx's, row by row** (`<ProgressiveBlur>`, the owner's of
+ * 2026-10-31): a Skia shader whose radius follows the row — sharp at the top
+ * and soft toward the foot at rest, the softness climbing to the top as the
+ * page scrolls (`lib/progressive-blur`). Its climb is the same `pinnedBlur`
+ * the old copy's opacity was. It lies over the art and over a trailer —
+ * though it blurs the *still*, so at rest a playing trailer's foot is the
+ * still's, softened, under the page's own fade.
+ *
+ * **Where Skia is not in the build** (an APK from before it, the web), or its
+ * picture will not load, the blur is what it was: a blurred copy whose
+ * opacity moves — a radius that moved would be a new bitmap a frame. It is
+ * the full-size file, mounted once the sharp
  * copy has loaded so Android decodes it from the cache that load filled. **Not
  * a small copy**: expo-image's Android blur shrinks the bitmap to a quarter
  * before blurring it (`BlurTransformation(min(radius, 25), 4)`), so a 180-wide
@@ -138,9 +186,8 @@ export const PinnedHero = memo(function PinnedHero({
   contentPosition,
   veil = 0,
   onLoad,
-  over = 'page',
+  tail: withTail = false,
 }: PinnedHeroProps) {
-  const fielded = over === 'field';
   const chrome = useScreenChrome();
   const still = useSharedValue(0);
   const scrollY = chrome?.scrollY ?? still;
@@ -154,19 +201,34 @@ export const PinnedHero = memo(function PinnedHero({
   const [loaded, setLoaded] = useState<string | null>(null);
   const blurReady = !!source && loaded === source;
 
-  const footColours = useMemo(() => colours(fade, page), [fade, page]);
-  const fieldHold = useMemo(() => holdColours(page), [page]);
+  /* Convx's blur when Skia can draw it; the one blurred copy when it cannot. */
+  const { width } = useWindowDimensions();
+  const [skiaFailed, setSkiaFailed] = useState(false);
+  const progressive = !!ProgressiveBlur && !skiaFailed;
+
+  /*
+   * On the game page, with Convx's blur, Convx's foot: the art runs on into
+   * its own reflection (a fifth of its height) and Convx's wash takes it to
+   * the page's colour over the art and the tail together — in place of the
+   * page's own `fade`. A studio, a collection and a build without Skia keep
+   * their `fade`, over the art alone, exactly as before. One fade either way,
+   * over every copy.
+   */
+  const tail = withTail && progressive && source ? Math.round(height * TAIL) : 0;
+  const reach = height + tail;
+  const foot = tail > 0 ? HERO_WASH : fade;
+  const footColours = useMemo(() => colours(foot, page), [foot, page]);
+  const onSkiaFailed = useCallback(() => setSkiaFailed(true), []);
+  const anchors = anchorsOf(contentPosition);
+  /* How far the blur has climbed: the old copy's opacity, as the climb's progress. */
+  const climb = useDerivedValue(() =>
+    pinnedBlur(scrollY.get(), solidAt, PINNED_HERO.blurFrom, PINNED_HERO.blurUntil)
+  );
 
   const frameStyle = useAnimatedStyle(() => {
     pulse.get();
-    const offset = scrollY.get();
-    const stretch = pinnedStretch(offset, height);
-    return {
-      /* Over the field the hero dissolves where it would have drained, so what
-         is left is the field and not a slab of the page's colour. */
-      opacity: fielded ? 1 - pinnedDrain(offset, solidAt, PINNED_HERO.drainFrom) : 1,
-      transform: [{ translateY: stretch.translateY }, { scale: stretch.scale }],
-    };
+    const stretch = pinnedStretch(scrollY.get(), height);
+    return { transform: [{ translateY: stretch.translateY }, { scale: stretch.scale }] };
   });
   const driftStyle = useAnimatedStyle(() => {
     pulse.get();
@@ -225,22 +287,53 @@ export const PinnedHero = memo(function PinnedHero({
       style={[
         styles.layer,
         {
-          height: height + (fielded ? PINNED_HERO.fieldHold : PINNED_HERO.footHold),
+          height: reach + PINNED_HERO.footHold,
           opacity: ready ? 1 : 0,
           transitionProperty: 'opacity',
           transitionDuration: PINNED_HERO.arriveMs,
         },
       ]}>
       <Animated.View style={[styles.fill, frameStyle]}>
-        {/* The box that drifts: the art, its blurred copy and its fade, then a
-            strip of the page's own colour under them (`footHold`), so the
-            art's foot is inside page colour on both sides. */}
+        {/* The box that drifts: the art, its blurred copy — and its mirrored
+            tail, under Convx's blur — and its fade, then a strip of the page's
+            own colour under them (`footHold`), so the foot is inside page
+            colour on both sides. */}
         <Animated.View style={[styles.fill, driftStyle]}>
           <View style={[styles.art, { height }]}>
             {media ? media(art) : art}
 
-            {/* The art softening: over the art, and over a trailer. */}
-            {blurReady && (
+            {/* The art softening: over the art, and over a trailer — row by row
+                (Convx's), sharp at the top and soft at the foot at rest, the
+                softness climbing to the top as the page scrolls. It fetches its
+                own small copy of the art, so it is mounted at once and shown
+                once the sharp art is in. */}
+            {progressive && ProgressiveBlur && source && (
+              <Animated.View
+                style={[
+                  styles.art,
+                  {
+                    /* Past the art's foot: the tail is the blur's alone. */
+                    height: reach,
+                    opacity: blurReady ? 1 : 0,
+                    transitionProperty: 'opacity',
+                    transitionDuration: 280,
+                  },
+                ]}>
+                <Suspense fallback={null}>
+                  <ProgressiveBlur
+                    uri={source}
+                    width={width}
+                    height={height}
+                    anchorX={anchors.x}
+                    anchorY={anchors.y}
+                    progress={climb}
+                    onFail={onSkiaFailed}
+                  />
+                </Suspense>
+              </Animated.View>
+            )}
+            {/* Where it cannot: one blurred copy, its opacity following the scroll. */}
+            {!progressive && blurReady && (
               <Animated.View style={[styles.fill, blurStyle]}>
                 <Image
                   source={{ uri: source }}
@@ -256,28 +349,28 @@ export const PinnedHero = memo(function PinnedHero({
 
             {/* The art's foot giving way to the page — over both copies, so the
               art dissolves by the same curve sharp or blurred, and on the art,
-              so it drifts with it and the art never shows an edge of its own. */}
+              so it drifts with it and the art never shows an edge of its own.
+              Over the tail too: it is part of the picture. */}
             {veil > 0 && (
               <View
-                style={[styles.fill, { backgroundColor: withAlpha(Palette.shadowInk, veil) }]}
+                style={[
+                  styles.art,
+                  { height: reach, backgroundColor: withAlpha(Palette.shadowInk, veil) },
+                ]}
               />
             )}
-            <LinearGradient colors={footColours} locations={locations(fade)} style={styles.fill} />
-          </View>
-          {fielded ? (
             <LinearGradient
-              colors={fieldHold}
-              locations={HOLD_STOPS}
-              style={[styles.hold, { top: height, height: PINNED_HERO.fieldHold }]}
+              colors={footColours}
+              locations={locations(foot)}
+              style={[styles.art, { height: reach }]}
             />
-          ) : (
-            <View
-              style={[
-                styles.hold,
-                { top: height, height: PINNED_HERO.footHold, backgroundColor: page },
-              ]}
-            />
-          )}
+          </View>
+          <View
+            style={[
+              styles.hold,
+              { top: reach, height: PINNED_HERO.footHold, backgroundColor: page },
+            ]}
+          />
         </Animated.View>
 
         {scrim > 0 && (
@@ -287,7 +380,7 @@ export const PinnedHero = memo(function PinnedHero({
           />
         )}
 
-        {!fielded && <Animated.View style={[styles.fill, { backgroundColor: page }, drainStyle]} />}
+        <Animated.View style={[styles.fill, { backgroundColor: page }, drainStyle]} />
       </Animated.View>
     </Animated.View>
   );

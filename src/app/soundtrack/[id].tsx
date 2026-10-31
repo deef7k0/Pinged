@@ -92,7 +92,7 @@ export default function SoundtrackScreen() {
   const title = game.data?.title ?? (params.title || null);
 
   return (
-    <AccentProvider artwork={game.data?.coverUrl ?? game.data?.heroUrl} genres={game.data?.genres}>
+    <AccentProvider artwork={game.data?.heroUrl ?? game.data?.coverUrl} genres={game.data?.genres}>
       <Soundtrack
         gameId={id}
         title={title}

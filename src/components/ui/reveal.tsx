@@ -65,7 +65,13 @@ export function useRevealing(): boolean {
  * A hidden shelf is still in the accessibility tree: a screen reader moving
  * onto it scrolls it into view, and that is a scroll.
  */
-export function Reveal({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> | any }) {
+export function Reveal({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle> | any;
+}) {
   const revealing = useRevealing();
   if (!revealing) return <Animated.View style={style}>{children}</Animated.View>;
   return <Arriving style={style}>{children}</Arriving>;
@@ -73,7 +79,13 @@ export function Reveal({ children, style }: { children: ReactNode; style?: Style
 
 type Phase = 'rest' | 'waiting' | 'arrived';
 
-function Arriving({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> | any }) {
+function Arriving({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle> | any;
+}) {
   const chrome = useScreenChrome();
   const reduceMotion = useReducedMotion();
   const { height: viewport } = useWindowDimensions();

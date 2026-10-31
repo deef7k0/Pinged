@@ -42,13 +42,16 @@ npx prettier --write "src/**/*.{ts,tsx}"
 npm test           # node:test — pure modules only: the M3 scheme generator, the
                    # genre reach order, barcodes, progress choices, review filters,
                    # the report reasons against 0031's CHECKs, the Commons
-                   # logo licence check, the immersive page colour
-                   # (Palette port, Oklab darkening), the PNG decoder (against
+                   # logo licence check, SimpMusic's scrim ramp (lib/scrim),
+                   # the PNG decoder (against
                    # Node's zlib and a real Commons thumbnail), the RSS
                    # lightening (parsed before and after, field for field),
                    # the pager's page numbers and the count-by-probing search,
                    # the release calendar's months and date precision, game
-                   # sorting, the game labels against 0034's CHECK, how a
+                   # sorting, the legal pages against their text
+                   # (constants/legal), "Games for you"'s rounds — seeds drawn by
+                   # score, no repeats (lib/games/recommend-rules), the game
+                   # labels against 0034's CHECK, how a
                    # logo is drawn from its pixels (lib/logo-ink), what the
                    # saved query cache keeps and evicts (lib/query-persist-rules),
                    # the seen-records store (lib/seen), the "12h ago" time
@@ -136,12 +139,9 @@ npm test           # node:test — pure modules only: the M3 scheme generator, t
                    # the size cap, IGDB's shapes and its WebP
                    # (lib/animated-cover) — no joke grids, the most liked
                    # first, and which file a phone falls back to when one will
-                   # not play (pickPlayable); the rating graph's eleven rows
-                   # and their colours (lib/rating-distribution); SimpMusic's
-                   # Apple Music page under
-                   # the game page's cover — the mesh, its blur, the BMP it is
-                   # drawn as, the top wash and whether white holds on it
-                   # (lib/artwork-mesh); Surprise Me's card — its shape, still
+                   # not play (pickPlayable); the rating graph's eleven rows,
+                   # their colours and which are drawn (lib/rating-distribution); Surprise
+                   # Me's card — its shape, still
                    # or animated, and what is fetched ahead within a byte
                    # budget (lib/surprise-prefetch); and how tall a
                    # collection's and a review's header art is
@@ -151,9 +151,9 @@ npm test           # node:test — pure modules only: the M3 scheme generator, t
                    # picks and the studio pick (lib/games/moods) and a
                    # genre's shelves and the clock in them
                    # (lib/games/genre-feed); RAWG's tags matched onto IGDB's
-                   # games (lib/games/rawg-match); Home's discover carousel —
-                   # its sizes, centring, the gaps through a swipe, the scrim
-                   # (constants/discover-carousel); a mood's and a genre's
+                   # games (lib/games/rawg-match); Home's "Games for you" —
+                   # BitChord's lead shelf: a card's width, its height, the
+                   # step it snaps by (constants/discover-carousel); a mood's and a genre's
                    # block at the foot of Home — the reference's measurements,
                    # the gradient from the item's own hue, and the name white
                    # at AA on all ten of them, with every name measured
@@ -161,26 +161,21 @@ npm test           # node:test — pure modules only: the M3 scheme generator, t
                    # (constants/mood-tile); and a copy's art — GameTDB's
                    # title lists and regions, a sleeve's back, ScreenScraper's
                    # answers, image sizes (lib/copy-art, which loads the Edge
-                   # Function's own _shared/copy-art.ts); and Apple Music's
-                   # hero — the key colour, against three real IGDB heroes
-                   # decoded as the app decodes them, the edges of the part
-                   # on screen, iTunes' black-or-white rule, the dark-room
-                   # ground (lib/key-color), and the hero's scroll: the
-                   # softening, the drain, the iOS stretch, a shelf arriving,
-                   # and the game page's pinned hero — its drift, its blur
-                   # whole as the title reaches the top, its drain, its
-                   # stretch (lib/scroll-motion); and the art-coloured
-                   # pages' colours — BitChord's page (the dominant re-lit,
-                   # the grey guard, the quiet ink, both inks held over
-                   # every hue), the accent by saturation × √population, on
-                   # six real heroes, Material's seed (fixed-seed, so
-                   # deterministic), the buttons kept to the page's family
-                   # — or the accent's on a neutral page — and apart by tone,
-                   # and the cards' inks at AA (lib/page-color); and the
-                   # colour field behind them — four blobs held to the
-                   # inks on every hero and every blend of them, a frame of
-                   # a trailer from JPEG to base64 and back, the black-frame
-                   # guard, BitChord's geometry (lib/artwork-field)
+                   # Function's own _shared/copy-art.ts); and the pinned
+                   # hero's scroll — its drift, its blur whole as the title
+                   # reaches the top, its drain, its stretch, a shelf
+                   # arriving (lib/scroll-motion), and its row-by-row blur —
+                   # Convx's curve and its shader, compiled in CanvasKit
+                   # (lib/progressive-blur); and the cover viewer's
+                   # page — SimpMusic's Apple Music mesh from the cover's
+                   # pixels, its blur, its seam, its washes (lib/artwork-mesh);
+                   # and the copy stage in 3D — each format's track pitch and
+                   # whether it shows a rainbow head on, the disc's rings, a
+                   # PlayStation disc's black plastic, the shaders' Fresnel
+                   # against the plastics' indices, the studio's light on a
+                   # printed face, the rock, and the 3D camera against the
+                   # flat stage's own arithmetic, and the globals three.js
+                   # is lent on Hermes (lib/copy-scene)
 
 node scripts/discovery-sql.mjs   # 0038's functions on a real Postgres
                    # (PGlite, in-process) over every migration, with seven
@@ -190,6 +185,11 @@ node scripts/community-rating-sql.mjs   # 0041 on PGlite, over ratings
                    # given before it ran: every weight and score against the
                    # TypeScript reference, the triggers, RLS, retries, the
                    # large-app path. Same PGlite as above
+node scripts/account-safety-sql.mjs   # 0045 on PGlite: blocking both
+                   # ways, the new reports, and an account deleted with no
+                   # uuid column anywhere still naming it. Same PGlite
+node --import ./scripts/esm-register.mjs scripts/legal-pages.mjs
+                   # writes public/legal/*.html from constants/legal.ts
 node scripts/community-rating-report.mjs [--out f.md]   # a read-only dry
                    # run over the LIVE ratings (anon key from .env): who
                    # would be adjusted, which games move, a sensitivity sweep
@@ -319,10 +319,19 @@ PATH via `~/.profile`. SDK 57 needs Node ≥ 22.13.
 11. Optional: RAWG's tags — a free key from rawg.io/apidocs in `.env` as
    `EXPO_PUBLIC_RAWG_API_KEY`, then restart with `--clear`. Without it no tag
    control is shown. See § RAWG tags.
-12. Pinned games — run migration `0043`. Without it a library has no pins
+12. Store release: blocking, reports on comments / wall posts / profiles, and
+   account deletion — run migration `0045`. Without it Block says the update
+   is missing, the new report kinds say nothing was sent, the moderation tab
+   says it is not set up, and Delete account sends people to the contact
+   email. Check it with `node scripts/account-safety-sql.mjs`. Before
+   publishing, set `LEGAL_CONTACT_EMAIL` in `src/constants/legal.ts`, run
+   `node --import ./scripts/esm-register.mjs scripts/legal-pages.mjs`, host
+   `public/legal/`, and give Play the URLs of `privacy.html` and
+   `delete-account.html`. See § Store-release compliance.
+13. Pinned games — run migration `0043`. Without it a library has no pins
    and pinning says the migration is missing; nothing else breaks. See § The
    library.
-13. PlayStation, Xbox and GOG by username — run migration `0044`, then
+14. PlayStation, Xbox and GOG by username — run migration `0044`, then
    `supabase functions deploy game-accounts`. GOG needs nothing else. For
    PlayStation, `supabase secrets set PSN_NPSSO=…` (the NPSSO cookie of an
    account the project owns: sign in at playstation.com, then open
@@ -378,13 +387,20 @@ src/
     suggest-similar/[id]  recommend a game like this one, with reasons (modal)
     similar/[id]     one community pick (?game= the side you came from): agree
                      or disagree, and every suggestion behind it, upvotable
-    report/[kind]/[id]  report a pick, a suggestion (?author=) or a review
+    report/[kind]/[id]  report a pick, a suggestion (?author=), a review,
+                     or (0045, ?author=) a comment, a wall post or a profile
                      (modal). Every `<ReportFlag>` in the app opens it
+    blocked          the people you blocked, with Unblock (0045)
+    delete-account   deleting your account, the username typed to confirm
+    legal/[doc]      privacy, terms, delete-account — the same text as
+                     public/legal/*.html; open signed out
     profile/[id]     someone else's profile
     new-list, edit-list/[id], edit-profile (modals)
     settings         game colours (a game's screens in its box art's Material
                      3 colours, or the app's own), animated artwork (covers
-                     that move by themselves, or still), review languages, how
+                     that move by themselves, or still), physical copies in
+                     3D or flat (where the build can draw 3D), review
+                     languages, how
                      ratings work, the games hidden from Surprise Me, a link
                      to the moderation queue for moderators, and Sign out.
                      Opened from
@@ -458,30 +474,19 @@ src/
                                         (SimpMusic's `AnimatedVisibility`,
                                         300ms), and `stagger` for a run of
                                         them. See § Loading
-                     ui/artwork-field   the colour field behind a game's and
-                                        a studio's page: four blobs of the
-                                        art's colours, drifting once and
-                                        cross-fading. See § The art-coloured
-                                        pages
-                     ui/pinned-hero     the art-coloured pages' hero — a
-                                        game's, a studio's, a collection's:
-                                        pinned behind the page as `<Screen
-                                        backdrop>`,
+                     ui/artwork-mesh-page  SimpMusic's Apple Music page
+                                        under the cover viewer: the cover's
+                                        blurred mesh hung from its foot. See
+                                        § Animated covers
+                     ui/pinned-hero     the hero of a game's, a studio's and
+                                        a collection's page: pinned behind
+                                        the page as `<Screen backdrop>`,
                                         nearly still, blurring and draining
-                                        as the page slides over it — and
-                                        `<PageFill>`. See § The game page's
-                                        colours
-                     ui/key-color-hero  Apple Music's hero — unused since
-                                        2026-10-27; its fades are still read.
-                                        It drew the art
-                                        melting into its key colour, a blurred
-                                        copy fading in and the colour draining
-                                        as the page scrolls, the iOS stretch.
-                                        See § Apple Music's hero
-                     ui/screen          `<Screen>`: the page shell — and
-                                        `tone`, the Apple Music pages' one
-                                        page colour, bright at rest and
-                                        darkening as the page is read
+                                        into the page's M3 colour as the page
+                                        slides over it — and `<PageFill>`,
+                                        `MASTHEAD_FADE`. See § One colour
+                                        method
+                     ui/screen          `<Screen>`: the page shell
                      ui/reveal          `<Reveal>`: a shelf rising into place
                                         as it scrolls into view, inside a
                                         `<RevealScope>` only. `<Section>`,
@@ -584,10 +589,10 @@ src/
                                         grey) and the glyph keys beside it
                      library-home       the head of a library (§ The library)
                      home/              Home's SimpMusic parts: discover-carousel
-                                        (Games for you as "Your daily
-                                        discover"), home-header
-                                        (the avatar, All / Mood chips,
-                                        Create, Settings), mood-chips,
+                                        (Games for you as BitChord's lead
+                                        shelf), home-header
+                                        (All / Mood / Genre chips, Create,
+                                        the bell), mood-chips,
                                         home-glow (the first block's glow),
                                         mood-feed (a mood's lead shelf and
                                         the rest), quick-picks, mood-tiles
@@ -621,12 +626,9 @@ src/
                                         See § Animated covers
                      cover-viewer       the game page's cover full size at the
                                         top of the screen, SimpMusic's Apple
-                                        Music page under it, and Static /
-                                        Animated — see § Animated covers
-                     ui/artwork-mesh-page  that page: a cover's colours as a
-                                        blurred mesh hung from its foot
-                                        (lib/artwork-mesh), drawn as two
-                                        stretched images
+                                        Music blur of it under it, and
+                                        Static / Animated — see § Animated
+                                        covers
                      onboarding/look-previews  a game's page and a Surprise Me
                                         card, drawn small, for onboarding's
                                         two look questions
@@ -668,8 +670,18 @@ src/
                                         § Progress, physical…
                      cd-disc-underside  the disc's mirrored side; the showcase
                                         alone turns a disc over
+                     copy-stage-gl      the copy's stage in 3D: three.js on
+                                        expo-gl, drawn over the flat stage once
+                                        it has a frame, and the flat stage left
+                                        in place if it never does. Lazily
+                                        imported. See § Progress, physical…
+                     copy-stage-sheet   the case's printed faces (its back,
+                                        spine, edge, edition band) laid out
+                                        under a page-coloured cover and
+                                        captured with view-shot, for the 3D
+                                        stage to print with
                      studio-identity    a studio's name, or its Commons logo in
-                                        its place; see § Immersive pages
+                                        its place; see § Studio pages, collection pages and studio logos
                      ui/smooth-scrim    SimpMusic's artworkScrimBrush: artwork
                                         melting into a page colour
                      ui/section         SimpMusic's artist-page sections: the
@@ -833,19 +845,7 @@ src/
     use-pulse           `usePulse()`: a value that changes on every render, so
                         a scroll-driven animated style is re-applied after one.
                         See § Gotchas, the lost end value
-    use-page-color      an art-coloured page's colours from its hero: the page, the
-                        Material 3 seed and tone for its buttons, whether it
-                        is art-coloured — IGDB's `t_cover_small_2x`, decoded in
-                        JavaScript, kept for good. See § The game page's
-                        colours
-    use-theme           `useTheme()` — and `<ThemeInks>`, a page's own inks
-                        for everything under it (`inks={null}` puts the
-                        app's back, round the protected case)
-    use-key-color       unused since 2026-10-27 — two tones from a hero's key colour — IGDB's
-                        `t_cover_small` of the art, decoded in JavaScript,
-                        kept on the device for good. See § Apple Music's hero
-    use-immersive-background  a page colour from one piece of artwork, or null
-                        for the app's page. Background only — never a control
+    use-theme           `useTheme()`: the palette
     use-studio-catalogue  a studio's company (identity + game ids) and its
                         games — the one company request the logo shares
     use-studio-banner   the studio's banner URL, remembered per device so a
@@ -860,8 +860,6 @@ src/
                         Surprise Me's next cards
     use-animated-artwork  whether covers move by themselves — Settings and
                         onboarding's switch, read by `useAnimatedCover`
-    use-artwork-mesh    a cover's mesh, from its 90×128 thumbnail decoded in
-                        JavaScript — the cover viewer's page
     use-square-cover    a game's 1:1 cover from SteamGridDB, persisted to
                         AsyncStorage. Returns `resolved` — do not draw the IGDB
                         cover before it is true; that is the swap it prevents
@@ -892,8 +890,10 @@ src/
                         the one record `<EventRsvp>` and the event page's foot
                         bar both write through
   lib/
-    color.ts         contrast, mixing, luminance-preserving tint, readable ink
-    artwork-color.ts dominant hue of a cover, decoded from the real pixels
+    color.ts         contrast, mixing (sRGB, and Compose's Oklab
+                     `mixOklab`), luminance-preserving tint, readable ink
+    artwork-color.ts the M3 seed's fallback in Expo Go: a cover's dominant
+                     hue, decoded from its 90×90 thumbnail
     games/           IGDB (the catalogue) + Steam/RAWG/itch id lookup only,
                      steam-artwork.ts for Steam CDN covers (preferred over IGDB),
                      sort.ts for in-memory ordering, recommend.ts for
@@ -940,29 +940,36 @@ src/
                      (finding the file), claims.ts and client.ts (reading a
                      statement; the Action API). The game's "Additional
                      information" lived here too and was scrapped — see
-                     § Immersive pages
-    key-color.ts     Apple's key colour (iTunes 11's): the colour a picture
-                     ends in, read off the edges of the part on screen, and
-                     the two page tones it becomes in a dark room (`keyPage`).
-                     Pure, tested against real heroes
-    page-color.ts    the art-coloured pages' colours: BitChord's page (what
-                     the art is mostly made of, re-lit), its quiet ink, the
-                     accent (saturation × √population), and Material 3's
-                     own seed for the buttons, kept to the page's family.
-                     Pure, tested
-    artwork-field.ts the colour field behind an art-coloured page —
-                     BitChord's legacy Now Playing backdrop: the blobs'
-                     colours held to the page's inks, their geometry, a
-                     trailer frame's colours. Pure, tested
-    scroll-motion.ts how an Apple Music hero answers the scroll, and a shelf
+                     § Studio pages, collection pages and studio logos
+    copy-scene/      the copy stage in 3D, platform-free: optics.ts (each
+                     disc format's track pitch, the disc's rings, the studio,
+                     the rock, the lens — pure, tested), shaders.ts (the
+                     case's plastic and print, the disc's label, playing side
+                     and edge, in GLSL), renderer.ts (three.js on expo-gl's
+                     context), three-globals.ts (what Hermes lacks, lent per
+                     call) and scene.ts (the three.js scene,
+                     posed from the flat stage's own numbers — tested against
+                     them)
+    artwork-mesh.ts  SimpMusic's Apple Music page under the cover viewer:
+                     the cover's pixels as a blurred, shuffled mesh, and the
+                     washes over it. Pure, tested (hooks/use-artwork-mesh
+                     decodes the thumbnail)
+    scroll-motion.ts how the pinned hero answers the scroll, and a shelf
                      arriving: the curves, as worklets. Pure, tested
-    immersive-color.ts  SimpMusic's page colour: Palette's dominant swatch,
-                     darkened in Oklab, and the scrim's stops. Pure, tested
+    progressive-blur.ts  Convx's row-by-row blur: the curve, the SkSL it is
+                     drawn by, the cover rect. Pure, tested (and compiled in
+                     CanvasKit); components/ui/progressive-blur draws it
+    scrim.ts         SimpMusic's `artworkScrimBrush` as stops, and a foot
+                     fade over part of a frame. Pure, tested
+    retired-colour-stores.ts  deletes, once, the device stores of the colour
+                     methods Material 3 replaced
     logo-luminance.ts   how light a logo's ink is, from a 250px thumbnail
                      decoded in JavaScript — and `measureLogoInk`, the same for
                      an IGDB logo's `t_cover_small`
     logo-ink.ts      what a logo's pixels say and how to draw it for them: as
-                     it is, a light silhouette, or a plate. Pure, tested
+                     it is, a light silhouette, or a plate — and whether a
+                     studio's Commons logo needs a light silhouette on its
+                     page. Pure, tested
     png.ts           a PNG decoder (inflate after puff.c), for the above. Pure,
                      tested against Node's zlib
     stage-geometry.ts  the copy showcase's camera: how a flat view is drawn to
@@ -1031,13 +1038,11 @@ src/
     animated-artwork.ts  whether covers move by themselves — Settings →
                      Animated artwork — kept the same way
                      (`useAnimatedArtwork`)
-    artwork-mesh.ts  SimpMusic's Apple Music page as data: a cover averaged to
-                     a 6×6 grid, lifted, shifted, smoothed, blurred, and
-                     written as a BMP. Pure, tested
     surprise-prefetch.ts  Surprise Me's media rules: a card's shape, and what
                      is fetched ahead within a byte budget. Pure, tested
     home-view.ts     what Home shows — All, a mood or a genre — and its feed
-    home-glow.ts     SimpMusic's Home glow as numbers: the tone (× 0.5), the
+    home-glow.ts     SimpMusic's Home glow as numbers: the tone (the first
+                     game's M3 primary × 0.45), the
                      25° line, the eased stops. Pure, tested. See § Home
     top-chart.ts     Search's Top 1000 as rules: a thousand at most, pages of
                      twenty, the critics' floor of seven, what a score is made
@@ -1116,7 +1121,8 @@ supabase/
                      public copy-art bucket (written by the function alone),
                      0043 library_pins: six pinned games a person,
                      0044 gaming_accounts.linked_by and gaming_service_tokens:
-                     PlayStation, Xbox and GOG linked by username
+                     PlayStation, Xbox and GOG linked by username,
+                     0045 blocks, user_content_reports, delete_my_account()
                      (0006, 0015, 0019 and 0022 each add an enum value and must
                       run alone — see those files)
   functions/igdb/    Edge Function proxying IGDB
@@ -1232,10 +1238,11 @@ Do not "finish the job" in any direction, and do not square the stack so that
 "the small one matches the big one": they are meant to differ. One detail that
 is easy to undo:
 
-- **The page colour is still read from the box art.** `useImmersiveBackground`
-  decodes in JavaScript and only takes a thumbnail; SteamGridDB's smallest is
-  400×400 (verified live: `…/thumb/<hash>.jpg`), four times what the extractor
-  will read. Same game, nearly always the same palette.
+- **The page colour is still read from the box art.** The M3 seed's extractor
+  (`useAlbumArtColor`) decodes in JavaScript in Expo Go and only takes a
+  thumbnail; SteamGridDB's smallest is 400×400 (verified live:
+  `…/thumb/<hash>.jpg`), four times what it will read. Same game, nearly
+  always the same palette.
 
 **There is no per-platform lookup, and rebuilding one against this API will not
 work.** The game page briefly asked for the selected platform's own box front.
@@ -1362,37 +1369,20 @@ about the API still matter to it:
   `npm run web`; browsers cannot set `User-Agent`, so the client also sends
   `Api-User-Agent`, which the preflight allows.
 
-## Immersive pages and studio logos
+## Studio pages, collection pages and studio logos
 
-A **collection** and the **studio page** fill their background with a colour
-taken from their artwork. A collection's is its one cover's — the game its
-screen opens on (`collectionCover`) — so every collection with a game in it has
-one; it used to be only those showing a single cover, when the alternative was
-a mosaic of four that had no one colour to give. An empty collection stays on
-the app's page. The colour is the artwork's own
-*tone*, so a dark or grey cover gives a near-black page, correctly: Disco
-Elysium's lands on `#0A0A06`, Marvel's Spider-Man's on `#530000`. The recipe is SimpMusic's, read from its source (`UIExt.kt`
-`toImmersiveBackground` / `artworkScrimBrush`, `AlbumScreen.kt`,
-`ArtistScreen.kt`), and `lib/immersive-color.ts` is a port, not a lookalike:
+A **collection** and the **studio page** take their page colour from their
+artwork through Material 3, as a game's page does (§ One colour method): a
+collection from its one cover's box art — the game its screen opens on
+(`collectionCover`), so every collection with a game in it has one; an empty
+collection stays on the app's page — and a studio from its banner game's art.
+Both wear the scheme on their controls too (`<AccentProvider>`), and both pin
+their art behind the page (`<PinnedHero>`). Their geometry is SimpMusic's
+(`AlbumScreen.kt`, `ArtistScreen.kt`, `artworkScrimBrush` in `lib/scrim`):
 
-- **The colour is the background's, never a control's.** No `<AccentProvider>`
-  on either screen: buttons, pills and links keep their neutral fills and the
-  house blue. `useImmersiveBackground` returns a page colour or null (the app's
-  page); `<Screen background>` and the header's scrim take it, nothing else.
-- **Palette's dominant swatch, ported** — 5-bit quantisation, median cut into
-  16 boxes, Palette's default filter (near-black, near-white, skin tones). Greys
-  survive, so black-and-white art gives a grey page. `extractArtworkColor`'s
-  hue vote is the *accent* and must not be used here: it drops greys by design.
-- **Darkened in Oklab**, as Compose's `lerp` does: `0.35 + 0.45 × lightness`
-  toward black. sRGB gives visibly different pages (white → #333 instead of
-  #161616); SimpMusic's own screenshots measure #1A1A1A / #1B1B1B / #3B1129 and
-  the Oklab port reproduces them. The page is then darkened further, rarely, if
-  `textMuted` would fall under AA on it.
-- **Geometry.** Collections: artwork half the display, scrim over its bottom
-  70%. Studio: a square banner (≤ half the display), 5% black veil, the same
+- **Collections**: artwork half the display, the scrim over its bottom 70%.
+- **Studio**: a square banner (≤ half the display), 5% black veil, the same
   scrim, the name or logo centred over the bottom with one meta line under it.
-  The scrim now runs into the art's key colour, not straight into the page
-  (§ Apple Music's hero); the page colour is unchanged and still this one.
 
 The **studio logo** replaces the name with the studio's logo from Wikimedia
 Commons — only ever a verified public-domain or CC0 file:
@@ -1445,8 +1435,10 @@ the owner's (2026-10-22): "Make the background color for that page back to
 normal m3, don't darken it", and "for a studio who doesn't have a logo image,
 paint the text of their name with the m3 color". `useGameAccent(bannerUrl,
 genres)` gives the page (`accent.page`) and the name's ink
-(`accent.onSurface`); no `<AccentProvider>`, so the controls stay the app's.
-With game colours off it is the app's page and the name the text ink. **A
+(`accent.onSurface`), and the controls the same scheme's — the owner's
+(2026-10-27): "integrate all of this into the other pages that had the same
+thing, studio and collection screen". With game colours off it is the app's
+page and the name the text ink. **A
 trailer's letterbox bars now show against the page** — near black was chosen
 on 2026-10-17 for exactly that, and the owner overrode it. Its sections, top to
 bottom: Latest releases, Best rated (four rated originals, was six), Most
@@ -1470,11 +1462,10 @@ game's official trailer from its Steam listing loops silently under the art
   separate audio track is never downloaded. About 1.1 Mbps measured, ~17 MB
   for a two-minute pass.
 - **The art stays on top until the first frame**, then fades over 500ms; a
-  slow or failed stream leaves the picture. On the game page the video
-  dissolves into the page by a gradient on the art mask's own curve — a video
-  surface does not render inside a mask on Android. On the studio page the
-  page is **near black** with the art's hue as a trace (`nearBlackBackground`,
-  `depth: 'black'`), so a letterboxed trailer's bars meet it without an edge.
+  slow or failed stream leaves the picture. The video dissolves into the page
+  under the pinned hero's foot fade, a gradient *to the page's colour* — a
+  video surface does not render inside a mask on Android — and drifts, blurs
+  and drains with the art.
 - **The player exists only while its page is in front**: a covered page
   unmounts it, releasing the decoder — a stack of game pages holds one player,
   not one each (phones have a handful of hardware decoders). It pauses once
@@ -1562,38 +1553,39 @@ once it has a frame.
 - **The review page draws it subdued**: at 0.6 over the page's colour, under
   the hero's own veil and fade — about 0.4 of full strength.
 - **The game page's viewer** (`<CoverViewer>`, 2026-10-21): "the artwork
-  must be full-size zoomed in to the edges of the screen… the space left
-  below should be filled with the same effect that SimpMusic uses for their
-  Apple Music Now Playing screen… a button for 'static' or 'animated'. Only
-  fetch animated when the user taps on the animated button… text alone, in
-  bold. Not inside a pill or a container. Static above and Animated below."
+  must be full-size zoomed in to the edges of the screen… a button for
+  'static' or 'animated'. Only fetch animated when the user taps on the
+  animated button… text alone, in bold. Not inside a pill or a container.
+  Static above and Animated below." For one day (2026-10-28) BitChord's
+  orbiting blobs in the game's M3 colours stood behind it; the owner had them
+  taken out the same day: "Bring back simpmusic's apple music now playing
+  blur on the zoomed in version and remove the mesh blob." **Do not bring
+  the blobs back.**
   - **The cover runs edge to edge from the top of the display**, at its own
     2:3, always the display's full width; a display too short to leave room
     for the two words under it trims the cover's height, never its width
     (the owner, 2026-10-21: covers "leave small gaps at the edges"). Its
     shape is the poster's 2:3, not the masthead cover's measured box.
-  - **Under it, SimpMusic's Apple Music page, ported from its source**
-    (`AppleMusicMeshBackdrop.kt` → `lib/artwork-mesh.ts`,
-    `<ArtworkMeshPage>`): the cover's 90×128 thumbnail averaged to a 6×6
-    grid read from the foot up, lifted, every row but the first shifted and
-    mirrored by a seed, smoothed, hung from the cover's foot with the first
-    row held behind it, and a 6%→30% scrim. **One departure**: the reference
-    blurs the page 44dp at draw time; there is no blur here (no Skia), and
-    without it the cells read as blocks (seen on a contact sheet of four
-    real covers), so the 64×64 texture is Gaussian-blurred in JavaScript and
-    drawn as a BMP data URI the platform stretches. The page is drawn again
-    over the cover's last eighth inside a mask, so the cover dissolves into
-    it — the reference's own method, the one that works over a video. The
-    mesh is the still's: with Animated on, the page keeps the box art's
-    colours. A wash under the status bar is as dark as the cover's top is
-    bright (16–65%).
+  - **Under it is SimpMusic's Apple Music page**, ported from
+    `AppleMusicMeshBackdrop.kt` (`lib/artwork-mesh.ts`, `<ArtworkMeshPage>`,
+    `use-artwork-mesh`): the cover's ~5 KB thumbnail decoded in JavaScript,
+    averaged to a 6×6 grid read bottom-up, lifted, rows shifted and mirrored
+    by a seed, smoothed and blurred into a 64×64 texture drawn as a BMP data
+    URI and hung from the cover's foot — its first row *is* the cover's foot,
+    so there is no join. The page is drawn again over the cover's last eighth
+    inside a mask, so the cover dissolves into it (the one method that works
+    over a video). Ink is white unless the page is too light for it; the wash
+    under the status bar is as dark as the cover's top is bright (16–65%).
+    Until the mesh is read the viewer stands on the game page's colour.
+    `['artwork-mesh', thumb]`, never persisted. This is a blur *of the
+    picture*, not a colour picked from it, and is the one exception to
+    § One colour method, by the owner's word.
   - **Static / Animated**: bold `h2` words on the page, nothing round them,
     the chosen one at full ink. Nothing is looked up until Animated is
     pressed; a line under it says "Looking for one…", "Loading the
     animation…" until its first frame, or "This game has no animated cover"
     — which a known answer says before anybody presses. Unavailable under
-    Reduce Motion, and it says so. The words are white unless white would
-    not hold 3:1 on the mesh (`whiteHoldsOn`).
+    Reduce Motion, and it says so.
   - A copy of the cover in a modal, transformed from the masthead cover's
     measured place and transitioned (Reanimated CSS, 300ms) to rest, its
     corner going to none; the close key, back and a tap on the page reverse
@@ -1617,12 +1609,8 @@ once it has a frame.
 
 **Not seen on a phone.** Types, lint, `npm test` (`lib/animated-cover`,
 `lib/artwork-mesh`, `lib/surprise-prefetch`) pass; the sources and sizes were
-checked live and the mesh was rendered from four real covers. To judge on a
-device: that a BMP data URI draws stretched and smooth through expo-image on
-both platforms (Glide and ImageIO both decode BMP; if a platform refuses it,
-the page is the game's colour and nothing else breaks), the 600×900 WebP's
-decoding cost on an older Android, the mask over the cover's foot, and the
-zoom's feel.
+checked live. To judge on a device: the 600×900 WebP's decoding cost, the mask
+over the cover's foot, and the zoom's feel.
 
 ## Search: six tabs under one field, and three pages behind it
 
@@ -1878,7 +1866,7 @@ list.
   Nothing is drawn until the measurement is known (`resolved`), for the reason
   a square cover waits; an unmeasured logo falls back to the light plate
   (`logoPlate`). The studio *page's* Commons logo is the same idea, older and
-  separate (§ Immersive pages).
+  separate (§ Studio pages, collection pages and studio logos).
 - **A platform's games are pages of ten, not a scroll** (`platform/[id]`,
   `<Pager>`). The PC has a quarter of a million games; an endless list of that
   has no middle. The pager shows first, last and the neighbours
@@ -2465,12 +2453,6 @@ reviews about many games* is `<LogCard>`; a review on *a game's own screens* is
   card as the review card in the home page"): `<ListTile>` restates the fill,
   the corner, the inset, the twelve between parts and the shadow. Change one
   and change the other. See the bullet on collections under § Conventions.
-- **Except on an art-coloured page — a game, a studio, a collection — where
-  every card is the review button's colour, exactly** (2026-10-27, § The
-  art-coloured pages): `useCardMaterial()` answers it there, with the
-  button's ink, and its `shape` is what a card spreads.
-- **Except on the game page, which has no cards at all** (2026-10-28,
-  `<BareCards>`, § The art-coloured pages).
 - **Every card in the app is this card** — the owner's direction
   (2026-10-20): "make all the cards in the app with that style of the review
   ones, with the same size and corner ratio and stuff. Even the ones in the
@@ -3036,7 +3018,8 @@ screen's heading under its bar again.
   blur removed (2026-10-14). Where this section still says "frost", read "the
   page's colour". The glass discs over artwork still blur; they are buttons.
   **One exception, the owner's of 2026-10-23: Apple's glass bar** on the game
-  page, a studio and a collection (`glass`) — § Apple Music's hero.
+  page, a studio and a collection (`glass`) — § One colour method, the glass
+  bar.
 - **Which of three ways it behaves is the page's, not a prop's:**
   1. **A page that opens on a list or a form** — `<Screen insetHeader>`. The
      bar is there from the start, clear while the page is at its very top and
@@ -3169,406 +3152,221 @@ screen's heading under its bar again.
   estimates and say so); Home's fold; and whether the animated blur holds its
   frame rate on an older phone.
 
-## Apple Music's hero: the key colour, the blur, the glass bar
+## One colour method: Material 3, under a pinned hero (2026-10-28)
 
-The owner's direction (2026-10-23), with a description of Apple Music's artist
-page pasted in: its hero, its `keyColor`, the blur from hero to content, the
-colour shift, the frosted bar and the shelves arriving — "for the game page,
-studio page and collection page… It needs to read as an apple product".
-Then, mid-build: "make sure it works for animated banners". `<KeyColorHero>`
-drew all three heroes. **Since 2026-10-27 no page uses any of this section**:
-the game page, the studio and the collection are all a pinned hero over one
-unchanging colour (§ The art-coloured pages). `<KeyColorHero>`, `useKeyColor`,
-the key colour itself and `<Screen tone>` are still in the code, unused; the
-fades in `key-color-hero` (`footFade`, `MASTHEAD_FADE`) are still read.
-DESIGN.md § 13.1 is the visual statement of the old one.
+The owner's ruling (2026-10-28), after a week of experiments with the game
+page's colours: "I want the m3 algorithm from simpmusic back in the game page
+and other places in the app. COMPLETELY REMOVE EVERY OTHER METHOD WE MADE FOR
+PICKING THE COLORS OF ANYTHING… I want the cards in the game page back… The
+masthead apple music transition will remain."
 
-**The key colour** (`lib/key-color.ts`, pure, tested) is iTunes 11's: crop the
-border, sample a band of each edge, cluster, take the largest — with iTunes'
-rule that black or white yields to a colour at least 30% as large. Three
-things this app adds, and each is load-bearing:
+**Material 3 is the only way anything in the app takes a colour from a
+picture.** A seed is read from the box art (`useAlbumArtColor`: the native
+extractor on a dev build, `lib/artwork-color`'s hue vote in Expo Go), the
+scheme is built from it (`theme/dynamic-color`, `ROLES`, `CHROMA`), and
+`accentRoles(seed, { tonal: true })` names its roles for the app's components.
+Where it is used:
 
-- **Only the part of the image on screen is read** (`visibleRegion`, which is
-  `contentFit: cover` with its anchor). A 16:9 key art drawn into a studio's
-  square shows its middle; the colour of its cropped-away sides is the colour
-  of something nobody can see.
-- **The foot counts most** (`HERO_EDGES`: foot 1, sides 0.5, top 0.15). iTunes
-  sampled the left edge because its art met the panel there; a hero meets the
-  page at its foot.
-- **Clustered in Oklab**, from a 5-bit histogram seeded most-populous first,
-  so the answer does not depend on pixel order and a distance is the same
-  visible difference in the darks as in the lights.
+- **The game page** — seeded by the *hero art* (`useGameAccent(heroUrl ??
+  coverUrl, genres)`, `<AccentProvider artwork>`), the owner's of 2026-10-31
+  ("grabs the color from the artwork hero instead of the portrait art"; it was
+  the cover). The log form, achievements and the soundtrack follow it, and so
+  does onboarding's game-page preview: the page is the scheme's
+  background, every card its `primaryContainer` at half brightness
+  (`cardMaterialFor`), the quiet type `onSurfaceVariant`, the masthead's rule
+  `outlineVariant`, the review button and the chosen tab `primary`.
+- **A studio** — the banner game's scheme (`useGameAccent(bannerUrl)`), page,
+  name and controls.
+- **A collection** — its cover's *box art* even when the header draws square
+  art (a 400px square is too large to decode on the phone); an empty
+  collection is the app's own page, its provider `neutral`.
+- **Home's glow** — the first cover's M3 `primary` at 0.45 (§ Home).
+- The review page, the log form, achievements, a soundtrack, a copy, Surprise
+  Me, an award slot — as they always were.
 
-Run on twelve real heroes (2026-10-23): Stardew Valley's is the teal of its
-hills where Palette's dominant colour is the navy of its sky — a navy page
-would have drawn a seam under the art. The test holds the key colour nearer
-the colour of the art's foot than the dominant one, on three real IGDB heroes
-decoded as the phone decodes them (`fixtures/key-color/`).
+Settings → Game colours off makes every one of them the owner's grey room.
 
-**The page is one colour, and it is the key colour** (`keyPage`, `<Screen
-tone>`) — the owner's correction of 2026-10-23: "The page must be one color,
-all the same." It was a *ground* behind the masthead over a different page
-colour, which put a seam across the page where the ground ran out, at the
-synopsis. Now:
+**Removed, and not to be rebuilt** — every one of these was a second way of
+picking a colour, and each was deleted with its tests, fixtures and device
+stores (`lib/retired-colour-stores` sweeps the stores once; `CACHE_VERSION` 5
+drops their saved queries):
 
-- **`bright`** is the key colour taken toward black in Oklab, in tenths, until
-  the quietest type on the page holds 4.5:1 (`keyGround`). Apple sets dark type
-  on a light key colour; this is a dark room with grey body copy in it, and a
-  page is not a backdrop — everything is read *on* it. **That is the ceiling on
-  how bright a bright page can be**, and on light art it binds: Stardew's
-  `#0B908C` lands on `#03504C`. To go brighter, the masthead's quiet inks have
-  to become white; nothing else will do it.
-- **`dark`** is that tone again, `KEY_PAGE_DARKEN` (45%) toward black. Measured
-  over twelve real heroes, the step is 1.7–1.9:1 on coloured art and 1.1–1.3:1
-  on art that is already near black — which is right: a dark game's page is
-  dark at both ends.
+- Apple Music's **key colour** (iTunes 11's edge clustering, `lib/key-color`,
+  `useKeyColor`, `<KeyColorHero>`, `<Screen tone>` and the page darkening as
+  it scrolled) and the unused `components/apple-music/` prototypes.
+- The **page-colour brief and BitChord's page** (`lib/page-color`,
+  `usePageColor`: Palette's swatches through an "anti-ugly" filter, the page
+  re-lit for white type, the pale quiet ink, Celebi + `Score` seeds,
+  `harmonySeed`, `buttonTone` / `primaryTone`).
+- **Cards in the review button's colour** (`filledMaterial`, `filledInks`,
+  `<CardInks>`, `<ThemeInks>`, `<AccentInks>`, the tab bar's `artColoured`),
+  and the **game page with no cards** (`<BareCards>`, the Details card as a
+  two-column grid of text). The cards are back, and Details is its card again.
+- **SimpMusic's immersive page colour** (`lib/immersive-color`'s Palette port
+  and Oklab darkening, `useImmersiveBackground`, the near-black studio) and
+  the three-depth ramp (`useArtworkPalette`).
+- The **colour field behind the game page and the studio**, which followed
+  the trailer's frames, and **BitChord's blobs** (`lib/artwork-field`,
+  `<ArtworkField>`), which went from there to the cover viewer for one day
+  and were then removed too (2026-10-28).
+- **The one exception, by the owner's word (2026-10-28)**: SimpMusic's Apple
+  Music page under the cover viewer (`lib/artwork-mesh`, `<ArtworkMeshPage>`)
+  was deleted with the rest and brought back the same day — "bring back
+  simpmusic's apple music now playing blur on the zoomed in version and
+  remove the mesh blob". It is a blur of the cover's own pixels, nothing else
+  reads it, and it colours that one modal and nothing else.
 
-**Every layer that paints the page's colour reads the same tone**, off
-`ScreenChrome.tone`, and crosses between the two on one shared value: the
-page's fill and its wash (`<Screen>`'s own `PageWash`), the hero's foot fade,
-and the veil under a synopsis (`<ExpandableText fade>`, which draws a second
-gradient in the bright tone only where a tone exists). A fourth place that
-paints the page's colour goes through the same context, or the page is two
-colours again for 600 ms or for a scroll.
+What survived of them is geometry, not colour: SimpMusic's scrim ramp
+(`lib/scrim`: `smoothScrimStops`, `footFade`), Compose's Oklab `mixOklab`
+(`lib/color`, Home's glow gradient), and a studio logo's legibility check
+(`lib/logo-ink`: `meanOpaqueLuminance`, `logoNeedsLightInk`).
 
-**What it is read from: IGDB's `t_cover_small` of the same picture, and
-nothing else** (`keyColorSource`). It is a *fit*, never a crop — every edge
-intact — about 2 KB, about 15 ms of JavaScript decoding. SteamGridDB's smallest
-square is 400px, measured at a full second to decode with the JIT off, so a
-collection drawing square art has no key colour and melts into its page's own
-colour, as it did; so does a legacy Steam hero. **Never read a stand-in
-picture's edges** for the one on screen. Kept on the device for good
-(`key-color:v1:`), and `['key-color', source, aspect, ax, ay]` is persisted, so
-every visit after the first has it before its first frame. Off with game
-colours.
+### The pinned hero
 
-**The layers** are in `<KeyColorHero>`'s docblock. What is easy to break:
-
-- **The hero paints no page colour of its own.** `<Screen tone>` is the page,
-  behind everything; the hero draws the art on it and fades the art's foot into
-  it. The hero's own `ground`/`base`/`tail` props are gone — it reads the tone
-  from the chrome, so the colour under the masthead and the colour at the foot
-  of the page cannot be two different colours. **A container round a hero must
-  not clip** (the studio banner's `overflow: hidden` went for that reason); the
-  frame clips its own art.
-- **The foot fade is to a colour, not the art's alpha**, and it is drawn
-  **twice** — the dark tone at full strength underneath, the bright one over it
-  at the page's own opacity. One gradient would have to change colour, which a
-  gradient cannot do; and the one underneath is full strength throughout, so
-  the art never shows through the middle of the cross. The game page's hero was
-  a `MaskedView`; a trailer cannot be drawn inside a mask on Android, and the
-  colour under it is flat and known now. `MASTHEAD_FADE` is the owner's soft
-  dissolve (`dissolveAt`) turned round, so the masthead's row sits in the same
-  last tenth it always did.
-- **One distance runs all of it**: rest to the hero's foot reaching the bar's
-  (`revealOffset`), computed the same way by the hero and by the chrome. The
-  page darkens over the whole of it; the picture lags throughout; the blur and
-  the zoom run over its last 45%, so the bar comes in over a page that is
-  already its own colour. On the game page the bar arrives later still (after
-  the masthead row).
-- **The picture travels with the page and falls behind it** — the owner's
-  (2026-10-23): "It scrolls with the user, it goes down, but it always stays
-  behind the page." `parallaxShift`, 60% of the page's speed. What the lag
-  uncovers at the top of the frame is **always above the display** — the frame
-  is scrolling up faster than the picture is being pushed down — which is why a
-  plain translate is enough and the image needs no extra height; the test holds
-  it for every offset. The trailer rides inside the same view, so an animated
-  banner lags and softens with the art.
-- **The blur and the zoom come late, together**, from `HERO_MOTION.blurFrom`
-  (0.55) to the end — "a little bit before the art is off the screen, it blurs
-  and zooms in a little". They were running from the first pixel of scroll,
-  which is what the owner corrected. The zoom is the picture's; the blurred
-  copy carries a further 1.1 so its soft edges never show.
-- **The blurred copy lies over the picture and fades in** — never under it
-  with the sharp one fading out. For a still the two are the same blend; over
-  a **trailer** (the animated banner: the art steps aside at the video's first
-  frame) only this way round softens anything. Scrolled, a moving banner
-  settles into its own still, blurred, then drains; the trailer pauses once
-  out of sight. The foot fade, scrim and drain all lie over the video too.
-- **The blur's radius never moves**: every radius is a new bitmap. The copy is
-  mounted once the sharp one has loaded — on Android a blur is a Glide
-  transformation, a second request, so it then decodes from the disk cache.
-  **Nothing is blurred at rest**, which keeps the owner's 2026-10-15 ruling on
-  the studio banner.
-- **The colour arriving is an opacity, never a background colour.** Every layer
-  in the bright tone is nested twice: an outer opacity that is a CSS transition
-  on a React prop (0 → 1 when the colour arrives, 600 ms, and cannot lose its
-  end value) and an inner one driven by the scroll. They multiply, which is what
-  lets a colour arrive mid-scroll without either forgetting the other — and what
-  keeps the wash, the foot fade and the synopsis's veil in step, since all three
-  are built the same way.
-- **Every scroll-driven style reads `pulse` and carries a transform**
-  (`usePulse`, exported from the bar for this): without it a render two
-  seconds after the page stopped would put the hero back to its first frame.
-- **The iOS stretch** is `stretchOf`: top pinned, foot with the page. Android
-  never reports a negative offset; its own stretch does the whole page.
-
-**The glass bar** (`<FrostedTopBar glass>`): the discs stay where they are,
-centred in the row — there is always a way back, which every other artwork
-page lacks for a hundred dp — and a bar of glass fades in under them (never
-slides), with the name centred between them. iOS draws it on
-`systemChromeMaterialDark`, the system's own nav-bar material; Android 12+
-blurs the page through the `blurReductionFactor` trick (`FROST.androidIntensity`
-— this is the bar's old blur, recovered from git, with the fixes it had when
-the owner last saw it); below 12 it is opaque. Washed with the page's colour
-at 60% (`FROST.glassTint`). **The blur is back on these three bars only**; the
-test fails if another page's bar takes `glass`, or if the plain bar blurs.
-
-**Shelves arrive** (`<Reveal>`, `SHELF_REVEAL`): a fade and a 16dp rise, 560ms,
-once, on a game's Overview and a studio's rails — the pages that wrap their
-content in `<RevealScope>`; `<Section>`, `<HomeSection>` and `<Panel>` are
-built on it and are plain views everywhere else. Things that are easy to get
-wrong:
-
-- **Never wrap a section from outside.** A box round a section that renders
-  nothing is a second `gap` in the page. That is why the primitives do it.
-- **A shelf hides only when its first layout finds it wholly below the
-  display.** Opening a page animates nothing; a page restored half-scrolled
-  shows what it showed.
-- **It re-reads where it is on events, never on a timer**: every scroll, its
-  own layout, and `ScreenChrome.layout` — bumped by the page scrollers'
-  content-size changes and by `<ExpandableText>` when it finishes opening or
-  closing on the UI thread. A frame callback was considered and refused: it
-  keeps the UI thread awake for as long as one shelf is waiting.
-- A shelf inside a shelf does not arrive twice.
-
-**Not seen on a phone.** Types, lint, `npm test` (954), the worklets as the
-plugin ships them (every closure unpacked in the body) and an Android Hermes
-bundle were checked here; four scroll states were rendered from the real
-curves, fade stops and twelve real heroes' colours. To judge on a device: how
-bright a bright page reads with the masthead's grey type on it (the one thing
-with a knob on it — the ink), the parallax at 0.4, the blur's strength at 72
-(Android caps it at 25 over a 4× downsample), the crossfade's middle — a
-blurred copy over a sharp one is a blend, not a growing radius — the glass
-bar's 60% wash, and the shelves' 560 ms.
-
-## The art-coloured pages: a game, a studio, a collection (2026-10-27)
-
-**2026-10-28 — BitChord's page, a colour field, and no cards on the game
-page.** The owner, having read how BitChord colours its artist page and Now
-Playing screen: "integrate the findings from bitchord… The legacy blob
-backdrop, seamless shade switch, and the two pure bits… Bitchord's background
-colors seem to be nicer to read than gamelog's, so make sure to apply their
-same logic"; and "remove the cards from the game page and leave the
-information as standalone text floating in the background", with a reference
-of the details as two columns of bold headings over pale values. What
-follows in this section from 2026-10-27 still holds except where this says
-otherwise — the page colour and the inks below it are replaced.
-
-- **The page is BitChord's** (`lib/page-color`, its docblock): the most
-  populous swatch *with Palette's filter off*, its hue kept, saturation into
-  0.20–0.62 and lightness into 0.13–0.24, then lowered until white holds 7:1
-  and the quiet ink 4.5:1. White holds 11–17:1 on the six fixture heroes,
-  where the brief's page held 3:1 and its quiet type was 2:1. **A grey is not
-  given a hue** (`adaptedSaturation`, under 0.12): a mostly-black hero —
-  Persona 5 Royal, ARK — gives a neutral dark page, and its colour is in the
-  field. The `minShare` floor, "prefer vibrant" and `darkenForWhite` are gone.
-- **The quiet ink is the page's own hue lifted pale** (`quietInk`, L 0.80):
-  the owner's reference is `#D69BA1` on `#5D1C24`, which is that rule.
-  `pageInks().secondary` is it, so every `textSecondary`/`textMuted`/
-  `proseInk` on the page is.
-- **The accent is saturation × √population** (`readArtwork`): the continuous
-  answer to the fleck that the 5% floor was a hard one to. It leads the field,
-  and **on a neutral page the buttons keep to its family** (`buttonFamily`) —
-  without that, ARK's grey page took Material's top seed, the olive the owner
-  rejected, beside its blue field.
-- **The field** (`<ArtworkField>`, `lib/artwork-field`) is BitChord's legacy
-  `MeshGradientBackground` on the **game page and the studio page**: four
-  radial gradients of the art's colours over the page's colour, filling the
-  screen as `<Screen backdrop>`'s first layer, their geometry BitChord's
-  number for number. Each blob is darkened until both inks hold on it, and a
-  blend is never brighter than its brightest colour, so the text reads
-  anywhere on it. It drifts once as the page opens, and a change of colour is
-  a 1.4 s cross-fade of whole layers — both CSS keyframe animations that end
-  on React's own style, so neither can lose its end value. **Not on the
-  collection**, which has no trailer; it keeps its flat page.
-- **The field follows the trailer** (`<TrailerBackdrop onFrame>`): every 3 s
-  while it plays in view, the video's own view — not the art over it — is
-  captured at 64 px by `react-native-view-shot` (lazily imported; it draws a
-  TextureView's bitmap on Android, ViewShot.java), decoded, rejected if black,
-  and quantised into new blob colours. The page and its inks stay the still's.
-- **Over the field the hero dissolves** (`<PinnedHero over="field">`): its
-  foot fades into the page's colour, which eases to nothing over 160dp
-  (`fieldHold`), and where it used to drain it fades out. The page's "solid
-  part" is transparent and the lip is gone; the pinned tab bar keeps the
-  page's colour.
-- **No cards on the game page** (`<BareCards>`, `card-material`): every card
-  there reads `useCardMaterial()`, which under the provider is bare —
-  transparent, no corner, edge or shadow, and `strip` takes the inset away —
-  so a section is its heading and its content at the page's inset. Panels
-  lose their rule. The sheets the page opens are outside it and keep theirs.
-- **Details is the reference's grid** (`<GameDetailsCard companies>`): two
-  entries a row, `h5` heading over values in the quiet ink, one a line;
-  Developers, Genres, Themes, Game modes, then "Show all"; tags, age ratings
-  and languages (over six values) run full width. **This brings the
-  developers back** (removed 2026-10-15) **and unbolds the values** (bold was
-  the 2026-10-16 sign of a link) — both because the reference does. Every
-  value is still a link.
-- **Not seen on a phone.** Types, lint, `npm test` and an Android bundle.
-  To judge on a device: the field's strength and whether it reads as light
-  or as blotches; the hero dissolving into it; frames being captured at all
-  (iOS may give black — the guard then keeps the still's colours); the cost
-  of four full-screen gradients under a scroll on an older Android.
-
-The owner's direction (2026-10-27), with frames of Apple Music's artist page
-scrolling: no colour transition on the page — "The color will stay the same";
-the page's colour picked by a pasted pipeline of "anti-ugly" rules; the
-buttons Material 3 from the hero art, "not the game cover"; and the hero
-pinned behind the page. Built for the game page, then — "integrate all of
-this into the other pages that had the same thing, studio and collection
-screen" — the studio and the collection the same way. All three are
-`<Screen artColoured>` over `usePageColor`, `<AccentProvider color={seed}
-primaryTone={tone}>`, `<ThemeInks>` and a `<PinnedHero>` backdrop. **This
-reverses the immersive pages' older rule** that a studio and a collection
-keep the app's controls (§ Immersive pages): they wear their art's Material 3
-now, kept to the page's family.
-
-**The page colour — replaced on 2026-10-28 by BitChord's (above); kept as the
-record of what was tried.** (`lib/page-color.ts`, `usePageColor`) It was the brief's
-pipeline, in JavaScript rather than through `react-native-image-colors`: the
-native module returns bare hexes with no populations and cannot crop, iOS's
-answer is not Palette's at all, and Expo Go has none — so Palette's quantiser
-(already ported, `lib/immersive-color`) and its six targets are run here, on
-IGDB's `t_cover_small_2x` of the hero (the 90-px file changed the answer for
-nine of twenty live heroes; 180 px is Palette's own sampling area). A 10% ring
-is cropped first; saturation ≥ 0.15, HSL lightness 0.08–0.92; vibrant and
-dark vibrant preferred; darkened in HSL until white holds 3:1; the most
-saturated if nothing passes the floor, `#2C2C2E` if nothing at all, `#1C1C1E`
-if the image fails. **One addition, measured**: a swatch must cover 5% of
-what Palette counted (`minShare`) — "prefer vibrant" otherwise gave God of
-War its logo's red, The Witcher 3 its blood, Ghost of Tsushima its leaves.
-
-**The buttons** are `<AccentProvider color={seed} primaryTone={tone}>`:
-Material's Celebi (128 colours) and `Score` on the hero's visible part —
-Android's wallpaper path — **kept to the page's family** (`harmonySeed`): the
-seed nearest the page's hue, if within 30°, pulled toward it by Material's
-own `Blend.harmonize`; else the page's colour itself; a grey page (HCT chroma
-under 12) takes the art's best seed, whatever its hue. The brief's rule 5
-(the button ΔE 30 from the page) is then kept by **tone** (`buttonTone`):
-the same palette, lighter, in steps from the scheme's 60 — `primaryTone`
-through `accentRoles` into `generateDynamicTheme`, which moves `primary` and
-nothing else. Why, measured on 26 live heroes: the page and the buttons came
-from two algorithms reading the art for different things, `Score` favours
-chroma (God of War's red logo, Persona 5's teal), and rule 5 taken literally
-reaches for the next seed or the complement — so ARK: Survival Evolved's blue
-page wore olive buttons (the owner's, 2026-10-27: "They just dont blend at
-all"), and five others clashed the same way. Ark is a fixture now. Things that
-are easy to break:
-
-- **Celebi's JS port is random.** Its k-means starts from `Math.random()`
-  (Java seeds `0x42688`); two reads of one hero disagreed by ΔE 17 one time in
-  ten. `m3Seeds` runs it under a fixed seed, so it is deterministic.
-- **It is the slow part**: ~200 ms on an interpreter for 1,000 pixels (most
-  of it is the 128 clusters, which are Android's and kept), once per hero.
-- **`Button` and `TonalKey` read the accent**, never the screen's tone.
-
-**The inks — the 60% white replaced on 2026-10-28 by the quiet ink (above).**
-White and white at 60% (`pageInks`), handed to everything on the
-page by `<ThemeInks>` — `useTheme()` reads it, so every `<Text color>` follows.
-**The protected case's printed back is set in those inks**, so the Platforms
-section wraps the case in `<ThemeInks inks={null}>`; none of the case's own
-files changed. **The 3:1 floor and the 60% are the owner's numbers, and on a
-bright page they make the quiet type faint**: white at 60% is 2.0:1 on
-Cyberpunk 2077's, Disco Elysium's and Ghost of Tsushima's pages (each right at
-3:1); 2.8:1 on God of War's, 5:1 and up on dark
-pages (measured on the live heroes). `PAGE_COLOR.whiteContrast` is the one
-number to raise if the owner wants AA back. Inside a card the inks are the
-button's, not the page's, and hold AA (below).
-
-**The cards are the review button's colour, exactly** — the owner's
-(2026-10-27): "Solid colored cards will remain, but they have to be EXACTLY
-the same as the review button and tab color. The exact same one." On an
-art-coloured page `useCardMaterial()` answers `filledMaterial(accent)`: the
-fill is `filledRoles(accent).fill`, the value the review button paints, and
-the edge is the fill too (the button has none). **The selected tab is the
-same value** there (`<TabBar>` reads `artColoured`) — it painted Material's
-`primary` as it is, where the button lifts it to a saturation floor, so the
-two could differ; every other screen's tabs are unchanged. A card takes the
-button's ink with it (`filledInks`: the ink, a quieter one eased toward the
-fill only as far as AA, a rule at 16%), and `<CardInks>` hands it to
-everything inside — the theme's type (`<ThemeInks>`, the grey action pill
-included) and the accent's type roles (`<AccentInks>`: `onSurface`,
-`quietInk`). Things that are easy to break:
-
-- **A card that reads `useTheme()` itself is split into a shell and a body**
-  (`MemberReviewCard` / `MemberReviewBody`, `ReviewQuote` /
-  `ReviewQuoteBody`): the shell paints the card and renders `<CardInks>`, the
-  body reads the inks from under it. A card whose own component reads the
-  theme for an icon, outside its provider, keeps the page's white on a light
-  fill.
-- **A caller that passes `fill`** (Surprise Me's review) gets no card inks:
-  the card is not the filled colour then.
-- The score ramp's colours inside a card are not inks and do not follow it.
-
-**The glass is gone.** For a few builds the cards were glass (white at 12%, a
-30% edge, a box-shadow highlight); the owner had it switched off, then
-removed: "remove the glass cards from the app officially, the code,
-everything". Nothing of it is left — do not bring it back.
-
-**The pinned hero** (`<PinnedHero>`, `PINNED_HERO`): `<Screen backdrop>`, not
-in the scroller. At rest it is exactly the old hero (38%, the owner's
-dissolve, the row set into it). Scrolled: the art drifts up at a fifth of the
-page's speed; the masthead (spacer, row, synopsis) is transparent and slides
-over it; a blurred copy comes in after a little scroll and gently (15% → 75%
-of the way — it was 15% → 45%, and the owner found it harsh); the art drains
-into the page's colour from 35% of the way, slowly (`drainFrom`; it was made
-the last quarter for one build, which the owner called the opposite of what
-they meant: "I want it to start slower, not faster"), and is
-**solid once the page is past the title and onto the developer lines — which
-is where the top bar comes in**. The owner's, over three messages of
-2026-10-27: "solid when the developer names reach the top", "at the same
-level where the top bar comes into screen", "I don't want it to start sooner,
-just that it goes blurrier quicker". One measured point — the top of the
-lines under the name reaching the bar's foot — is the bar's `header` and,
-through `revealOffset`, the art's `solidAt`. **The bar used to come in once
-the cover had gone under it (2026-10-23); it now comes in once the name has.**
-No zoom. The trailer pauses at `solidAt`. Things that are easy to break:
+The masthead's Apple Music transition, which the owner kept: the art is
+`<Screen backdrop>`, not in the scroller (`<PinnedHero>`, `PINNED_HERO`,
+`lib/scroll-motion`). At rest it is the old hero (38%, the owner's dissolve
+`MASTHEAD_FADE`, the row set into it). Scrolled: the art drifts up at a fifth
+of the page's speed; the masthead (spacer, row, synopsis) is transparent and
+slides over it; a blurred copy comes in after a little scroll and gently (15%
+→ 75% of the way — it was 15% → 45%, and the owner found it harsh); the art
+drains into the page's colour from 35% of the way, slowly (`drainFrom`; it was
+made the last quarter for one build, which the owner called the opposite of
+what they meant: "I want it to start slower, not faster"), and is **solid once
+the page is past the title and onto the developer lines — which is where the
+top bar comes in**. The owner's, over three messages of 2026-10-27: "solid
+when the developer names reach the top", "at the same level where the top bar
+comes into screen", "I don't want it to start sooner, just that it goes
+blurrier quicker". One measured point — the top of the lines under the name
+reaching the bar's foot — is the bar's `header` and, through `revealOffset`,
+the art's `solidAt`. No zoom. The trailer rides inside the art's box, drifts
+and blurs with it, and pauses at `solidAt`. Things that are easy to break:
 
 - **One foot fade, over both copies.** For one build the blurred copy had a
   shorter fade of its own, so as it came in the art stopped dissolving and
   read "as if it was pasted onto the page raw". The sharp art and the blur
-  dissolve by the same curve, drawn once over both.
+  dissolve by the same curve, drawn once over both — a fade *to a colour*, not
+  the art's alpha, because a trailer cannot be drawn inside a mask on Android.
 - **Nothing has an edge at the art's foot.** The blurred copy is drawn at the
   art's own size, unclipped — it was 10% oversize and clipped, and the clip's
   edge let a sliver of it through at fractional scroll positions: a line under
   the art that moved at the art's speed, not the page's, "some kind of z
-  fighting" (the owner). Both platforms' blurs extend an edge rather than
-  darken it, so the overscale bought nothing. And a strip of page colour
-  hangs under the art on the box that drifts (`footHold`, 32dp), so the
-  foot is page colour on both sides.
-- **The studio and the collection** put the art behind the page the same
-  way: their name block is in a transparent spacer the height of the art, so
-  it floats up over it, and the solid part (with the same 40dp lip) starts
-  under it — the studio's rails, the collection's byline and description.
-  Both bars, and both `solidAt`s, are the name's foot reaching the bar's (the
-  line under the name, `META_LINE` / `COLLECTION_META_LINE`). The studio's
-  grid rows are opaque too, spaced by their own padding, since the list's gap
-  would leave slits of the art between them. The collection's art is still
-  `collectionArt` — square art, else the box anchored a fifth down — and its
-  colour still from the box, since a 400px square is too large to decode.
-- **The studio's rails are a memoised component** (`StudioShelves`). They
-  were the list's header inline, so every render of the screen as its
-  queries landed redrew seven rails of a dozen covers — on Sony's page three
-  seconds of a blocked JS thread ("VirtualizedList: You have a large list
-  that is slow to update", `dt` 3,023 ms, the owner's log).
-- **The blur is the full-size file, never a small copy.** expo-image's
+  fighting" (the owner). And a strip of page colour hangs under the art on the
+  box that drifts (`footHold`, 32dp), so the foot is page colour on both sides.
+- **The blur is Convx's, row by row, in Skia** (the owner's, 2026-10-31:
+  "use convx's row by row blur, if you have to bring skia do it"). It was
+  behind a flag for a few hours that day so the owner could see the old blur
+  beside it; they chose Convx's — "keep the convx hero blur. Make it
+  permanent, not a flag" — and the flag is gone. **This is the hero's blur**;
+  the blurred copy in the next bullet is only what a build without Skia falls
+  back to.
+  `<ProgressiveBlur>` (`components/ui/progressive-blur`, `lib/progressive-blur`)
+  is `ArtistHero.kt`'s variable gaussian — two 81-tap passes as Skia
+  runtime-shader image filters, on a canvas a quarter of the art scaled back
+  up — whose radius follows the row: nothing above 0.78 of a *side*, then
+  Convx's foot curve (`207 × (f − 0.78)^1.855`, ≤ 48pt of a 402pt display),
+  and a 28pt ramp that climbs from the foot to the top as `pinnedBlur` goes
+  0 → 1. **Rows are counted in Convx's own unit**, a side (its square's
+  width): here the art's height × 393/405, which puts the art's foot where
+  Convx's square has its, so every number is Convx's unconverted. It is
+  transparent where the radius is nothing and fades in over the first
+  **7.5pt** (`fadeIn`, in points: Convx's ~2pt cut the art in a line, see
+  `scripts/progressive-blur-render.mjs`). Until 2026-10-31 that was 5 in the
+  canvas's own units, which are dp on a phone and pixels in the render, so
+  the phone faded in three times slower than the render that was looked at.
+  **The game page has Convx's mirrored tail and wash** (the owner's,
+  2026-10-31: "Add convx's mirrored tail and color wash just like their artist
+  page"; `<PinnedHero tail>`). The hero runs on past the art's foot by a fifth
+  of its height (`TAIL`, 90/405), and what is there is the art turned over in
+  its own foot — drawn into the layer the filters see, not reflected in the
+  shader as Convx's is, because Skia may compute a filter's output only where
+  its input has something drawn. It is never seen sharp: the blur there is 16
+  to 48pt, and whole from 0.947 of a side, above the art's foot. Convx's wash
+  (`heroWash`, `washStops`: a smoothstep from 307/393 of a side to 1.21) is the
+  page's foot fade there, in place of `MASTHEAD_FADE`, as one gradient over
+  every copy — not in the shader as Convx draws it, since the shader cannot
+  wash a playing trailer. It begins where the blur begins and leaves about
+  two fifths of the art at its foot, which the tail carries on from.
+  **It puts art behind the game's name again** (ruling 2 of the masthead, "the
+  art has gone by the title", no longer holds with Skia): measured white on
+  the title's ground, brightest tenth — The Walking Dead 19:1, Celeste 12:1,
+  Animal Crossing 4.8:1, a pure-white foot **2.7:1**, under the 3:1 that
+  large text needs. Convx's own artist name has the same exposure. If a
+  bright hero's title is reported unreadable, the levers are the wash's start
+  (`washFrom`) or a shadow on the name; nothing was added unasked.
+  **A studio and a collection do not take it**: their solid part starts at
+  the art's foot and would cover a tail, and their names stand higher in the
+  art, at 0.8–0.87, where Convx's wash has hardly begun — they would sit on
+  80–95% of the art for a tail nobody sees. They keep their `fade`, as does a
+  build without Skia. It fetches its own copy of the art, IGDB's `t_720p` for a
+  `t_1080p` (`blurSourceUri`). `npm test` compiles both shaders in CanvasKit.
+  **Gated without importing** (`TurboModuleRegistry.get('RNSkiaModule')`, then
+  `React.lazy`): Skia's entry `getEnforcing`s its module, so an APK from
+  before it — and the web — keep the one blurred copy below, as does a
+  picture that will not load (`onFail`). It blurs the trailer's *still*, so a
+  playing trailer's foot is the still's at rest. Not seen on a phone.
+- **Without Skia, the blur is the full-size file, never a small copy.** expo-image's
   Android blur is `BlurTransformation(min(radius, 25), 4)` — it shrinks the
   bitmap to a quarter *before* blurring — so a 180-wide copy became a
   45-pixel smear: a flat grey, "no blur at all" on the owner's phone. The
-  full-size file decodes at the view's size and keeps its shapes.
+  copy is mounted once the sharp one has loaded, so Android decodes it from
+  the disk cache that load filled. Its radius never moves — every radius is a
+  new bitmap; its opacity does.
+- **The studio and the collection** put the art behind the page the same
+  way: their name block is in a transparent spacer the height of the art, so
+  it floats up over it, and the solid part (with a 40dp lip) starts under it.
+  Both bars, and both `solidAt`s, are the name's foot reaching the bar's (the
+  line under the name, `META_LINE` / `COLLECTION_META_LINE`). The studio's
+  grid rows are opaque too, spaced by their own padding, since the list's gap
+  would leave slits of the art between them.
+- **The studio's rails are a memoised component** (`StudioShelves`). They
+  were the list's header inline, so every render of the screen as its
+  queries landed redrew seven rails of a dozen covers — on Sony's page three
+  seconds of a blocked JS thread (the owner's log).
+- **Every scroll-driven style reads `pulse` and carries a transform**
+  (`usePulse`): without it a render two seconds after the page stopped would
+  put the hero back to its first frame.
+- **A worklet in `lib/scroll-motion` calls only worklets above it**
+  (`smoothstep` is first) — § Gotchas.
 
-The first time a hero's colour is read the art and the page's colour come in
-over 400 ms; every visit after, the colour is there before the first frame.
+**The glass bar** (`<FrostedTopBar glass>`), on these three pages only: the
+discs stay where they are, centred in the row — there is always a way back —
+and a bar of glass fades in under them (never slides), with the name centred
+between them. iOS draws it on `systemChromeMaterialDark`; Android 12+ blurs
+the page through the `blurReductionFactor` trick (`FROST.androidIntensity`);
+below 12 it is opaque. Washed with the page's colour at 60%
+(`FROST.glassTint`). The test fails if another page's bar takes `glass`, or if
+the plain bar blurs.
+
+**The glass bar is scrubbed by the scroll, and the two names hand over**
+(2026-10-31, after FancyScrollView's `HeaderScrollView` and eleev's
+`DrawerView`; `HANDOFF` in `constants/top-bar`). The band is the page's name
+crossing the bar's foot (`handoffBand`, built from the name's measured height)
+and ends at `solidAt`, as before. Across it the glass is `1 − √w`; the page's
+name (`<HandoffTitle>`) fades over the first half and the bar's name in over
+the second, so the two are never on screen together. Before this the bar was a
+300ms fade set off at `solidAt`, and the name lay in the bar's row under 60%
+glass while the bar's name faded in over it. The page never rests inside the band
+(`settle` on `<PageScrollView>` / `<PageFlatList>`): a release mid-way goes the
+way the finger went, else to the nearer end. **Not `snapToOffsets`**: with
+`snapToEnd={false}` React Native clamps a fling that *passes through* the last
+offset to it on both platforms, so every fling from the top would stop at the
+bar. The award show's own scroller has no `settle` yet. Not seen on a phone.
+
+**Shelves arrive** (`<Reveal>`, `SHELF_REVEAL`): a fade and a 16dp rise, 560ms,
+once, on a game's Overview and a studio's rails — the pages that wrap their
+content in `<RevealScope>`; `<Section>`, `<HomeSection>` and `<Panel>` are
+built on it and are plain views everywhere else. Never wrap a section from
+outside (a box round a section that renders nothing is a second `gap`); a
+shelf hides only when its first layout finds it wholly below the display; it
+re-reads where it is on events — every scroll, its own layout, and
+`ScreenChrome.layout` — never on a timer.
 
 **Not seen on a phone**, and the owner asked for no emulator here. Checked:
-types, lint, `npm test`, the worklets as the plugin ships them, and scroll
-states rendered from the real geometry and real heroes. To judge on a device:
-the drift (0.2), the blur's ramp (15% → 75%) and the drain's (35% → 100%),
-the cards in the button's colour with its ink, the studio's and the
-collection's names floating up over their art, how light the buttons go on the
-brightest pages (tone 85–90 on Ark, Horizon, No Man's Sky), the lip's 40dp,
-the box shadow's look on Android, white at 60% on the brightest pages, and
-the first visit's 400 ms arrival.
+types, lint, `npm test`. To judge on a device: the M3 page under the pinned
+hero — the art's foot dissolving into a page seeded by the hero itself (it was
+the cover, often another hue) — the cards back in the game's tone, and the
+studio's and the collection's controls in their scheme.
 
 ## Home: SimpMusic's header, glow and moods
 
@@ -3641,11 +3439,13 @@ second round is what is described here:
   owner had that stopped ("they go over and on top of the + and setting
   buttons… out of screen boundary"). Create (+, a 36 disc in a 48 key) drops
   an anchored menu (`ui/anchored-menu`) — log, review, new collection —
-  because a sheet would be under the floating tab bar; Settings is the bare
-  glyph.
+  because a sheet would be under the floating tab bar; **the bell** is the
+  bare glyph beside it, with the unread count on its shoulder — where Settings
+  was until the owner had it moved there (2026-10-28: "Place the notification
+  button where the settings icon is, and remove the settings icon from the
+  home section, it will only be in the profile tab"). **No Settings on Home.**
 - **The avatar is on the page again**: the "Welcome back," row — face and
-  name to the profile, the bell with its unread badge at the row's end — on
-  All only ("only for the home screen, not the mood tabs"). For one build it
+  name to the profile (the bell ended it until 2026-10-28) — on All only ("only for the home screen, not the mood tabs"). For one build it
   was the reference's avatar in the bar with a menu, and the masthead row
   (GameLog, greeting, bell) is gone for good.
 - **The chips are All, Mood and Genre** (`<HomeChips>`, the reference's `Chip`
@@ -3665,15 +3465,17 @@ second round is what is described here:
   the `genre/[id]` screen are **deleted**.
 - **The glow** (`<HomeGlow>`, `lib/home-glow.ts`, pure, tested): the first
   block's background — the bar's room, 24, and the first section — **plus
-  140dp**, scrolling with the page. Palette's dominant swatch of the first
+  140dp**, scrolling with the page. **The Material 3 primary** of the first
   cover of the first section (Games for you, Releases on a first run, a
-  feed's lead shelf) **× 0.5 in sRGB** (`rgbFactor`; the reference's 0.3, the
-  owner's "the hue has to be stronger") — not Material 3 —, an
+  feed's lead shelf) — the scheme its box art seeds, the same seed and query
+  as that game's page (`['album-art-color', cover]`) — **× 0.45 in sRGB**
+  (`rgbFactor`, `AmbientThemeGlow`'s rule for a themed page), an
   `angledGradientBackground` at 25° with Compose's own line length and 24
   smoothstep stops mixed in Oklab, and the page rising over its bottom 60%.
   A new tone cross-dissolves over 500 ms; the last tone holds while the next is
-  decoded. With game colours off it is the house primary × 0.45
-  (`AmbientThemeGlow`'s rule). No tone, no glow. **The sections start 24 under
+  decoded. With game colours off it is the house primary × the same 0.45. No
+  tone, no glow. (Until 2026-10-28 it was Palette's dominant swatch × 0.5, the
+  reference's Home's own method; Material 3 is the app's only one now.) **The sections start 24 under
   the bar** (`LEAD_GAP`; the reference's 8 — "a little bit lower").
   **What is inside the first block is the glow's length**, and the block ends
   after Surprise Me. On All it used to hold four bands — the greeting,
@@ -3758,6 +3560,34 @@ the grid and the loading work of 2026-10-22: whether ten rows of blocks is too
 much foot for Home, where the turned cover lands in a tile's corner, whether
 the shimmer's sweep holds its frame rate on a list of thirty placeholders, and
 whether the bands' arrival reads as smooth or as late.
+
+## Games for you: a new round every time the app is opened
+
+The owner's request (2026-10-29): "The games for you section should update
+every time the user opens the app, giving new recommendations that don't
+repeat, based on the games they logged in the app." It was the same three
+seeds (the best-rated logs) and the same twelve games, restored from disk.
+The rules are `lib/games/recommend-rules.ts` (pure, tested):
+
+- **A round** is `useAppRound()` (`lib/app-round.ts`): a cold start, a return
+  to the app after fifteen minutes in the background, or a pull to refresh on
+  Home (`startNewRound`). A glance at another app is not a new round.
+- **Seeds are drawn, weighted by score**: any log rated 60+ or unrated; a 100
+  is thirteen times as likely as a 60 to come first. Four seeds, four more only
+  when the first lead to fewer than twelve unseen games. Each seed's
+  `similar_games` is shuffled.
+- **No repeats while unseen games last**: what was shown is kept on the device
+  per account (`lib/games/recommend-history.ts`, the last 240), and a round
+  puts those last, the longest-unseen first — the band is never shorter for
+  having been seen. The history is read once per round
+  (`['recommend-history', userId, round]`) and the round's generator is seeded
+  by `userId:round`, so a refetch inside a round (a log saved) does not
+  reshuffle the band.
+- `['recommended', userId, seedKey, round]` and `['recommend-history', …]` are
+  in `NEVER_PERSIST`: a restored round would be last time's. Home's glow
+  waits for the round (no Releases colour first).
+- Surprise Me's "Based on my games" calls `recommendFromLogs` without a round
+  and gets the old, fixed answer.
 
 ## RAWG tags
 
@@ -4010,8 +3840,9 @@ and the event page's foot bar are all for a device.
   1000 is `['critic-chart', page]` and `['critic-chart', 'length']` — its own
   root, so a rating here never refetches IGDB. Search:
   `['latest-reviews', languages]`, `['lists', 'latest']`. Settings:
-  `['game-colours', userId]` and `['animated-artwork', userId]` read device
-  stores and are in `NEVER_PERSIST`; each one writer sets its own.
+  `['game-colours', userId]`, `['animated-artwork', userId]` and
+  `['copy-stage-3d', userId]` read device stores and are in `NEVER_PERSIST`;
+  each one writer sets its own.
   `['gaming-accounts', userId]` (the profile's platform badges; a link or
   unlink invalidates it),
   `['library-pins', userId]` (a library's pins; the picker and unpin
@@ -4019,14 +3850,10 @@ and the event page's foot bar are all for a device.
   `['mood-art', 'mood:relax' | 'genre:12']` is one cover for a tile at the
   foot of Home — a week fresh and kept on the device, so the grid is not blank
   on a cold start; nothing invalidates it.
-  `['key-color', source, aspect, ax, ay]` is a hero's key colour — kept on
-  the device, nothing invalidates it (a picture's edges do not change).
-  `['page-color', 2, source, aspect, ax, ay]` is an art-coloured page's colours (the
-  page, its accent, Material's seeds and the field) — the same: kept, never
-  invalidated. The `2` is the rules' version: BitChord's page replaced the
-  brief's on 2026-10-28, so a row saved under the old rules is never read.
-  `['artwork-mesh', thumbnail]` is the cover viewer's page, never persisted;
-  `['onboarding-examples', 'colours' | 'animated']` the look questions'
+  `['album-art-color', uri]` is a picture's Material 3 seed — the game page,
+  a studio, a collection, Home's glow and every `<AccentProvider>` share it;
+  never persisted (the extractor keeps its own store), never invalidated.
+  `['onboarding-examples', 'colours' | 'animated']` is the look questions'
   games.
 - **Colours**: always `useTheme()`. Never hardcode a hex in a component; add the
   token to `Colors.dark` in `constants/theme.ts` — that object is the entire
@@ -4041,12 +3868,14 @@ and the event page's foot bar are all for a device.
   grey (`controlFill`) or, when they are choices, an `outline`.
   Colour enters from *content*, in exactly three ways. A colour that is none of
   these three is decoration and does not belong:
-  1. **Identity — read from the box art.** `lib/artwork-color.ts` fetches the
-     game's IGDB `t_thumb` (90×90, ~3 KB), decodes it with `jpeg-js` (pure JS, so
-     it works in Expo Go where a native module would not) and returns the
-     dominant *hue*. Watch Dogs 2 resolves blue, DOOM red, Cyberpunk yellow.
-     That hue lights the page: the ambient ramp, the active tab, the primary
-     button, the links. Cached in `AsyncStorage` — box art does not change.
+  1. **Identity — read from the box art, through Material 3.** The seed is
+     the box art's dominant colour (`useAlbumArtColor`: the native extractor on
+     a dev build; in Expo Go `lib/artwork-color.ts` fetches IGDB's `t_thumb`,
+     90×90, ~3 KB, and decodes it with `jpeg-js`). Watch Dogs 2 resolves blue,
+     DOOM red, Cyberpunk yellow. The scheme built from it lights the page: the
+     page, the cards, the active tab, the primary button, the links. Cached in
+     `AsyncStorage` — box art does not change. It is the only way a colour is
+     taken from a picture (§ One colour method).
      **The ten-hue ramp (`identityEmber` … `identityMagenta`) is now the
      fallback**, used when extraction fails or when no hue dominates (Celeste's
      cover holds only 20% on its best hue, under the confidence floor). Do not
@@ -4132,6 +3961,30 @@ and the event page's foot bar are all for a device.
   onto a margin that is not the app's 15; the profile is its one caller, and
   its row is the one `iconOnly` strip — four glyphs spread across the column
   under the widgets.
+- **A tap always answers, and icons move — Convx's** (2026-10-31, the
+  owner: "on tap there is always responsiveness and even the icons have
+  animations"; `constants/press-motion`, read from Convx's `ModifierExt.kt`,
+  `Player_v2.kt` and `InteractiveHighlight.kt`, under `npm test`):
+  - **`<PressableScale>` springs** (`bounceClick`): one spring both ways,
+    Compose's medium-bouncy (ζ 0.5) at 400, so it answers at once and lands
+    a little past rest. The default sink is 0.95 (was 0.98); the 244 callers
+    with their own `scaleTo` kept theirs. Reduce Motion still dims instead.
+  - **It tells its glyphs it is held** (`press-state`), and **`<PressGlyph>`**
+    answers: `wobble` (0.86 on a loose ζ 0.38 spring — `pressWobble`), `play`
+    (toward 0.2 and back), `skip` (dips, then steps 8dp the way it skips).
+    Wrap the *glyph* only. On the icon button, round action, tonal key,
+    engagement bar, the top bar's keys and discs, the tab bar, the player's
+    and the mini player's keys, the collection's share and like, a review's
+    like. Icon controls sink only to 0.95–0.96 now, so the glyph is what
+    moves.
+  - **A state pops** (`pop={on}`, `likePop`): 0.88 → 1.56 → 1 over 700ms with
+    a blink that hides the glyph's swap — likes, Favourite / Wishlist, a tab
+    being chosen, Keep playing. **Only within 1.5s of a press of that control**
+    (`pressedAt`), so data arriving never pops anything.
+  - **Glass lights where it is touched** (`InteractiveHighlight`): a top bar
+    glass disc gets a white wash at 8% and a spot at 15% where the finger
+    landed, on a ζ 0.5 spring.
+  Not seen on a phone. A new icon control wraps its glyph in `<PressGlyph>`.
 - **An outline that turns solid pours** (`ui/paint-fill`) — the owner's rule
   (2026-10-15): "Colored outline > fill in animation > still solid color pill",
   the colour "born and expanding from the middle to the edges… like a bucket of
@@ -4401,18 +4254,21 @@ and the event page's foot bar are all for a device.
     with the game's rails." A row is its heading on the page and its covers
     under it, starting at the page's margin and running off the far edge.
     **Do not wrap a row of games in a card, a panel or a band, on any screen.**
-  - **One exception: Home's "Games for you" is SimpMusic's "Your daily
-    discover"** (`<DiscoverCarousel>`, the owner's, 2026-10-22 — it was Apple
-    Music's Top Picks cards for an hour). Material 3's centered hero carousel,
-    read from `HomeSectionStyles.kt`: a 320-tall card 74% of the display wide
-    (360 at most) in the middle, a narrow neighbour each side, 8 apart, 10 in,
-    28 round; every card's mask morphs between the two sizes on Material's
-    keylines as the row moves, the art staying full size under it. The game's
-    square art (SteamGridDB, else its box), its name in `h2` and "Similar to
-    Hades" (`recommendFromLogs`' `because`) over a scrim 0 → 0.78 from 45%
-    down. One card a swipe; a neighbour tapped comes to the middle, the middle
-    one opens the game. `constants/discover-carousel` is the geometry (pure,
-    tested). Cards and words on art here only — no other row follows it.
+  - **One exception: Home's "Games for you" is BitChord's lead shelf**
+    (`<DiscoverCarousel>`, the owner's, 2026-10-28: "like the one in
+    bitchord in the albums & singles section at the top"), read from
+    `HeroShelf` / `HeroCard` in its `HomeScreen.kt` and `heroCardWidth` in
+    `Common.kt`: big cards from the page's margin, each 70% of the row (320
+    at most) so the next peeks in, 0.92 wide to tall (252×274 on a 360dp
+    phone), 18 round with a 1dp edge of white at 15%, 14 apart, snapping to
+    each card's leading edge. The game's square art (SteamGridDB, else its
+    box), its name in `h2` on one line and "Similar to Hades"
+    (`recommendFromLogs`' `because`) in white at 72% on two, over a scrim to
+    black at 78% behind the caption alone. A card opens its game.
+    `constants/discover-carousel` is the geometry (pure, tested). It was
+    SimpMusic's "Your daily discover" (Material 3's centred hero carousel,
+    morphing masks) for a week, and Apple Music's Top Picks for an hour
+    before that. Cards and words on art here only — no other row follows it.
   - **The heading** (`<HomeSection>`; `<Section>` on a game's page) is one
     line of `h2` (the owner's "make the texts for the sections title bigger",
     2026-10-22 — it was `h4`; every `<HomeSection>` caller moved with it), no subtitle, and no "See all" — a heading that leads
@@ -4663,7 +4519,7 @@ and the event page's foot bar are all for a device.
     the box cropped to the banner and anchored a fifth of the way down, where a
     box's subject and logo sit. A collection with no games draws its initial —
     or an award show's trophy — on the app's well. **Every collection with a
-    game takes the cover's page colour** now (§ Immersive pages); it was only
+    game takes the cover's page colour** now (§ Studio pages, collection pages and studio logos); it was only
     those not showing four.
   - **Where it is listed** (`<ListTile>`: Search, a profile's Collections tab,
     Discover, the game page's "In collections" sheet): the mosaic row above,
@@ -4740,9 +4596,8 @@ and the event page's foot bar are all for a device.
   because it can be nine hundred rows. Sorting is a view: never write the new
   order back, and read a ranked collection's numbers from its stored sequence.
 - **A game's screens run Material 3 dynamic colour, seeded by its box art** —
-  except the game page itself, whose seed is its *hero's* (Material's own
-  seed choice off the hero art, § The art-coloured pages) and whose page is
-  not M3's at all.
+  the game page included, and a studio and a collection by their art; it is
+  the app's one colour method (§ One colour method).
   `theme/dynamic-color.ts` turns one seed hex into the twenty-three M3 roles via
   `DynamicScheme` + `Variant.TONAL_SPOT`. **The tones are read off the palettes,
   not off the scheme's getters** — those implement whichever M3 spec revision the
@@ -4794,11 +4649,9 @@ and the event page's foot bar are all for a device.
   - `<GameColoursWarmup>` in the root layout reads the switch once there is
     an account, so the first game page finds the answer in memory and an
     "off" never opens in colour first.
-  - **A collection's and a studio's page colour** (`useImmersiveBackground`)
-    follow it too, at the owner's word ("it should apply for collection and
-    studio page"): off, a collection is the app's page and a studio keeps
-    its near black, made from the app's page colour rather than the art's, so
-    a trailer's letterbox bars still meet it without an edge.
+  - **A collection's and a studio's page colour** (`useGameAccent`) follow
+    it too, at the owner's word ("it should apply for collection and studio
+    page"): off, both are the app's page.
 - **`react-native-image-colors` must never be imported statically.** Its entry is
   a bare `requireNativeModule('ImageColors')` evaluated at import scope, and Expo
   Go ships only Expo SDK modules — so a static import throws while the module is
@@ -4832,6 +4685,10 @@ and the event page's foot bar are all for a device.
      straight line, which has a corner at each end. The row rises into the
      hero (`mastheadOverlap`, 11.5% of its height, ~30dp) so the top of the
      cover is on the last tenth of the art and the art has gone by the title.
+     **Not with Skia since 2026-10-31**: the hero's foot is Convx's there,
+     and about 45% of the art, blurred, is behind the title — § One colour
+     method, the pinned hero. The fade below is what a build without Skia
+     draws.
      **This replaced "under the art, twelve below its edge"**, which had
      replaced the cover rising 46% into the picture ("a boxed copy propped
      against a poster"). Neither comes back: not a gap under the hero, not a
@@ -4973,7 +4830,9 @@ and the event page's foot bar are all for a device.
        `<ScoreSummary>` — the verdict ("Very Positive"), **under it "Based on
        N reviews"**, the score as its drawing and number, and **the rating
        graph** (`<RatingDistribution>`): a row for 100 and for each ten below
-       it, the count, a bar as long as it, in the score ramp's three colours.
+       it, the count, a bar as long as it, in the score ramp's three colours —
+       **only the rows that hold a score** (`shownBands`; the owner's,
+       2026-10-28: "if there is no rating with a 0-9, dont display it").
        The count was at the far end of the title until the owner had it
        put under the verdict (2026-10-16). **The reviews sheet's own
        summary, one component in both places.** On 2026-10-09 the owner was
@@ -5551,6 +5410,85 @@ that are easy to break:
   open case. Tune those on a device before trusting any of them. The case
   templates are 420–680px wide and are drawn at up to twice their pixels here;
   only re-exported files make the plastic as sharp as the cover now is.
+- **The stage is drawn in 3D wherever the build can** (2026-10-30, the
+  owner: "a 3D effect for the CD and game case… a dazzling, iridescent sheen
+  that shifts as the disc/case tilts back and forth… the back of the CD should
+  have a transparent, clear-plastic appearance… physically accurate
+  lighting… threejs, shaders… expo-gl"). `<CopyStageGL>` draws
+  `lib/copy-scene` — the box, its hinged cover, tray and inside, and the
+  disc's two sides and edge — with three.js into an expo-gl canvas, and adds
+  the one motion the flat faces could not make: an idle rock, 7° back and
+  forth (DESIGN.md § 4.3.1, In 3D). Things that are easy to break:
+  - **It follows; it does not lead.** Every number that moves is still the
+    flat stage's, on the UI thread — the drift, the springs, the gestures,
+    the tilt — packed into one `ScenePose` a frame (`scenePose`) and sent to
+    JavaScript with `runOnJS`. The scene stands everything in dp round the
+    same centre, seen from `STAGE_CAMERA`, through a lens offset to the
+    stage's centre (`stageLens`) — so the 3D case is where the flat one was,
+    and the taps (`onDisc`, `onCase`, worked out against the flat camera)
+    still find it. `scene.test.ts` projects both and holds them together.
+    Change the camera on one side and change it on the other.
+  - **The flat stage is the fallback, always.** It is on screen from the
+    first frame; the 3D one loads behind it and is only shown — a 320ms
+    crossfade, then the flat faces unmounted — once it has drawn a frame.
+    Any failure on the way (`onFail`: no expo-gl or view-shot in the build,
+    no WebGL 2, a shader the driver refuses, a template that will not load,
+    nothing drawn in 20s) leaves the flat stage as it was. Its canvas is at
+    0.02 while it loads, never 0: a TextureView that is never drawn may
+    never be given its surface.
+  - **A setting, off by default on a 32-bit phone** (the owner's,
+    2026-10-30: "add a setting to disable the 3d effect and on phones with
+    32 bit make it off by default, but keep them able to turn it on").
+    Settings → Physical copies, In 3D or Flat (`lib/copy-stage-3d`,
+    `useCopyStage3d`), per account on the device, offered only where
+    `STAGE_3D_AVAILABLE`. 32-bit is Android's `Build.SUPPORTED_ABIS` with no
+    64-bit ABI in it (`lib/copy-scene/device.ts`, tested), read from
+    `ExpoDevice` through `requireOptionalNativeModule` — so Android Go on a
+    64-bit chip counts as 32-bit, and an unknown list (iOS, an older build)
+    leaves it on. Unlike Animated artwork the choice is stored either way,
+    because the default is not always on. Flipping it while a copy is open
+    resets the stage to flat, and loads afresh when it is on again.
+  - **Gated without importing**: `STAGE_3D_AVAILABLE` asks `requireOptionalNativeModule
+    ('ExpoGL')` and for `RNViewShot` before `React.lazy` loads anything, as
+    `use-album-art-color` does for `ImageColors` — expo-gl requires its
+    native module as it is imported, and view-shot's spec uses
+    `getEnforcing`. A build from before them draws the flat stage.
+  - **The printed faces are pictures of the flat ones.** A GPU cannot set
+    type, so `<CopyStageSheet>` lays out `<CopyCaseBack unlit>`, the spine,
+    the edge and `<CopyCaseEditionBand>` under a cover in the page's colour
+    at the back of the stage, captures each (view-shot, PNG files) and is
+    unmounted. Change how one of those faces looks and the 3D one follows.
+    They are retaken when the copy's record changes (`snapshotKey`) and
+    swapped in without a rebuild (`scene.reprint`). Nothing in the sheet may
+    be expo-image (§ A review in one sentence: view-shot cannot read its
+    bitmaps). The box art, the case and disc templates and the scans are not
+    pictures of views: expo-asset downloads each to a file and expo-gl
+    decodes it natively (`texImage2D` with `{ localUri }` — stb_image, so
+    **JPEG and PNG only**), wrapped as a `THREE.ExternalTexture`. A scan
+    found after the stage is up builds a new scene and swaps it in whole.
+  - **Physics, per format** (`lib/copy-scene/optics.ts`): a CD's tracks are
+    1.6 µm apart, a DVD's 0.74, a Blu-ray's 0.32 — and the playing side's
+    rainbow is those tracks' diffraction, so a PS5 disc is a plain silver
+    mirror and a Saturn disc a CD's bow-tie, as they really are. A
+    PlayStation disc is black (dyed plastic). If the owner wants every disc
+    to show a CD's rainbow, it is `discFormatFor` — not the shader.
+  - **Drawn at two pixels a dp** (`stageRenderScale`) and scaled up: the
+    canvas is laid out small and transformed, because its pixel buffer is
+    its laid-out size. The playing side's grating is the costliest shader in
+    the app; the loop runs only while the drift would (`active && !still`)
+    and draws on demand otherwise.
+  - **Run twice on a phone** (2026-10-30): it stopped on Hermes's missing
+    `FinalizationRegistry`, then on expo-gl's context having no `canvas`;
+    each time the flat stage stayed, as designed, and each is fixed
+    (§ Gotchas). Not yet seen drawing. Rendered here through the same
+    three.js, shaders and `makeRenderer` in a browser — WebGL 2 on
+    SwiftShader, on a context made to look like expo-gl's (no `canvas`, a
+    WebGL 1 prototype, two `pixelStorei` parameters) with Hermes's missing
+    globals deleted — with no shader errors;
+    `npm test`, types, lint and an Android export pass. Still unknown: frame
+    rate on a mid-range phone, the TextureView's compositing over the page,
+    snapshot captures on a device, and how the studio's strengths read.
+    Expo Go has expo-gl; a sideloaded APK needs a new build for any of it.
 - **A copy's edition is printed on the back of its case and nowhere else.**
   Release, what is in the box, condition, when it was got, the barcode: the
   card of those facts under the showcase is gone, by the owner's rule, and the
@@ -5592,6 +5530,67 @@ A copy-pasted web component will not run. What has to change:
 web component and the header comment maps every construct to what replaced it.
 Port snippets that way rather than installing DOM libraries — `motion` and
 `tailwind-merge` would bundle and then do nothing.
+
+## Store-release compliance (audited 2026-10-29)
+
+Against a security / Play Store checklist the owner pasted. **Done in
+`app.json`** (a native change — needs a new build, and the local `android/`
+folder is stale: `npx expo prebuild --clean` before a local build):
+`allowBackup: false` (the session and the query cache are in AsyncStorage);
+expo-audio with `recordAudioAndroid: false` and `enableBackgroundPlayback:
+false` — nothing records, and music stops outside the app by the owner's rule —
+and `blockedPermissions` for RECORD_AUDIO, SYSTEM_ALERT_WINDOW and
+FOREGROUND_SERVICE_MEDIA_PLAYBACK (that one needs a Play Console declaration).
+
+Already fine: target SDK 36; cleartext off in release; only the launcher
+activity exported; no `console.log`/`info`/`debug` in `src` and nothing logs a
+token; IGDB ids from a deep link are checked numeric before a query.
+
+**Done in 0045 and the app (2026-10-29), the three Play requirements:**
+
+- **A privacy policy and terms of use**, written from what the code does
+  (`constants/legal.ts`) — in the app (`legal/[doc]`, outside every guard, so
+  the sign-up page can link to it; Settings → Privacy and safety) and as web
+  pages (`public/legal/`, generated by `scripts/legal-pages.mjs`;
+  `legal.test.ts` fails if they are stale). **Add a service that receives
+  data, a table of personal data or a permission, and change the policy and
+  the Play Data Safety form with it.** `LEGAL_CONTACT_EMAIL` is unset until
+  the owner gives one; until then the pages point at the store listing's
+  contact address.
+- **Account deletion**: Settings → Delete account (`delete-account`, the
+  username typed to confirm). The app deletes the `media` uploads under
+  `<uid>/avatars|banners|posts` (storage cannot be emptied from SQL), then
+  `delete_my_account()` removes other people's likes, comments and
+  notifications on the person's writing (polymorphic, no foreign key) and
+  deletes the `auth.users` row; every personal table cascades from it —
+  `account-safety-sql.mjs` checks no uuid column anywhere still names the
+  account. Release photos (`<uid>/releases`) and catalogue releases stay,
+  unnamed: they are the shared catalogue's. **A new table holding a person's
+  data must cascade from `profiles`**, or that check fails. The web page for
+  it is `delete-account.html` (in the app, or by email).
+- **UGC**: terms agreed at sign-up (a line under "Make my account" and under
+  Google / Facebook), **blocking** (both ways: restrictive RLS hides `logs`,
+  `comments`, `wall_posts` and `lists` across a block, triggers refuse a
+  follow, friend request, comment, reply, like or wall post across one, and a
+  notification between them is dropped; `block_user` cuts follows,
+  friendship and notifications; from a profile's menu, undone there or in
+  Settings → Blocked accounts), and **reports on comments, wall posts and
+  profiles** (`user_content_reports`, one table, keyed on its own id; the
+  author is filled in by trigger) in the moderation queue's "Comments &
+  people" tab. Profiles stay readable across a block — every embed of an
+  author would be null otherwise — and a blocked profile shows a sentence
+  and Unblock instead of its content. A block hides ratings from the
+  reader's lists but not from any game's score (0041's functions read past
+  RLS).
+
+**Still open**: the RAWG and SteamGridDB keys ship in the bundle
+(`EXPO_PUBLIC_*`) and want an Edge Function each, as IGDB has; the session is
+in AsyncStorage, not the Keystore (`expo-secure-store` was removed for size;
+Supabase's LargeSecureStore pattern is the route); R8 is off (§ APK size);
+`flowType: 'pkce'` should be set before Google or Facebook sign-in is
+enabled; `npm audit` reports transitive issues, mostly in the Expo CLI's
+tooling; there is no way for a moderator to suspend an account from the app
+(the SQL editor can delete one).
 
 ## APK size and speed
 
@@ -5635,8 +5634,9 @@ was not this app's code. The rules that keep it that way:
   have is a missing keep rule.
 - **A native module costs its full size whether or not anything calls it.**
   Autolinking links every Expo module in `node_modules`, transitive ones
-  included. Uninstall what no bundled file imports (Skia, `react-native-svg`,
-  `expo-secure-store` and `expo-device` went this way — Metro fails the build
+  included. Uninstall what no bundled file imports (Skia — since reinstalled
+  for the hero's blur — `react-native-svg`,
+  `expo-secure-store` went this way, and `expo-device` did until the 3D copy stage needed it back — Metro fails the build
   if anything still imports a package that is gone, which is the check). List
   what is linked with `npx expo-modules-autolinking resolve --platform android`.
 - **Import fonts by weight path** — `@expo-google-fonts/inter/400Regular`,
@@ -5664,7 +5664,18 @@ was not this app's code. The rules that keep it that way:
   loaded lazily** (`import()` when the share sheet's pills are pressed) — see
   § A review in one sentence. They were added together; a release build has not
   been made with them. **`expo-video`** is the same: `React.lazy`, in `<TrailerBackdrop>`
-  (§ Immersive pages).
+  (§ Studio pages, collection pages and studio logos).
+- **`expo-gl` and `three` came with the 3D copy stage** (2026-10-30): one
+  native module and about 700 KB of minified JavaScript, which Metro bundles
+  whether or not the screen is opened. `expo-three` and `@react-three/fiber`
+  were not added: the bridge is a few dozen lines in `lib/copy-scene/renderer.ts`,
+  and `expo-three` brings `@expo/browser-polyfill`, which puts a fake
+  `document` on the global object (see the Gotcha on `typeof document`).
+  expo-gl is reached only through `React.lazy`, behind `STAGE_3D_AVAILABLE`.
+  **`expo-device` came back with it** (it had been uninstalled as unused),
+  for one constant: the ABIs a phone runs, which decide whether the 3D
+  stage starts off. Read through `requireOptionalNativeModule('ExpoDevice')`,
+  never imported.
 - **Judge speed in a release build**, not Expo Go: `npx expo start --no-dev
   --minify`, or the preview APK. Dev mode is several times slower and its
   performance warnings measure that.
@@ -5693,7 +5704,7 @@ was not this app's code. The rules that keep it that way:
   string.** As a string its CSS animations and transitions accept only the
   predefined names (`ease`, `linear`, `ease-in-out`…) and throw at the first
   render — typecheck, lint, `npm test` and an Android bundle all pass it. The
-  colour field (`<ArtworkField>`) shipped one and the game page would not
+  blob mesh (`<ArtworkField>`, since removed) shipped one and the game page would not
   open (2026-10-28). Import `cubicBezier` from `react-native-reanimated`, as
   `paint-fill` and `reveal` do.
 - **A worklet's parameter default cannot name anything outside the worklet.**
@@ -5725,12 +5736,17 @@ was not this app's code. The rules that keep it that way:
   were swept for the same thing (twelve same-file captures, all in order).
   Transform the file and read the order of the `__closure` assignments if in
   doubt — a capture must come after its target's own.
-- **There is no Skia, and a gradient does not need it.** React Native 0.86 draws
+- **Skia is back for one thing — the pinned hero's row-by-row blur — and a
+  gradient still does not need it.** (`<ProgressiveBlur>`, § One colour
+  method; reached only through `React.lazy` behind its module's presence.)
+  Nothing else may draw through Skia without the owner's say: it is ~8–15 MB
+  of native library per CPU architecture, and every `<Canvas>` is a GPU
+  surface of its own. React Native 0.86 draws
   `experimental_backgroundImage: 'radial-gradient(…)'` / `'linear-gradient(…)'`
   natively on the New Architecture, iOS and Android alike, so `<SoftGlow>` (and
   Home's old corner light) are plain views. Skia was ~8–15 MB of native library per CPU
-  architecture for those two glows and one logo measurement, and each Skia
-  `<Canvas>` was a GPU surface of its own. What it had and a CSS gradient lacks
+  architecture for those two glows and one logo measurement when it was
+  removed the first time. What it had and a CSS gradient lacks
   is `dither`: a gradient spanning a few dozen 8-bit steps on near-black can show
   faint rings. Use enough stops that each band is narrow (the ambient light has
   eleven); if rings ever show, the answer is a dithered bitmap, not Skia back.
@@ -5778,6 +5794,31 @@ was not this app's code. The rules that keep it that way:
   `absoluteFill` child begins below the status bar and ends up drawing a hard
   line across it. The `backdrop` slot renders outside the inset.
 
+- **three.js refuses expo-gl's WebGL 2 context unless told otherwise.**
+  Since r163 three.js throws "WebGL 1 is not supported" for any context that
+  is `instanceof WebGLRenderingContext`, and expo-gl 57 makes its WebGL 2
+  class *extend* that one (`common/EXWebGLRenderer.cpp`, as the spec's
+  interfaces do). `makeRenderer` (`lib/copy-scene/renderer`) hides the
+  global for the length of the constructor, after the caller has checked
+  `supportsWebGL2`. **expo-gl's context has no `canvas`**, and three.js
+  reads `gl.canvas.width` in `resetState()` — the second phone run stopped
+  there ("Cannot read property 'width' of undefined"); the stub canvas is
+  hung on the context as `gl.canvas`. It also drops every
+  `pixelStorei` parameter expo-gl does not know (it knows two, and logs a
+  line for each of the rest, on every state reset). And **import three as an
+  ES module** — `import * as THREE from 'three'`: its CommonJS entry is a
+  shim that calls `process.emitWarning`, which React Native's `process` does
+  not have. Metro picks the module build today (checked in an export).
+  **Hermes has no `FinalizationRegistry`**, which three.js's renderer keeps
+  for its geometry and texture books — the first run on the owner's phone
+  failed in `new WebGLRenderer` on exactly that, and fell back to the flat
+  stage. Every call into three.js (the constructor, `compile`, `render`) goes
+  through `whileThreeRuns` (`lib/copy-scene/three-globals`), which lends a
+  no-op registry and a strong `WeakRef` for the call's length and only where
+  the engine lacks them — never installed globally, because other libraries
+  feature-detect them. Harmless here only because everything is disposed by
+  hand. `three-globals.test.ts` reads three's source and fails if a new
+  version creates either anywhere else.
 - **`color: 'transparent'` on a nested `<Text>` is ignored on Android.** The
   renderer stores "no colour set" as `0` (`HostPlatformColor::UndefinedColor`
   in `react/renderer/graphics/platform/android`), and `transparent` *is* `0`,

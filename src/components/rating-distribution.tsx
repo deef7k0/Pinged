@@ -1,14 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { StyleSheet, View } from 'react-native';
 
-import { useCardMaterial } from '@/components/ui/card-material';
 import { Card, Skeleton } from '@/components/ui/surface';
 import { Text } from '@/components/ui/text';
 import { scoreColor } from '@/constants/score';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { getRatingDistribution } from '@/lib/api';
-import { DISTRIBUTION_BANDS, barShare, toneScore } from '@/lib/rating-distribution';
+import { DISTRIBUTION_BANDS, barShare, shownBands, toneScore } from '@/lib/rating-distribution';
 
 /** The label column: as wide as "90–99" in `caption`, as How ratings work's. */
 const LABEL_WIDTH = 48;
@@ -59,8 +58,9 @@ export function useRatingDistribution(scope: DistributionScope | null) {
  * game's Overview — so it is never a card inside a card.
  *
  * The same graph on a person's profile, a game's Ratings card and the head
- * of its reviews sheet. A band with no scores is its empty track and its
- * zero: an empty row is part of the picture.
+ * of its reviews sheet. **Only a band that holds a score is drawn** — the
+ * owner's (2026-10-28): "if there is no rating with a 0-9, dont display it".
+ * The rows keep their order, so a gap in the labels is where nobody scored.
  */
 export function RatingDistributionGraph({
   counts,
@@ -70,67 +70,55 @@ export function RatingDistributionGraph({
   card?: boolean;
 }) {
   const theme = useTheme();
-  /* A step up on a card of the room; on a card in the filled colour, its rule. */
-  const material = useCardMaterial();
   const total = counts.reduce((sum, count) => sum + count, 0);
+  const rows = shownBands(counts);
 
   const graph = (
     <View
       style={styles.graph}
       accessible
-      accessibilityLabel={`How ${total.toLocaleString()} ${total === 1 ? 'score divides' : 'scores divide'}: ${DISTRIBUTION_BANDS.map(
-        (band, index) => `${band.spoken}, ${counts[index] ?? 0}`
-      ).join('; ')}.`}>
-      {DISTRIBUTION_BANDS.map((band, index) => {
-        const count = counts[index] ?? 0;
-        return (
-          <View key={band.key} style={styles.row}>
-            <Text variant="caption" color="textMuted" numberOfLines={1} style={styles.label}>
-              {band.label}
-            </Text>
+      accessibilityLabel={`How ${total.toLocaleString()} ${total === 1 ? 'score divides' : 'scores divide'}: ${rows
+        .map(({ band, count }) => `${band.spoken}, ${count}`)
+        .join('; ')}.`}>
+      {rows.map(({ band, count }) => (
+        <View key={band.key} style={styles.row}>
+          <Text variant="caption" color="textMuted" numberOfLines={1} style={styles.label}>
+            {band.label}
+          </Text>
+          <View style={[styles.track, { backgroundColor: theme.surfaceElevated }]}>
             <View
               style={[
-                styles.track,
+                styles.bar,
                 {
-                  /* On the page itself (`<BareCards>`), the page's own rule:
-                     the app's ladder step is a blue-grey that is not this
-                     page's colour. */
-                  backgroundColor: material.inks
-                    ? material.rule
-                    : material.bare
-                      ? theme.border
-                      : theme.surfaceElevated,
+                  width: `${barShare(count, counts) * 100}%`,
+                  backgroundColor: scoreColor(toneScore(band), theme),
                 },
-              ]}>
-              {count > 0 && (
-                <View
-                  style={[
-                    styles.bar,
-                    {
-                      width: `${barShare(count, counts) * 100}%`,
-                      backgroundColor: scoreColor(toneScore(band), theme),
-                    },
-                  ]}
-                />
-              )}
-            </View>
-            <Text variant="caption" color="textSecondary" numberOfLines={1} style={styles.count}>
-              {count.toLocaleString()}
-            </Text>
+              ]}
+            />
           </View>
-        );
-      })}
+          <Text variant="caption" color="textSecondary" numberOfLines={1} style={styles.count}>
+            {count.toLocaleString()}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 
   return card ? <Card>{graph}</Card> : graph;
 }
 
+/**
+ * How many rows the skeleton draws. The graph draws only the bands that hold
+ * a score, so it is anywhere from one row to eleven; five is the middle, and
+ * the card moves least on the way to either.
+ */
+const SKELETON_ROWS = 5;
+
 /** The graph's shape while its scores are on their way. */
 export function RatingDistributionSkeleton({ card = true }: { card?: boolean }) {
   const graph = (
     <View style={styles.graph}>
-      {DISTRIBUTION_BANDS.map((band, index) => (
+      {DISTRIBUTION_BANDS.slice(0, SKELETON_ROWS).map((band, index) => (
         <View key={band.key} style={styles.row}>
           <View style={styles.label} />
           <View style={styles.trackBare}>

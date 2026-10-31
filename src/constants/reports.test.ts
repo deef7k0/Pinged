@@ -7,8 +7,16 @@ import {
   CONTENT_REPORT_REASON_HINT,
   CONTENT_REPORT_REASON_LABEL,
   MAX_REPORT_NOTE,
+  PROFILE_REPORT_REASONS,
+  USER_CONTENT_REASON_LABEL,
+  USER_CONTENT_REPORT_REASONS,
   isReportKind,
 } from './reports.ts';
+
+const SAFETY = readFileSync(
+  new URL('../../supabase/migrations/0045_account_safety.sql', import.meta.url),
+  'utf8'
+);
 
 const MIGRATION = readFileSync(
   new URL('../../supabase/migrations/0031_content_reports.sql', import.meta.url),
@@ -43,11 +51,39 @@ describe('content report reasons', () => {
   });
 });
 
+describe('reports on comments, wall posts and profiles (0045)', () => {
+  it('offer exactly what the table accepts', () => {
+    const check = SAFETY.match(/check \(reason in \(([^)]*)\)\)/);
+    assert.ok(check, '0045 has a CHECK on reason');
+    const accepted = check[1].split(',').map((value) => value.trim().replace(/'/g, ''));
+    assert.deepEqual([...accepted].sort(), [...USER_CONTENT_REPORT_REASONS].sort());
+    for (const reason of PROFILE_REPORT_REASONS) assert.ok(accepted.includes(reason), reason);
+  });
+
+  it('name every reason', () => {
+    for (const reason of USER_CONTENT_REPORT_REASONS) assert.ok(USER_CONTENT_REASON_LABEL[reason]);
+  });
+
+  it('cap the note where the table does', () => {
+    assert.match(SAFETY, new RegExp(`char_length\\(note\\) <= ${MAX_REPORT_NOTE}`));
+  });
+
+  it('cover the kinds the table does', () => {
+    const kinds = SAFETY.match(/check \(kind in \(([^)]*)\)\)/)![1]
+      .split(',')
+      .map((value) => value.trim().replace(/'/g, ''));
+    for (const kind of kinds) assert.ok(isReportKind(kind), kind);
+  });
+});
+
 describe('isReportKind', () => {
-  it('accepts the three kinds and nothing else', () => {
+  it('accepts the six kinds and nothing else', () => {
     assert.ok(isReportKind('pick'));
     assert.ok(isReportKind('suggestion'));
     assert.ok(isReportKind('review'));
+    assert.ok(isReportKind('comment'));
+    assert.ok(isReportKind('wall_post'));
+    assert.ok(isReportKind('profile'));
     assert.equal(isReportKind('post'), false);
     assert.equal(isReportKind(undefined), false);
   });

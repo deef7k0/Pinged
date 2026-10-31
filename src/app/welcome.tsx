@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, BackHandler, Pressable, StyleSheet, View } from 'react-native';
 
@@ -304,9 +304,46 @@ function EmailStep({
           </View>
 
           {error ? <PosterStatus tone="bad">{error}</PosterStatus> : null}
+          {/* Google and Facebook make an account on the first press. */}
+          <AgreementNote action="continuing with Google or Facebook" />
         </View>
       </Reveal>
     </PosterPage>
+  );
+}
+
+/**
+ * What making an account agrees to, with the two documents a tap away — the
+ * user-generated content policy's "accept the terms before posting". Both open
+ * signed out (`legal/[doc]` is outside the guards).
+ */
+function AgreementNote({ action }: { action: string }) {
+  const router = useRouter();
+  const open = (doc: 'terms' | 'privacy') =>
+    router.push({ pathname: '/legal/[doc]', params: { doc } });
+
+  return (
+    <Text variant="caption" color="textMuted" style={styles.agreement}>
+      {`By ${action} you agree to GameLog’s `}
+      <Text
+        variant="caption"
+        color="textSecondary"
+        style={styles.agreementLink}
+        accessibilityRole="link"
+        onPress={() => open('terms')}>
+        Terms of use
+      </Text>
+      {' and '}
+      <Text
+        variant="caption"
+        color="textSecondary"
+        style={styles.agreementLink}
+        accessibilityRole="link"
+        onPress={() => open('privacy')}>
+        Privacy policy
+      </Text>
+      .
+    </Text>
   );
 }
 
@@ -424,6 +461,7 @@ function PasswordStep({
             onPress={onSwitch}
             disabled={busy}
           />
+          {creating && <AgreementNote action="making an account" />}
         </>
       }>
       <TypedText text={headline} />
@@ -502,4 +540,6 @@ const styles = StyleSheet.create({
   },
   dimmed: { opacity: 0.45 },
   eye: { width: TapTarget, height: TapTarget, alignItems: 'flex-end', justifyContent: 'center' },
+  agreement: { textAlign: 'center' },
+  agreementLink: { textDecorationLine: 'underline' },
 });

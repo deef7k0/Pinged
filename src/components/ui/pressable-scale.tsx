@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -11,10 +11,13 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withSpring,
   withTiming,
   type AnimatedStyle,
 } from 'react-native-reanimated';
 
+import { PressContext, type PressState } from '@/components/ui/press-state';
+import { PRESS_MOTION } from '@/constants/press-motion';
 import { Motion } from '@/constants/theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -59,7 +62,15 @@ const RING_WIDTH = 3;
 const PRESSED_OPACITY = 0.62;
 
 /**
- * A Pressable that gently sinks while held.
+ * A Pressable that sinks while held and springs back past where it was —
+ * Convx's `bounceClick` (`constants/press-motion`, the owner's of
+ * 2026-10-31: "on tap there is always responsiveness"). One spring both ways,
+ * Compose's medium-bouncy at medium-low stiffness: it answers the instant a
+ * finger lands — it used to ease in over 150ms — and it lands with a small
+ * overshoot when the finger lifts. A disabled control does not move.
+ *
+ * It also tells the glyphs inside it that it is held (`PressContext`), so an
+ * icon can wobble, pop or step (`<PressGlyph>`).
  *
  * Runs on the UI thread via Reanimated, so the animation stays smooth even
  * while the JS thread is busy rendering a list — which is exactly when a feed
@@ -98,6 +109,11 @@ export function PressableScale({
      press timing is identical whichever property expresses it — and switching
      between them cannot desynchronise, because there is only one thing moving. */
   const progress = useSharedValue(0);
+
+  /* What the glyphs inside are told (`<PressGlyph>`). */
+  const down = useSharedValue(0);
+  const pressedAt = useRef(0);
+  const press = useMemo<PressState>(() => ({ down, pressedAt }), [down]);
 
   /*
    * The caller's own opacity, composed rather than overwritten.
@@ -152,11 +168,22 @@ export function PressableScale({
         animatedStyle,
       ]}
       onPressIn={(event) => {
-        progress.set(withTiming(1, { duration: Motion.fast }));
+        progress.set(
+          reduceMotion
+            ? withTiming(1, { duration: Motion.fast })
+            : withSpring(1, PRESS_MOTION.press)
+        );
+        down.set(1);
+        pressedAt.current = Date.now();
         onPressIn?.(event);
       }}
       onPressOut={(event) => {
-        progress.set(withTiming(0, { duration: Motion.normal }));
+        progress.set(
+          reduceMotion
+            ? withTiming(0, { duration: Motion.normal })
+            : withSpring(0, PRESS_MOTION.press)
+        );
+        down.set(0);
         onPressOut?.(event);
       }}
       onFocus={(event) => {
@@ -168,7 +195,7 @@ export function PressableScale({
         onBlur?.(event);
       }}
       {...rest}>
-      {children}
+      <PressContext.Provider value={press}>{children}</PressContext.Provider>
     </AnimatedPressable>
   );
 }

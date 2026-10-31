@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { CARD_INSET, CardInks, useCardMaterial } from '@/components/ui/card-material';
+import { CARD_INSET, cardShape, useCardMaterial } from '@/components/ui/card-material';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Reveal, useRevealing } from '@/components/ui/reveal';
 import { useSectionInset } from '@/components/ui/section';
@@ -67,7 +67,7 @@ export function Panel({
   const revealing = useRevealing();
 
   const shell = StyleSheet.flatten([
-    material.shape,
+    cardShape,
     {
       marginHorizontal: margin ?? sectionInset,
       backgroundColor: material.fill,
@@ -76,12 +76,10 @@ export function Panel({
     },
     styles.shell,
     style,
-    material.strip,
   ]);
 
-  /* The card's own inks under it, when it is in the filled colour. */
   const body = (
-    <CardInks material={material}>
+    <>
       <View style={styles.head}>
         <Text
           variant="h5"
@@ -96,16 +94,9 @@ export function Panel({
         </Text>
         {trailing}
       </View>
-      {/* No card, no rule: the title is a heading on the page. */}
-      {material.bare ? (
-        <View style={styles.bareGap} />
-      ) : (
-        <View
-          style={[styles.rule, { backgroundColor: material.rule ?? accent.m3.outlineVariant }]}
-        />
-      )}
+      <View style={[styles.rule, { backgroundColor: accent.m3.outlineVariant }]} />
       {children}
-    </CardInks>
+    </>
   );
 
   /* A `<Reveal>`: on a page that opts in (`<RevealScope>`, a game's
@@ -138,5 +129,4 @@ const styles = StyleSheet.create({
   /* Takes the line, so whatever follows it sits at the far end. */
   title: { flex: 1 },
   rule: { height: StyleSheet.hairlineWidth, marginTop: Spacing.x8, marginBottom: Spacing.x12 },
-  bareGap: { height: Spacing.x8 },
 });

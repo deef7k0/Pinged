@@ -1,4 +1,12 @@
 import { getSimilarTo } from '@/lib/games';
+import {
+  EXTRA_SEEDS,
+  SEED_COUNT,
+  eligibleSeeds,
+  orderSeeds,
+  pickRecommendations,
+  type LogSeed,
+} from '@/lib/games/recommend-rules';
 import type { GameSearchResult } from '@/lib/games/types';
 
 /**
@@ -14,35 +22,29 @@ import type { GameSearchResult } from '@/lib/games/types';
  * well", which is a claim the data actually supports. `seeds` comes back with
  * the result so the UI can say so.
  *
- * ## Why seeds are ranked by score and not by recency
+ * ## Why seeds lean on score and not on recency
  *
  * The most recent thing someone logged is often the thing they bounced off. A
  * 90 is a much stronger signal than a Tuesday. Unrated logs are still eligible
- * but sort last — a played game with no score says something, just less.
+ * but count for less — a played game with no score says something, just less.
  *
  * ## Cost
  *
- * One IGDB request per seed, so `SEED_COUNT` is the dial that matters. Three
- * covers the "what do I like" question — a fourth mostly returns games the
- * first three already suggested, because similarity is not that discriminating
- * within one person's taste.
+ * One IGDB request per seed. Surprise Me asks three; Home's rotation four, and
+ * four more only when those lead mostly to games it has shown before.
+ *
+ * Home's band changes every time the app is opened and does not repeat what it
+ * showed — `recommend-rules.ts` says how.
  */
 
-/** How many of the viewer's games to ask IGDB about. */
-const SEED_COUNT = 3;
+/** Seeds for a call with no round: the old, fixed answer. */
+const LEGACY_SEED_COUNT = 3;
 
-/** Logs below this score are not treated as an endorsement worth extending. */
-const MIN_SEED_RATING = 60;
-
-export type LogSeed = {
-  gameId: string;
-  title: string;
-  rating: number | null;
-};
+export type { LogSeed } from '@/lib/games/recommend-rules';
 
 export type Recommendations = {
   games: GameSearchResult[];
-  /** The games these were derived from, best first. Empty when nothing seeded. */
+  /** The games these were derived from, in the order used. Empty when nothing seeded. */
   seeds: LogSeed[];
   /**
    * Which seed's title each game came from, by game id — Home's cards say
@@ -52,6 +54,13 @@ export type Recommendations = {
 };
 
 const EMPTY: Recommendations = { games: [], seeds: [], because: {} };
+
+export type RoundOptions = {
+  /** The round's generator: seeds are drawn and lists shuffled with it. */
+  random: () => number;
+  /** Games shown in earlier rounds, oldest first; they go last. */
+  recent: readonly string[];
+};
 
 /**
  * Recommend games from a viewer's logs.
@@ -63,13 +72,20 @@ const EMPTY: Recommendations = { games: [], seeds: [], because: {} };
  * right answer, and better than a rail of "popular" games pretending to be
  * personal.
  *
+ * Without `round`, the seeds are the three best-rated logs and the answer is
+ * the same every time (Surprise Me's "Based on my games"). With it, Home's
+ * rotation: `SEED_COUNT` drawn seeds, up to `EXTRA_SEEDS` more when they lead
+ * to too few unseen games, and what was shown before at the back
+ * (`recommend-rules.ts`).
+ *
  * @param logs   The viewer's logs, any order.
  * @param limit  Maximum games to return.
  */
 export async function recommendFromLogs(
   logs: readonly { game_id: string; rating: number | null; game?: { title?: string } | null }[],
   limit = 12,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  round?: RoundOptions
 ): Promise<Recommendations> {
   if (logs.length === 0) return EMPTY;
 
@@ -80,58 +96,34 @@ export async function recommendFromLogs(
    * sequel is "similar to" its predecessor in both directions.
    */
   const known = new Set(logs.map((log) => log.game_id));
-
-  const seeds: LogSeed[] = logs
-    .filter((log) => log.rating === null || log.rating >= MIN_SEED_RATING)
-    .map((log) => ({
-      gameId: log.game_id,
-      title: log.game?.title ?? 'a game you played',
-      rating: log.rating,
-    }))
-    // Rated first and highest-first; unrated logs keep their incoming order
-    // behind them, which is recency, since `getUserLogs` sorts by created_at.
-    .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))
-    .slice(0, SEED_COUNT);
-
-  if (seeds.length === 0) return EMPTY;
+  const ordered = orderSeeds(eligibleSeeds(logs), round?.random);
+  if (ordered.length === 0) return EMPTY;
 
   /*
    * In parallel. These are independent reads and the band is already the
-   * slowest thing on Home; three sequential round trips to an Edge Function
-   * that proxies IGDB is most of a second for no reason.
+   * slowest thing on Home; sequential round trips to an Edge Function that
+   * proxies IGDB are most of a second for no reason.
    */
-  const results = await Promise.all(seeds.map((seed) => getSimilarTo(seed.gameId, signal)));
+  const firstCount = round ? SEED_COUNT : LEGACY_SEED_COUNT;
+  let seeds = ordered.slice(0, firstCount);
+  let results = await Promise.all(seeds.map((seed) => getSimilarTo(seed.gameId, signal)));
+  const pick = () =>
+    pickRecommendations(results, seeds, {
+      known,
+      limit,
+      recent: round?.recent,
+      random: round?.random,
+    });
+  let picked = pick();
 
-  /*
-   * Interleave rather than concatenate.
-   *
-   * Concatenating puts every recommendation from the top seed first, so the
-   * rail opens with eight games that are all like one thing and the other two
-   * seeds are past the fold. Round-robin means the first screenful spans the
-   * viewer's taste, which is what the band is claiming to do.
-   */
-  const games: GameSearchResult[] = [];
-  const because: Record<string, string> = {};
-  const taken = new Set<string>();
-
-  for (let rank = 0; games.length < limit; rank += 1) {
-    let foundAtThisRank = false;
-
-    for (const [index, result] of results.entries()) {
-      const candidate = result[rank];
-      if (!candidate) continue;
-      foundAtThisRank = true;
-
-      if (known.has(candidate.id) || taken.has(candidate.id)) continue;
-      taken.add(candidate.id);
-      games.push(candidate);
-      because[candidate.id] = seeds[index].title;
-      if (games.length >= limit) break;
-    }
-
-    // Every seed is exhausted; nothing deeper to interleave.
-    if (!foundAtThisRank) break;
+  /* A second wave only when the first leaves the band leaning on repeats. */
+  const extra = ordered.slice(firstCount, firstCount + EXTRA_SEEDS);
+  if (round && picked.fresh < limit && extra.length > 0) {
+    const more = await Promise.all(extra.map((seed) => getSimilarTo(seed.gameId, signal)));
+    seeds = [...seeds, ...extra];
+    results = [...results, ...more];
+    picked = pick();
   }
 
-  return { games, seeds, because };
+  return { games: picked.games, seeds, because: picked.because };
 }

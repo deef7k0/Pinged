@@ -7,10 +7,9 @@ import { PORTRAIT_COLUMNS, gridItemWidth } from '@/components/gaming/game-tile';
 import { GameCoverRail } from '@/components/game-rail';
 import { HomeSection } from '@/components/home-section';
 import { LOGO_WIDTH_RATIO, StudioIdentity } from '@/components/studio-identity';
-import { TrailerBackdrop, type TrailerFrame } from '@/components/trailer-backdrop';
-import { ArtworkField } from '@/components/ui/artwork-field';
+import { TrailerBackdrop } from '@/components/trailer-backdrop';
 import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
-import { footFade } from '@/components/ui/key-color-hero';
+import { HandoffTitle } from '@/components/ui/handoff-title';
 import { PageFill, PinnedHero } from '@/components/ui/pinned-hero';
 import { PageFlatList } from '@/components/ui/page-scroll';
 import { Poster } from '@/components/ui/poster';
@@ -26,14 +25,11 @@ import { useStudioBanner } from '@/hooks/use-studio-banner';
 import { BANNER_MAX_ASPECT, useStudioCatalogue } from '@/hooks/use-studio-catalogue';
 import { useStudioLogo } from '@/hooks/use-studio-logo';
 import { useGameTrailer, useTrailerSetting } from '@/hooks/use-game-trailer';
-import { usePageColor } from '@/hooks/use-page-color';
-import { ThemeInks, useTheme } from '@/hooks/use-theme';
-import { AccentProvider } from '@/hooks/use-accent';
+import { useTheme } from '@/hooks/use-theme';
+import { AccentProvider, useGameAccent } from '@/hooks/use-accent';
 import { useTopBarInset } from '@/hooks/use-header-height';
-import { TOP_BAR_ROW, revealOffset } from '@/constants/top-bar';
-import { smoothScrimStops } from '@/lib/immersive-color';
-import { frameFieldColors } from '@/lib/artwork-field';
-import { pageInks } from '@/lib/page-color';
+import { TOP_BAR_ROW, handoffBand, revealOffset } from '@/constants/top-bar';
+import { footFade, smoothScrimStops } from '@/lib/scrim';
 import { gameSortOptions, sortGames, type GameSearchResult, type GameSort } from '@/lib/games';
 import type { StudioGame } from '@/lib/games/igdb';
 
@@ -95,9 +91,8 @@ const SORTS = gameSortOptions(['newest', 'oldest', 'rating', 'title']);
 const FRAME_MAX_RATIO = 0.5;
 
 /**
- * How much of the banner gives way to its ground, from the bottom: the
- * reference's `fillMaxHeight(0.7f)`, the scrim it was before the ground was the
- * art's own key colour.
+ * How much of the banner gives way to the page, from the bottom: the
+ * reference's `fillMaxHeight(0.7f)` (`artworkScrimBrush`).
  */
 const BANNER_FADE = footFade(0.7);
 
@@ -106,6 +101,8 @@ const VEIL = 0.05;
 
 /** The line under the name, and the four above it: where the name ends, for the bar. */
 const META_LINE = (Type.body.lineHeight ?? 19) + Spacing.x4;
+/** The name's height until it is measured: a line of the display step. */
+const NAME_ESTIMATE = Type.display.lineHeight ?? 34;
 
 /** The solid part's soft top edge, and its stops: the page's colour from nothing to all of it. */
 const LIP = 40;
@@ -289,21 +286,18 @@ function yearsOf(games: readonly GameSearchResult[]): string | null {
  * and redone, and which of its games exist in more than one box. Every one
  * comes out of the list already fetched; see `shelves`.
  *
- * ## The page takes the banner's colour; the controls do not
+ * ## The page and its controls are the banner's Material 3
  *
  * The header is SimpMusic's artist page, read from `ArtistScreen.kt`: the
- * artwork square and full width, melting into a page that is the banner
- * game's Material 3 page — the owner's, 2026-10-22; it was near black from
- * 2026-10-17, so a trailer's letterbox bars met it without an edge — and the
- * studio's name set over the bottom: as its logo, when Wikimedia Commons has a
- * public-domain one (`useStudioLogo`, `<StudioIdentity>`), else as type in the
- * same palette's colour.
+ * artwork square and full width, pinned behind the page (`<PinnedHero>`) and
+ * melting into the banner game's Material 3 page — the owner's, 2026-10-22 —
+ * with the studio's name set over the bottom: as its logo, when Wikimedia
+ * Commons has a public-domain one (`useStudioLogo`, `<StudioIdentity>`), else
+ * as type in the same scheme's ink.
  *
- * The colour is the page's and nothing else's. There is still no
- * `<AccentProvider>`: this page shows a hundred games, and a sort pill or a link
- * in one title's hue would claim that game speaks for the catalogue. So the
- * chrome stays the app's — neutral controls, the house blue on what is selected
- * — and only the ground under it changes.
+ * The controls wear the same scheme (`<AccentProvider>`), as a game's page's
+ * do — the owner's (2026-10-27): "integrate all of this into the other pages
+ * that had the same thing, studio and collection screen".
  *
  * ## What arrives, and when
  *
@@ -371,44 +365,32 @@ export default function StudioScreen() {
   const bannerHeight = Math.round(Math.min(width, height * FRAME_MAX_RATIO));
 
   /*
-   * The page's colours, from the banner, as the game page reads its hero
-   * (`usePageColor`, `lib/page-color`, CLAUDE.md § The game page's colours):
-   * one colour that does not change as the page is read, white type on it,
-   * the controls Material 3 from the same art and kept to its family, the
-   * cards and the chosen tab the review button's colour. The owner's
-   * (2026-10-27): "integrate all of this into the other pages that had the
-   * same thing, studio and collection screen" — which reverses this page's
-   * older rule that its controls stay the app's.
+   * The page's colour: the banner game's Material 3 page, as its own game
+   * page has — the owner's (2026-10-22): "make the background color for that
+   * page back to normal m3, don't darken it" — and its controls the same
+   * scheme's, through the provider below. The app's own page until there is a
+   * banner, and with game colours off. A trailer's letterbox bars show
+   * against the page.
    */
-  const colour = usePageColor(bannerUrl, { frame: { width, height: bannerHeight } });
-  const page = colour.page;
-  const inks = colour.artColoured ? pageInks(page) : null;
-  const themeInks = inks
-    ? { text: inks.primary, secondary: inks.secondarySolid, rule: inks.rule }
-    : null;
-
-  /* The art's colours as a field behind the page, following the banner's
-     trailer while it plays — the game page's (`<ArtworkField>`). Over it the
-     page's parts are not solid: the rails and the grid stand on the field. */
-  const fielded = colour.artColoured;
+  const accent = useGameAccent(bannerUrl, banner?.genres ?? null);
+  const pageColor = bannerUrl && accent.tonal ? accent.page : null;
+  const page = pageColor ?? theme.background;
+  const nameColor = pageColor ? accent.onSurface : undefined;
   const playingTrailer = trailers.ready && trailers.on ? (trailer?.url ?? null) : null;
-  const [clipField, setClipField] = useState<{ url: string; colors: string[] } | null>(null);
-  const onTrailerFrame = useCallback(
-    (frame: TrailerFrame) => {
-      if (!playingTrailer) return;
-      const colors = frameFieldColors(frame.data, frame.width, frame.height, page);
-      if (colors) setClipField({ url: playingTrailer, colors });
-    },
-    [page, playingTrailer]
-  );
-  const field = clipField && clipField.url === playingTrailer ? clipField.colors : colour.field;
-  const solidFill = fielded ? 'transparent' : page;
 
   /* Solid page colour, and the top bar in, once the name has gone under the
      bar — the line under it reaching the bar's foot — as on the game page. */
   const topInset = useTopBarInset();
   const barHeader = bannerHeight - Spacing.x24 - (games.data ? META_LINE : 0);
   const solidAt = Math.max(1, revealOffset(barHeader, topInset + TOP_BAR_ROW));
+  /* The handoff to the glass bar: from the name's (or the logo's) top
+     reaching the bar's foot to its foot reaching it, as on the game page. */
+  const [nameHeight, setNameHeight] = useState<number | null>(null);
+  const handoff = handoffBand(
+    barHeader - (nameHeight ?? NAME_ESTIMATE),
+    barHeader,
+    topInset + TOP_BAR_ROW
+  );
 
   /* The logo, when Commons has a free one. The name is on screen from the
      route in the meantime, and stays whenever there is none. */
@@ -429,181 +411,171 @@ export default function StudioScreen() {
   }
 
   return (
-    <AccentProvider color={colour.seed} primaryTone={colour.tone} genres={banner?.genres ?? null}>
-      <ThemeInks inks={themeInks}>
-        {/* No `insetHeader`: the banner runs under the glass discs, which stay
+    <AccentProvider artwork={bannerUrl} genres={banner?.genres ?? null}>
+      {/* No `insetHeader`: the banner runs under the glass discs, which stay
             put (`glass`, Apple's bar); the bar fades in under them with the
             studio's name once the name has gone under it, by when the banner
             is solid page colour. */}
-        <Screen
-          edges={['bottom']}
-          background={page}
-          artColoured={colour.artColoured}
-          /* Behind the page: its colour, then the banner pinned at the top of
+      <Screen
+        edges={['bottom']}
+        background={page}
+        /* Behind the page: its colour, then the banner pinned at the top of
              the display (`<PinnedHero>`) — the game page's, here too. */
-          backdrop={
-            <>
-              {fielded ? <ArtworkField page={page} colors={field} /> : <PageFill color={page} />}
-              <PinnedHero
-                over={fielded ? 'field' : 'page'}
-                uri={bannerUrl}
-                height={bannerHeight}
-                page={page}
-                fade={BANNER_FADE}
-                solidAt={solidAt}
-                scrim={0.4}
-                veil={VEIL}
-                ready={colour.resolved}
-                onLoad={({ width: artWidth, height: artHeight }) => {
-                  if (
-                    banner &&
-                    banner.heroUrl === bannerUrl &&
-                    artHeight > 0 &&
-                    artWidth / artHeight > BANNER_MAX_ASPECT
-                  ) {
-                    setStrips((previous) => [...previous, banner.id]);
-                  }
-                }}
-                media={(art) => (
-                  <TrailerBackdrop
-                    url={playingTrailer}
-                    height={bannerHeight}
-                    until={solidAt}
-                    onFrame={fielded ? onTrailerFrame : undefined}>
-                    {art}
-                  </TrailerBackdrop>
-                )}
-              />
-            </>
-          }
-          topBar={
-            <FrostedTopBar
-              back
-              glass
-              title={name}
-              header={barHeader}
-              /* The trailer on and off — SimpMusic's video ⇄ picture key,
-                 opposite the back disc — shown only when there is one. */
-              right={
-                trailer ? (
-                  <TopBarDisc
-                    icon={trailers.on ? 'videocam-off-outline' : 'videocam-outline'}
-                    label={trailers.on ? 'Stop the trailer' : 'Play the trailer'}
-                    onPress={() => trailers.setOn(!trailers.on)}
-                  />
-                ) : undefined
-              }
+        backdrop={
+          <>
+            <PageFill color={page} />
+            <PinnedHero
+              uri={bannerUrl}
+              height={bannerHeight}
+              page={page}
+              fade={BANNER_FADE}
+              solidAt={solidAt}
+              scrim={0.4}
+              veil={VEIL}
+              onLoad={({ width: artWidth, height: artHeight }) => {
+                if (
+                  banner &&
+                  banner.heroUrl === bannerUrl &&
+                  artHeight > 0 &&
+                  artWidth / artHeight > BANNER_MAX_ASPECT
+                ) {
+                  setStrips((previous) => [...previous, banner.id]);
+                }
+              }}
+              media={(art) => (
+                <TrailerBackdrop url={playingTrailer} height={bannerHeight} until={solidAt}>
+                  {art}
+                </TrailerBackdrop>
+              )}
             />
-          }>
-          <PageFlatList
-            data={ordered}
-            key={`grid-${COLUMNS}`}
-            numColumns={COLUMNS}
-            keyExtractor={keyExtractor}
-            /* Opaque, edge to edge, and spaced by their own padding rather than
+          </>
+        }
+        topBar={
+          <FrostedTopBar
+            back
+            glass
+            title={name}
+            header={barHeader}
+            handoff={handoff}
+            /* The trailer on and off — SimpMusic's video ⇄ picture key,
+                 opposite the back disc — shown only when there is one. */
+            right={
+              trailer ? (
+                <TopBarDisc
+                  icon={trailers.on ? 'videocam-off-outline' : 'videocam-outline'}
+                  label={trailers.on ? 'Stop the trailer' : 'Play the trailer'}
+                  onPress={() => trailers.setOn(!trailers.on)}
+                />
+              ) : undefined
+            }
+          />
+        }>
+        <PageFlatList
+          settle={handoff}
+          data={ordered}
+          key={`grid-${COLUMNS}`}
+          numColumns={COLUMNS}
+          keyExtractor={keyExtractor}
+          /* Opaque, edge to edge, and spaced by their own padding rather than
                the list's gap, which would leave slits of the art between rows. */
-            columnWrapperStyle={[styles.column, { backgroundColor: solidFill }]}
-            contentContainerStyle={styles.grid}
-            showsVerticalScrollIndicator={false}
-            initialNumToRender={GRID_INITIAL_ITEMS}
-            maxToRenderPerBatch={GRID_BATCH_ITEMS}
-            windowSize={GRID_WINDOW}
-            renderItem={renderItem}
-            removeClippedSubviews={Platform.OS === 'android'}
-            ListHeaderComponent={
-              <View>
-                {/* The solid part's soft top edge, under the name block: the art
+          columnWrapperStyle={[styles.column, { backgroundColor: page }]}
+          contentContainerStyle={styles.grid}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={GRID_INITIAL_ITEMS}
+          maxToRenderPerBatch={GRID_BATCH_ITEMS}
+          windowSize={GRID_WINDOW}
+          renderItem={renderItem}
+          removeClippedSubviews={Platform.OS === 'android'}
+          ListHeaderComponent={
+            <View>
+              {/* The solid part's soft top edge, under the name block: the art
                     the name floats on gives way to the page here. */}
-                {!fielded && (
-                  <View pointerEvents="none" style={[styles.lip, { top: bannerHeight - LIP }]}>
-                    <LinearGradient
-                      colors={lipColours(page)}
-                      locations={
-                        LIP_STOPS.locations as unknown as readonly [number, number, ...number[]]
-                      }
-                      style={styles.fill}
-                    />
-                  </View>
-                )}
+              <View pointerEvents="none" style={[styles.lip, { top: bannerHeight - LIP }]}>
+                <LinearGradient
+                  colors={lipColours(page)}
+                  locations={
+                    LIP_STOPS.locations as unknown as readonly [number, number, ...number[]]
+                  }
+                  style={styles.fill}
+                />
+              </View>
 
-                {/* Where the banner shows through, with the studio's name over its
+              {/* Where the banner shows through, with the studio's name over its
                     foot — in the page, so it floats up over the art as the page
                     scrolls. Out of flow, so a logo replacing the name moves
                     nothing below. */}
-                <View style={{ height: bannerHeight }}>
-                  <View style={styles.identity}>
+              <View style={{ height: bannerHeight }}>
+                <View style={styles.identity}>
+                  <HandoffTitle band={handoff} onHeight={setNameHeight}>
                     <StudioIdentity
                       name={name}
                       logo={logo.data}
                       pageColor={page}
                       maxWidth={Math.round(width * LOGO_WIDTH_RATIO)}
-                      nameColor={inks?.primary}
+                      nameColor={nameColor}
                     />
-                    {games.data && (
-                      <Text
-                        variant="body"
-                        style={[styles.meta, { color: withAlpha(theme.text, META_ALPHA) }]}>
-                        {`${catalogue.length} ${catalogue.length === 1 ? 'game' : 'games'}`}
-                        {span ? ` · ${span}` : ''}
-                        {average !== null && (
-                          <>
-                            {' · Average rating '}
-                            {/* The score's own ramp, never the accent: a blue 55
+                  </HandoffTitle>
+                  {games.data && (
+                    <Text
+                      variant="body"
+                      style={[styles.meta, { color: withAlpha(theme.text, META_ALPHA) }]}>
+                      {`${catalogue.length} ${catalogue.length === 1 ? 'game' : 'games'}`}
+                      {span ? ` · ${span}` : ''}
+                      {average !== null && (
+                        <>
+                          {' · Average rating '}
+                          {/* The score's own ramp, never the accent: a blue 55
                                 would read as endorsed (CLAUDE.md, "One score ramp"). */}
-                            <Text variant="h5" style={{ color: scoreColor(average, theme) }}>
-                              {average}
-                            </Text>
-                          </>
-                        )}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-
-                {/* The page's solid part: the rails, opaque, rising over the art. */}
-                <View style={[styles.solid, { backgroundColor: solidFill }]}>
-                  {/* The rails rise into place as they scroll into view. */}
-                  <RevealScope>
-                    <StudioShelves
-                      latest={latest}
-                      best={best}
-                      popular={popular}
-                      upcoming={upcoming}
-                      franchises={franchises}
-                      redone={redone}
-                      repackaged={repackaged}
-                      count={catalogue.length}
-                      sort={sort}
-                      onSort={setSort}
-                    />
-                  </RevealScope>
+                          <Text variant="h5" style={{ color: scoreColor(average, theme) }}>
+                            {average}
+                          </Text>
+                        </>
+                      )}
+                    </Text>
+                  )}
                 </View>
               </View>
-            }
-            ListEmptyComponent={
-              games.isLoading ? (
-                <View style={styles.skeletonGrid}>
-                  {Array.from({ length: 12 }).map((_, index) => (
-                    <Skeleton
-                      key={index}
-                      width={tileWidth}
-                      height={tileWidth / (2 / 3)}
-                      radius={Radius.image}
-                    />
-                  ))}
-                </View>
-              ) : games.isLoadingError ? (
-                <ErrorState error={games.error} />
-              ) : (
-                <EmptyState
-                  title="No games found"
-                  message="IGDB has no catalogue for this studio."
-                />
-              )
-            }
-          />
-        </Screen>
-      </ThemeInks>
+
+              {/* The page's solid part: the rails, opaque, rising over the art. */}
+              <View style={[styles.solid, { backgroundColor: page }]}>
+                {/* The rails rise into place as they scroll into view. */}
+                <RevealScope>
+                  <StudioShelves
+                    latest={latest}
+                    best={best}
+                    popular={popular}
+                    upcoming={upcoming}
+                    franchises={franchises}
+                    redone={redone}
+                    repackaged={repackaged}
+                    count={catalogue.length}
+                    sort={sort}
+                    onSort={setSort}
+                  />
+                </RevealScope>
+              </View>
+            </View>
+          }
+          ListEmptyComponent={
+            games.isLoading ? (
+              <View style={styles.skeletonGrid}>
+                {Array.from({ length: 12 }).map((_, index) => (
+                  <Skeleton
+                    key={index}
+                    width={tileWidth}
+                    height={tileWidth / (2 / 3)}
+                    radius={Radius.image}
+                  />
+                ))}
+              </View>
+            ) : games.isLoadingError ? (
+              <ErrorState error={games.error} />
+            ) : (
+              <EmptyState title="No games found" message="IGDB has no catalogue for this studio." />
+            )
+          }
+        />
+      </Screen>
     </AccentProvider>
   );
 }

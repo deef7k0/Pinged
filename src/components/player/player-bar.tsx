@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SoundCloudMark } from '@/components/player/soundcloud-mark';
+import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { useSelectable } from '@/components/ui/selectable';
 import { Text } from '@/components/ui/text';
@@ -149,11 +150,13 @@ export function PlayerBar({ queue }: PlayerBarProps) {
           focusRing={keep.focusRing}
           scaleTo={0.97}
           style={StyleSheet.flatten([styles.keep, keep.style])}>
-          <Ionicons
-            name={keepPlaying ? 'checkmark-circle' : 'ellipse-outline'}
-            size={16}
-            color={keepPlaying ? accent.onSurface : theme.textSecondary}
-          />
+          <PressGlyph pop={keepPlaying}>
+            <Ionicons
+              name={keepPlaying ? 'checkmark-circle' : 'ellipse-outline'}
+              size={16}
+              color={keepPlaying ? accent.onSurface : theme.textSecondary}
+            />
+          </PressGlyph>
           <Text variant="button" color={keep.label}>
             Keep playing
           </Text>
@@ -178,13 +181,17 @@ export function PlayerBar({ queue }: PlayerBarProps) {
             {loading ? (
               <ActivityIndicator color={accent.ink} />
             ) : (
-              <Ionicons
-                name={playing ? 'pause' : 'play'}
-                size={24}
-                color={accent.ink}
-                /* A play triangle is optically left-heavy in a circle. */
-                style={playing ? undefined : styles.playNudge}
-              />
+              /* Shrinks toward nothing under the finger and springs back as
+                 the other glyph (Convx's `playGlyphPress`). */
+              <PressGlyph motion="play">
+                <Ionicons
+                  name={playing ? 'pause' : 'play'}
+                  size={24}
+                  color={accent.ink}
+                  /* A play triangle is optically left-heavy in a circle. */
+                  style={playing ? undefined : styles.playNudge}
+                />
+              </PressGlyph>
             )}
           </PressableScale>
 
@@ -260,7 +267,11 @@ export function TransportKey({ icon, label, disabled = false, onPress }: Transpo
       pressedColor={theme.pressed}
       scaleTo={0.9}
       style={StyleSheet.flatten([styles.key, disabled && styles.dimmed])}>
-      <Ionicons name={icon} size={22} color={theme.text} />
+      {/* Dips under the finger and, let go, steps the way it skips
+          (Convx's `skipGlyphPress`). */}
+      <PressGlyph motion="skip" direction={icon.includes('back') ? -1 : 1}>
+        <Ionicons name={icon} size={22} color={theme.text} />
+      </PressGlyph>
     </PressableScale>
   );
 }

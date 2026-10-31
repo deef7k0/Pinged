@@ -46,12 +46,6 @@ export type AccentProviderProps = {
   /** Bypass everything with an explicit hue. For a tier row or a preview. */
   color?: string | null;
   /**
-   * The tone the loud fill — the review button, a lit key, the chosen tab —
-   * is taken at, when the page is not the scheme's own dark one: the game
-   * page's, whose colour is its hero's (`usePageColor`, `buttonTone`).
-   */
-  primaryTone?: number;
-  /**
    * Provide the house accent instead — the app's own page and its white — as
    * if there were no provider at all. A review's page switches this from its
    * top bar (`useReviewColour`); keeping the provider mounted is what lets the
@@ -67,7 +61,6 @@ export function AccentProvider({
   artwork,
   genres,
   color,
-  primaryTone,
   neutral = false,
 }: AccentProviderProps) {
   const theme = useTheme();
@@ -87,8 +80,8 @@ export function AccentProvider({
         ? accentRoles(theme.gameNeutral)
         : neutral
           ? accentRoles(theme.primary)
-          : accentRoles(hue, { tonal: true, primaryTone }),
-    [hue, neutral, colours.on, theme.primary, theme.gameNeutral, primaryTone]
+          : accentRoles(hue, { tonal: true }),
+    [hue, neutral, colours.on, theme.primary, theme.gameNeutral]
   );
 
   /* Both contexts, from one extraction. `useAccent()` is what the app's own
@@ -148,29 +141,6 @@ function useArtworkHue({
   const seed = useAlbumArtColor(color ? null : artwork, { fallback });
 
   return color ?? seed;
-}
-
-/**
- * The accent's type roles swapped for other inks, for everything under it —
- * inside a card in the filled colour (`CardInks`), where the accent's own
- * `onSurface` and `quietInk`, light type made for a dark room, would sit on a
- * light fill. Every other role is the accent's own.
- */
-export function AccentInks({
-  ink,
-  quiet,
-  children,
-}: {
-  ink: string;
-  quiet: string;
-  children?: ReactNode;
-}) {
-  const accent = useAccent();
-  const roles = useMemo(
-    () => ({ ...accent, onSurface: ink, quietInk: quiet }),
-    [accent, ink, quiet]
-  );
-  return <AccentContext.Provider value={roles}>{children}</AccentContext.Provider>;
 }
 
 /**

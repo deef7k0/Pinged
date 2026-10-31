@@ -18,13 +18,14 @@ import {
   TapTarget,
   withAlpha,
 } from '@/constants/theme';
+import { useAccent } from '@/hooks/use-accent';
 import { useAnimatedCover } from '@/hooks/use-animated-cover';
 import { useArtworkMesh } from '@/hooks/use-artwork-mesh';
 import { useTheme } from '@/hooks/use-theme';
 import { topWashAlpha } from '@/lib/artwork-mesh';
 import { INK_ON_LIGHT } from '@/lib/color';
 import { sharpCoverUrl } from '@/lib/games/sharp-cover';
-import { smoothScrimStops } from '@/lib/immersive-color';
+import { smoothScrimStops } from '@/lib/scrim';
 
 /** The zoom, both ways: the request's ~300ms, easing out. */
 const ZOOM_MS = 300;
@@ -80,8 +81,6 @@ export type CoverViewerProps = {
   game: { id: string; title: string; coverUrl: string | null; heroUrl: string | null };
   /** The masthead cover's place, measured when it was tapped. */
   origin: CoverOrigin;
-  /** The page's colour: what the viewer stands on until the mesh is read. */
-  page: string;
   /** The cover is back in its place: unmount this. */
   onClosed: () => void;
 };
@@ -99,7 +98,9 @@ type Shown = 'static' | 'animated';
  * add a button for 'static' or 'animated'. Only fetch animated when the user
  * taps on the animated button, and show if it has one. The buttons should be
  * text alone, in bold. Not inside a pill or a container. Static above and
- * Animated below."
+ * Animated below." For one day (2026-10-28) BitChord's mesh of blobs stood
+ * in for it; the owner had it taken back out: "Bring back simpmusic's apple
+ * music now playing blur on the zoomed in version and remove the mesh blob."
  *
  * - **The cover runs edge to edge from the top of the display**, under the
  *   status bar, at 2:3. A display too short to leave `ROOM_BELOW` under it
@@ -129,8 +130,11 @@ type Shown = 'static' | 'animated';
  * - The close key, the system's back and a tap anywhere but the two words
  *   reverse the zoom.
  */
-export function CoverViewer({ game, origin, page, onClosed }: CoverViewerProps) {
+export function CoverViewer({ game, origin, onClosed }: CoverViewerProps) {
   const theme = useTheme();
+  /* The game page's colour — the page's provider is round this too: what the
+     viewer stands on until the mesh is read. */
+  const page = useAccent().page;
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const duration = reduceMotion ? 0 : ZOOM_MS;

@@ -45,8 +45,12 @@
  * shape barely moved; what it means did — as with 2, every saved score would
  * have opened a game's page on the old number for the moment before the new
  * one arrived, beside a verdict and a breakdown already weighted.
+ *
+ * 5: every colour method but Material 3 was removed from the app (2026-10-28),
+ * and with it the queries that kept their answers. Their saved rows would
+ * have been restored into memory on every launch for nothing to read.
  */
-export const CACHE_VERSION = 4;
+export const CACHE_VERSION = 5;
 
 /** A week, as SimpMusic keeps its own cached answers (`MOOD_ARTWORK_TTL_MILLIS`). */
 export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -98,10 +102,10 @@ const NEVER_PERSIST: ReadonlySet<string> = new Set([
   'review-colour',
   'game-colours',
   'animated-artwork',
+  'copy-stage-3d',
   'trailers',
   'album-art-color',
   'artwork-color',
-  'artwork-dominant',
   'studio-logo',
   'studio-banner',
   /* A mesh is a few kilobytes of data URI worked out from a 90×128 thumbnail:
@@ -114,6 +118,11 @@ const NEVER_PERSIST: ReadonlySet<string> = new Set([
   /* Home's moods and genres: up to sixty whole games a feed, and Home always opens on
      All — rows that would push out the ones a cold start actually draws. */
   'home-feed',
+  /* "Games for you" is a new round every time the app is opened, and the
+     history it reads is a device store of its own. A restored round would be
+     last time's games. */
+  'recommended',
+  'recommend-history',
 
   /* SoundCloud's. Its API terms forbid keeping titles, names or artwork past
      the session, and a query cache written to the device is exactly that.

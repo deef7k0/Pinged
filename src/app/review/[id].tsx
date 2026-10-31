@@ -22,6 +22,7 @@ import { AnimatedCoverImage } from '@/components/ui/animated-cover-image';
 import { Avatar } from '@/components/ui/avatar';
 import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
 import { PageScrollView } from '@/components/ui/page-scroll';
+import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
@@ -449,11 +450,13 @@ function ReviewPage({
                   onPress={toggle}
                   scaleTo={0.9}
                   style={styles.like}>
-                  <Ionicons
-                    name={liked ? 'heart' : 'heart-outline'}
-                    size={LIKE_ROW.heart}
-                    color={liked ? theme.liked : theme.textMuted}
-                  />
+                  <PressGlyph pop={liked}>
+                    <Ionicons
+                      name={liked ? 'heart' : 'heart-outline'}
+                      size={LIKE_ROW.heart}
+                      color={liked ? theme.liked : theme.textMuted}
+                    />
+                  </PressGlyph>
                   {likeCount > 0 && (
                     <Text style={[styles.count, { color: theme.textMuted }]}>
                       {likeCount.toLocaleString()}

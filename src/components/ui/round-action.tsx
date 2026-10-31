@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet } from 'react-native';
 
+import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Radius } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
@@ -45,7 +46,7 @@ export function RoundAction({
       accessibilityState={{ selected, busy, disabled: busy }}
       disabled={busy}
       onPress={onPress}
-      scaleTo={0.9}
+      scaleTo={0.96}
       style={StyleSheet.flatten([
         styles.round,
         busy && styles.busy,
@@ -57,13 +58,16 @@ export function RoundAction({
           backgroundColor: selected ? accent.m3.primaryContainer : accent.m3.surfaceContainerHigh,
         },
       ])}>
-      <Ionicons
-        name={icon}
-        size={22}
-        /* Measured against the fill directly behind it rather than against the
-           page — the fill is the only thing under the glyph. */
-        color={selected ? accent.m3.onPrimaryContainer : theme.text}
-      />
+      {/* It wobbles under the finger, and a like or a save pops (Convx's). */}
+      <PressGlyph pop={selected}>
+        <Ionicons
+          name={icon}
+          size={22}
+          /* Measured against the fill directly behind it rather than against the
+             page — the fill is the only thing under the glyph. */
+          color={selected ? accent.m3.onPrimaryContainer : theme.text}
+        />
+      </PressGlyph>
     </PressableScale>
   );
 }

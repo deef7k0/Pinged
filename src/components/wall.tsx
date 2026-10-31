@@ -4,6 +4,7 @@ import { Link } from 'expo-router';
 import { memo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { ReportFlag } from '@/components/report-flag';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Poster } from '@/components/ui/poster';
@@ -109,19 +110,26 @@ export const WallPostRow = memo(function WallPostRow({ post }: { post: WallPost 
 
   return (
     <View style={[styles.postCard, { borderTopColor: theme.border }]}>
-      <Link href={{ pathname: '/profile/[id]', params: { id: post.author_id } }} asChild>
-        <PressableScale accessibilityRole="button" scaleTo={0.99} style={styles.postHead}>
-          <Avatar uri={post.author?.avatar_url} name={displayNameFor(post.author)} size={34} />
-          <View style={styles.postHeadText}>
-            <Text variant="h5" numberOfLines={1}>
-              {displayNameFor(post.author)}
-            </Text>
-            <Text variant="caption" color="textMuted">
-              {timeAgo(post.created_at)}
-            </Text>
-          </View>
-        </PressableScale>
-      </Link>
+      <View style={styles.postHeadRow}>
+        <Link href={{ pathname: '/profile/[id]', params: { id: post.author_id } }} asChild>
+          <PressableScale accessibilityRole="button" scaleTo={0.99} style={styles.postHead}>
+            <Avatar uri={post.author?.avatar_url} name={displayNameFor(post.author)} size={34} />
+            <View style={styles.postHeadText}>
+              <Text variant="h5" numberOfLines={1}>
+                {displayNameFor(post.author)}
+              </Text>
+              <Text variant="caption" color="textMuted">
+                {timeAgo(post.created_at)}
+              </Text>
+            </View>
+          </PressableScale>
+        </Link>
+        <ReportFlag
+          target={{ kind: 'wall_post', targetId: post.id, authorId: post.author_id }}
+          authorId={post.author_id}
+          label={`Report ${displayNameFor(post.author)}’s post`}
+        />
+      </View>
 
       <Text variant="body" color="textSecondary">
         {post.body}
@@ -288,7 +296,8 @@ const styles = StyleSheet.create({
     gap: Spacing.x8,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  postHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
+  postHeadRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
+  postHead: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
   postHeadText: { flex: 1, gap: 1 },
   /* No inset of its own: the profile hands every row its margin, and a row
      that added four to it started its glyph inside the edge the heading, the

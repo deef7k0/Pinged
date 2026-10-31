@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import { withAlpha } from '@/constants/theme';
-import { smoothScrimStops } from '@/lib/immersive-color';
+import { smoothScrimStops } from '@/lib/scrim';
 
 const STOPS = smoothScrimStops();
 const LOCATIONS = STOPS.locations as unknown as readonly [number, number, ...number[]];

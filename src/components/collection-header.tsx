@@ -4,9 +4,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Link } from 'expo-router';
 import { Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
+import { HandoffTitle } from '@/components/ui/handoff-title';
 import { Avatar } from '@/components/ui/avatar';
 import { ExpandableText } from '@/components/ui/expandable-text';
-import { footFade } from '@/components/ui/key-color-hero';
+import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { useSectionMetrics } from '@/components/ui/section';
 import { SmoothScrim } from '@/components/ui/smooth-scrim';
@@ -16,7 +17,7 @@ import { Palette, Radius, Spacing, TapTarget, Type, withAlpha } from '@/constant
 import { useLikeToggle } from '@/hooks/use-like-toggle';
 import { useTheme } from '@/hooks/use-theme';
 import { displayNameFor } from '@/lib/format';
-import { smoothScrimStops } from '@/lib/immersive-color';
+import { footFade, smoothScrimStops } from '@/lib/scrim';
 import type { Engagement, ListCover, ListItem, ListWithItems } from '@/lib/api';
 import type { Profile } from '@/lib/database.types';
 
@@ -50,7 +51,7 @@ const META_ALPHA = 0.77;
 export const COLLECTION_BOX_ANCHOR = 0.22;
 const SINGLE_ANCHOR = `${COLLECTION_BOX_ANCHOR * 100}%` as const;
 
-/** The art giving way to its ground over its bottom `SCRIM_RATIO`, eased at both ends. */
+/** The art giving way to the page over its bottom `SCRIM_RATIO`, eased at both ends. */
 export const COLLECTION_COVER_FADE = footFade(SCRIM_RATIO);
 
 /** How much of the cover, from the top, is darkened for the status bar and the glass discs. */
@@ -97,6 +98,13 @@ export type CollectionHeaderProps = {
   /** Like count and whether the viewer is one of them. */
   engagement?: Engagement;
   onShare?: () => void;
+  /**
+   * The glass bar's handoff (`handoffBand`): the name fades over its first
+   * half as it goes under the bar, and the bar's name comes in over the
+   * second. The page builds it from the name's height, `onTitleHeight`.
+   */
+  handoff?: { from: number; to: number };
+  onTitleHeight?: (height: number) => void;
 };
 
 /**
@@ -158,20 +166,17 @@ export type CollectionHeaderProps = {
  *
  * ## The page takes that cover's colour
  *
- * The screen fills with the cover's immersive colour
- * (`useImmersiveBackground`) and the scrim melts into it — every collection
- * with a game in it now, where it was only those showing one cover. The colour
- * is the background's alone — the actions keep a neutral wash.
+ * The screen is the cover's Material 3 page — the box art's seed, as the
+ * game's own page is (`useGameAccent`) — and the art melts into it: every
+ * collection with a game in it. The controls wear the same scheme, through
+ * the screen's `<AccentProvider>`; the two actions keep their wash of the ink.
  *
- * ## The art ends in its own colour, and softens as the page scrolls
+ * ## The art is pinned behind the page
  *
- * Apple Music's artist hero (2026-10-23, the owner's direction,
- * `<KeyColorHero>`): the cover melts into its key colour — read off the edges
- * of the part of the box the banner shows — and that colour into the page.
- * At rest the cover is sharp and the fade is the reference's plain ramp, over
- * the bottom 70%; scrolled, a blurred copy fades in over it and the colour
- * drains to the page, finished as the glass bar comes in. Square art has no
- * key colour (`useKeyColor` says why) and melts into the page's own colour.
+ * The game page's hero (`<PinnedHero>`): the art stays at the top of the
+ * display, drifting slowly, while the title floats up over it; a blurred copy
+ * fades in and the art drains into the page's colour, solid as the glass bar
+ * comes in. This header leaves the room for it and draws the title over it.
  */
 /**
  * Which picture a collection's hero is, and where it sits: its cover game's
@@ -215,6 +220,8 @@ export function CollectionHeader({
   pageColor = null,
   engagement,
   onShare,
+  handoff,
+  onTitleHeight,
 }: CollectionHeaderProps) {
   const theme = useTheme();
   const { height } = useWindowDimensions();
@@ -234,9 +241,17 @@ export function CollectionHeader({
 
   const titleBlock = (
     <View style={styles.titleBlock} pointerEvents="none">
-      <Text variant="display" numberOfLines={2} style={styles.title} accessibilityRole="header">
-        {collection.title}
-      </Text>
+      {handoff ? (
+        <HandoffTitle band={handoff} onHeight={onTitleHeight} style={styles.handoff}>
+          <Text variant="display" numberOfLines={2} style={styles.title} accessibilityRole="header">
+            {collection.title}
+          </Text>
+        </HandoffTitle>
+      ) : (
+        <Text variant="display" numberOfLines={2} style={styles.title} accessibilityRole="header">
+          {collection.title}
+        </Text>
+      )}
 
       <Text variant="body" style={[styles.meta, { color: withAlpha(theme.text, META_ALPHA) }]}>
         {collectionKindLabel(collection)} · {items.length} {items.length === 1 ? 'game' : 'games'}
@@ -344,7 +359,9 @@ export function CollectionHeader({
                 pressedColor={theme.pressed}
                 scaleTo={0.92}
                 style={StyleSheet.flatten([styles.action, { backgroundColor: actionFill }])}>
-                <Ionicons name="share-outline" size={ACTION_GLYPH} color={theme.text} />
+                <PressGlyph>
+                  <Ionicons name="share-outline" size={ACTION_GLYPH} color={theme.text} />
+                </PressGlyph>
               </PressableScale>
             )}
 
@@ -374,11 +391,13 @@ export function CollectionHeader({
                 likeCount > 0 && styles.actionCounted,
                 { backgroundColor: actionFill },
               ])}>
-              <Ionicons
-                name={liked ? 'heart' : 'heart-outline'}
-                size={ACTION_GLYPH}
-                color={liked ? theme.liked : theme.text}
-              />
+              <PressGlyph pop={liked}>
+                <Ionicons
+                  name={liked ? 'heart' : 'heart-outline'}
+                  size={ACTION_GLYPH}
+                  color={liked ? theme.liked : theme.text}
+                />
+              </PressGlyph>
               {likeCount > 0 && <Text variant="button">{likeCount}</Text>}
             </PressableScale>
           </View>
@@ -609,6 +628,8 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.x24,
   },
   title: { textAlign: 'center' },
+  /* The name's own width, as the column had it: the text centres in it. */
+  handoff: { alignSelf: 'stretch' },
   meta: { textAlign: 'center' },
 
   /* The page's margin: one left edge for the byline, the description, the sort

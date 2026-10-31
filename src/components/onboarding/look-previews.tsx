@@ -98,7 +98,7 @@ export function ExamplePager({
  */
 export function GamePagePreview({ game, width }: { game: Game; width: number }) {
   return (
-    <AccentProvider artwork={game.coverUrl ?? game.heroUrl} genres={game.genres}>
+    <AccentProvider artwork={game.heroUrl ?? game.coverUrl} genres={game.genres}>
       <GamePageSketch game={game} width={width} />
     </AccentProvider>
   );

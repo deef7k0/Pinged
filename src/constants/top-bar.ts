@@ -255,3 +255,104 @@ export function homeBarMoved(anchor: number, offset: number, slop: number): bool
   'worklet';
   return Math.abs(offset - anchor) > slop;
 }
+
+/**
+ * The handoff on a page with Apple's glass bar (`<FrostedTopBar glass>`): the
+ * page's own name gives way to the bar's as it goes under the bar.
+ *
+ * Read from FancyScrollView's `HeaderScrollView` (nerdsupremacist), which is
+ * Apple Music's large-title bar written out in SwiftUI, and from eleev's
+ * `DrawerView`, a scrubbed, interruptible transition:
+ *
+ *  - **It is scrubbed by the scroll, never timed.** The bar's glass, its name
+ *    and the page's name all follow one number, `handoffWeight`: 1 before the
+ *    band, 0 after it, the page's offset between. Scrolling halfway leaves
+ *    everything halfway; scrolling back runs it backwards. (The bar was a
+ *    300ms fade set off as the page crossed one line: a slow scroll had the
+ *    page's name lying in the bar's row, under the 60% glass, while the bar's
+ *    own name faded in over it. Two names, one on top of the other.)
+ *  - **The two names are never seen together.** FancyScrollView's
+ *    `HeaderScrollViewTitle`: the large title fades out over the first half of
+ *    the band, the small one in over the second, each on a square root, so it
+ *    leaves fast and arrives fast and neither is ever a ghost.
+ *  - **The glass is `1 − √w`**: there as soon as the band begins, whole at
+ *    its end — FancyScrollView's blur against its header's `√w`.
+ *  - **The band is the page's name crossing the bar's foot**: from its top
+ *    reaching it to its foot reaching it (`handoffBand`). FancyScrollView's is
+ *    one navigation-bar height before the collapse; here the name is measured,
+ *    because a game's name runs to four lines.
+ *  - **It does not rest in between** (`settleOffset`): DrawerView's `.ended`
+ *    — a release mid-way finishes the way the finger was going, or back to the
+ *    nearer end when it was not going anywhere.
+ *
+ * The band ends where it always did: the lines under the name at the bar's
+ * foot, which is where the pinned hero is solid (`solidAt`).
+ */
+export const HANDOFF = {
+  /** The band is never thinner than this, whatever the name measured: a hair-trigger is a flicker. */
+  minBand: 16,
+  /** How far a release has to have travelled one way for the settle to follow it, in dp. */
+  intent: 8,
+} as const;
+
+/**
+ * The handoff's band, in page offsets: where the name's top reaches the bar's
+ * foot, and where its foot does.
+ *
+ * @param titleTop the name's top, from the top of the page
+ * @param titleFoot its foot — the top of whatever is under it
+ * @param bar the bar's whole height, inset included
+ */
+export function handoffBand(
+  titleTop: number,
+  titleFoot: number,
+  bar: number
+): { from: number; to: number } {
+  const to = Math.max(1, revealOffset(titleFoot, bar));
+  const from = Math.max(0, Math.min(revealOffset(titleTop, bar), to - HANDOFF.minBand));
+  return { from, to };
+}
+
+/** How much of the handoff is still to come: 1 before the band, 0 after, linear between. */
+export function handoffWeight(offset: number, from: number, to: number): number {
+  'worklet';
+  if (to <= from) return offset >= to ? 0 : 1;
+  return Math.min(1, Math.max(0, (to - offset) / (to - from)));
+}
+
+/** The page's own name: whole until the band is half done, gone by then (`√`). */
+export function pageTitleOpacity(weight: number): number {
+  'worklet';
+  return Math.sqrt((Math.max(weight, 0.5) - 0.5) * 2);
+}
+
+/** The bar's name: nothing until the band is half done, whole at its end (`√`). */
+export function barTitleOpacity(weight: number): number {
+  'worklet';
+  return Math.sqrt(1 - Math.min(weight, 0.5) * 2);
+}
+
+/** The bar's glass: as soon as the band begins, whole at its end. */
+export function glassIn(weight: number): number {
+  'worklet';
+  return 1 - Math.sqrt(Math.min(1, Math.max(0, weight)));
+}
+
+/**
+ * Where a page that has stopped inside the band should go: the end the finger
+ * was going toward (`moved`, the gesture's travel, + down the page), or the
+ * nearer one if it was hardly going anywhere. `null` outside the band, and at
+ * either end of it — nothing to do.
+ */
+export function settleOffset(
+  offset: number,
+  from: number,
+  to: number,
+  moved: number,
+  intent: number
+): number | null {
+  if (!(offset > from + 0.5 && offset < to - 0.5)) return null;
+  if (moved > intent) return to;
+  if (moved < -intent) return from;
+  return offset - from < to - offset ? from : to;
+}

@@ -776,15 +776,12 @@ const TONAL_STATES = { wash: 0.14, edge: 0.45, ring: 0.22 } as const;
  * every control that reads `useAccent()` — so the result is cached, and callers
  * get the same object back. Treat it as immutable.
  */
-export function accentRoles(
-  hue: string,
-  { tonal = false, primaryTone }: { tonal?: boolean; primaryTone?: number } = {}
-): AccentRoles {
-  const key = `${tonal ? 'tonal' : 'house'}:${hue}:${primaryTone ?? ''}`;
+export function accentRoles(hue: string, { tonal = false }: { tonal?: boolean } = {}): AccentRoles {
+  const key = `${tonal ? 'tonal' : 'house'}:${hue}`;
   const cached = accentCache.get(key);
   if (cached) return cached;
 
-  const roles = buildAccentRoles(hue, tonal, primaryTone);
+  const roles = buildAccentRoles(hue, tonal);
   /* Oldest first out; a Map iterates in insertion order. A game's hue is read
      off its box art, so a long session would otherwise keep every one it saw. */
   if (accentCache.size >= ACCENT_CACHE_SIZE) {
@@ -827,12 +824,7 @@ function neutralM3(hue: string, ink: string): DynamicThemeColors {
   };
 }
 
-/**
- * `primaryTone`: the loud fill at another tone of its own palette — the game
- * page's, whose page is a mid-tone colour of its own (`lib/page-color`,
- * `buttonTone`). Tonal only; every other role is the scheme's.
- */
-function buildAccentRoles(hue: string, tonal: boolean, primaryTone?: number): AccentRoles {
+function buildAccentRoles(hue: string, tonal: boolean): AccentRoles {
   if (!tonal) {
     /* The house blue. `primary` is a chosen brand colour sitting on a fixed
        `background`, not a measurement, so there is nothing for a tonal palette
@@ -902,7 +894,7 @@ function buildAccentRoles(hue: string, tonal: boolean, primaryTone?: number): Ac
    * the page back up means raising the neutral palettes' chroma in
    * `dynamic-color.ts`, in one place, for every role at once.
    */
-  const m3 = generateDynamicTheme(hue, true, { primaryTone });
+  const m3 = generateDynamicTheme(hue, true);
 
   return {
     color: m3.primary,
@@ -1456,8 +1448,12 @@ export const Motion = {
    * still and dims instead, because a scale is spatial movement while press
    * feedback is an affordance, and answering the first by deleting the second
    * would be the wrong trade. This value is the motion-on path.
+   *
+   * 0.95 since 2026-10-31, toward Convx's 0.94 (`bounceClick`): at 0.98 a
+   * card barely moved, and the owner asked that a tap always answer. Every
+   * control that sets its own `scaleTo` kept it; they all spring now.
    */
-  pressScale: 0.98,
+  pressScale: 0.95,
 } as const;
 
 /**

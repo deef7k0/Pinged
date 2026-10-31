@@ -15,10 +15,8 @@ import {
   withAlpha,
 } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
-import { useScreenChrome } from '@/hooks/use-screen-chrome';
 import { useTheme } from '@/hooks/use-theme';
 import { readableInk } from '@/lib/color';
-import { filledRoles } from '@/lib/filled';
 
 export type TabItem<T extends string> = {
   key: T;
@@ -149,25 +147,14 @@ export function TabBar<T extends string>({
 }: TabBarProps<T>) {
   const theme = useTheme();
   const accent = useAccent();
-  const artColoured = useScreenChrome()?.artColoured ?? false;
 
   const { m3 } = accent;
-  /*
-   * The chosen tab's fill and label. On a page coloured from its art — a
-   * game, a studio, a collection — the review button's, to the value
-   * (`filledRoles`): the owner's (2026-10-27), the cards, the button and the
-   * tab are "the exact same one". Everywhere else Material's `primary` as it
-   * was, so no other screen's tabs move.
-   */
-  const filled = artColoured ? filledRoles(accent) : null;
-  const chosenFill = filled?.fill ?? m3.primary;
-  const chosenInk = filled?.ink ?? m3.onPrimary;
   const reduceMotion = useReducedMotion();
   const fill = align === 'spread' && !iconOnly;
   const items = tabs.map((tab, index) => {
     const active = tab.key === value;
     const showCount = tab.count != null && tab.count > 0;
-    const ink = active ? chosenInk : m3.onSurfaceVariant;
+    const ink = active ? m3.onPrimary : m3.onSurfaceVariant;
 
     return (
       <PressableScale
@@ -194,10 +181,10 @@ export function TabBar<T extends string>({
              fill eases in from. */
           {
             backgroundColor: 'transparent',
-            borderColor: active ? chosenFill : m3.outlineVariant,
+            borderColor: active ? m3.primary : m3.outlineVariant,
           },
         ])}>
-        <PaintFill on={active} color={chosenFill} />
+        <PaintFill on={active} color={m3.primary} />
         {tab.icon && <PaintGlyph name={tab.icon} size={iconOnly ? 22 : 15} color={ink} />}
 
         {!iconOnly && (

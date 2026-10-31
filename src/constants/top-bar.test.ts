@@ -5,6 +5,7 @@ import {
   BAR_SLIDE,
   BAR_SPRING,
   FROST,
+  HANDOFF,
   HOME_BAR,
   TOP_BAR_DISC,
   TOP_BAR_DISC_ROOM,
@@ -15,11 +16,17 @@ import {
   TOP_BAR_ROW,
   TOP_BAR_SIDE,
   discShift,
+  barTitleOpacity,
   frostStrength,
+  glassIn,
+  handoffBand,
+  handoffWeight,
   homeBarMoved,
   homeBarOpen,
   isScrolled,
+  pageTitleOpacity,
   revealOffset,
+  settleOffset,
   titleStart,
 } from './top-bar';
 
@@ -276,5 +283,77 @@ describe('Home’s row', () => {
       true,
       true, // and home
     ]);
+  });
+});
+
+describe('the glass bar’s handoff — FancyScrollView’s large title, scrubbed', () => {
+  /* The game page on a 360 × 800 phone, 24dp status bar: the lines under a
+     one-line name (27) at 304 − 35 + 12 + 27, the bar 24 + 64. */
+  const BAR = 24 + TOP_BAR_ROW;
+  const FOOT = 304 - 35 + 12 + 27;
+  const band = handoffBand(FOOT - 27, FOOT, BAR);
+  const at = (offset: number) => handoffWeight(offset, band.from, band.to);
+
+  it('is the name crossing the bar’s foot, and ends where the bar always arrived', () => {
+    assert.equal(band.to, revealOffset(FOOT, BAR));
+    assert.equal(band.to - band.from, 27);
+    /* A four-line name starts sooner; it does not end later. */
+    const long = handoffBand(FOOT - 108, FOOT, BAR);
+    assert.equal(long.to, band.to);
+    assert.ok(long.from < band.from);
+  });
+
+  it('is never a hair-trigger, and never starts above the page', () => {
+    const thin = handoffBand(FOOT - 2, FOOT, BAR);
+    assert.equal(thin.to - thin.from, HANDOFF.minBand);
+    const short = handoffBand(10, 40, BAR);
+    assert.ok(short.from >= 0 && short.to >= 1 && short.to > short.from);
+  });
+
+  it('follows the scroll both ways, and holds outside the band', () => {
+    assert.equal(at(0), 1);
+    assert.equal(at(-50), 1, 'a bounce');
+    assert.equal(at(band.from), 1);
+    assert.equal(at(band.to), 0);
+    assert.equal(at(band.to + 500), 0);
+    let last = 1;
+    for (let o = band.from; o <= band.to; o += 0.5) {
+      assert.ok(at(o) <= last);
+      last = at(o);
+    }
+  });
+
+  it('never shows the two names together', () => {
+    for (let w = 0; w <= 1; w += 0.01) {
+      const page = pageTitleOpacity(w);
+      const bar = barTitleOpacity(w);
+      assert.ok(page === 0 || bar === 0, `both at ${w}`);
+    }
+    assert.equal(pageTitleOpacity(1), 1, 'the page’s name is whole at rest');
+    assert.equal(barTitleOpacity(1), 0);
+    assert.equal(pageTitleOpacity(0), 0);
+    assert.equal(barTitleOpacity(0), 1, 'the bar’s is whole once the band is done');
+  });
+
+  it('brings the glass in from the first dp of the band, whole at its end', () => {
+    assert.equal(glassIn(1), 0);
+    assert.ok(glassIn(0.95) > 0.02);
+    assert.equal(glassIn(0), 1);
+    /* Over the hero's own solid point: the glass is whole where the art is. */
+    assert.equal(glassIn(at(band.to)), 1);
+  });
+
+  it('does not rest half-way: it settles the way the finger went, else to the nearer end', () => {
+    const mid = (band.from + band.to) / 2;
+    const { intent } = HANDOFF;
+    assert.equal(settleOffset(mid, band.from, band.to, 40, intent), band.to);
+    assert.equal(settleOffset(mid, band.from, band.to, -40, intent), band.from);
+    assert.equal(settleOffset(band.from + 3, band.from, band.to, 0, intent), band.from);
+    assert.equal(settleOffset(band.to - 3, band.from, band.to, 2, intent), band.to);
+    /* Outside the band, and at its ends, there is nothing to do — so a settle
+       that has arrived does not set off another. */
+    for (const o of [0, band.from, band.to, band.to + 100]) {
+      assert.equal(settleOffset(o, band.from, band.to, 40, intent), null);
+    }
   });
 });

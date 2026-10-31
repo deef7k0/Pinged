@@ -4,7 +4,7 @@ import { describe, it } from 'node:test';
 import { hexToRgb } from './color.ts';
 import {
   GLOW_ANGLE,
-  GLOW_ARTWORK_FACTOR,
+  GLOW_THEME_FACTOR,
   GLOW_OVERFLOW,
   GLOW_SCRIM_SHARE,
   GLOW_STEPS,
@@ -15,11 +15,11 @@ import {
 } from './home-glow.ts';
 
 describe('the reference’s numbers', () => {
-  it('is SimpMusic’s Home glow — 25°, 140dp past the first item, a 60% scrim — at the owner’s × 0.5', () => {
+  it('is SimpMusic’s Home glow — 25°, 140dp past the first item, a 60% scrim — at AmbientThemeGlow’s × 0.45', () => {
     assert.equal(GLOW_ANGLE, 25);
     assert.equal(GLOW_OVERFLOW, 140);
     assert.equal(GLOW_SCRIM_SHARE, 0.6);
-    assert.equal(GLOW_ARTWORK_FACTOR, 0.5);
+    assert.equal(GLOW_THEME_FACTOR, 0.45);
     assert.equal(GLOW_STEPS, 24);
   });
 });
@@ -102,8 +102,11 @@ describe('easedStops', () => {
 });
 
 describe('glowTone', () => {
-  it('is the dominant colour at 0.5 while game colours are on', () => {
-    assert.equal(glowTone('#C86432', { gameColours: true, primary: '#0070CC' }), '#643219');
+  it('is the first game’s Material 3 primary at 0.45 while game colours are on', () => {
+    assert.equal(
+      glowTone('#C86432', { gameColours: true, primary: '#0070CC' }),
+      rgbFactor('#C86432', 0.45)
+    );
   });
 
   it('is no glow at all while the colour is unknown — not a stand-in', () => {

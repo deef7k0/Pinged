@@ -10,7 +10,6 @@ import { editionLabel } from '@/constants/game-editions';
 import { PLATFORMS, hasCase, type PlatformKey } from '@/constants/platform-cases';
 import { PosterAspectRatio, Spacing } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
-import { ThemeInks } from '@/hooks/use-theme';
 import type { GameLog } from '@/lib/database.types';
 import type { Game } from '@/lib/games';
 
@@ -132,19 +131,15 @@ export function GamePlatforms({
           { paddingHorizontal: inset, paddingTop: metrics.artTop, paddingBottom: Spacing.x8 },
         ]}>
         <View style={[styles.slot, { width: artWidth, height: slotHeight }]}>
-          {/* The app's own inks, whatever the page's: the case's printed back
-              is set in them, and the case is protected (`ThemeInks`). */}
-          <ThemeInks inks={null}>
-            <CaseFlip
-              coverUrl={game.coverUrl}
-              heroUrl={game.heroUrl}
-              title={game.title}
-              edition={game.edition ? editionLabel(game.edition) : null}
-              platform={selected}
-              width={artWidth}
-              log={log}
-            />
-          </ThemeInks>
+          <CaseFlip
+            coverUrl={game.coverUrl}
+            heroUrl={game.heroUrl}
+            title={game.title}
+            edition={game.edition ? editionLabel(game.edition) : null}
+            platform={selected}
+            width={artWidth}
+            log={log}
+          />
         </View>
 
         <View style={styles.column}>

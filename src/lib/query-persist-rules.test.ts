@@ -36,6 +36,7 @@ describe('shouldPersistKey', () => {
     assert.equal(shouldPersistKey(['album-art-color', 'https://x/y.jpg']), false);
     assert.equal(shouldPersistKey(['game-colours', 'abc']), false);
     assert.equal(shouldPersistKey(['animated-artwork', 'abc']), false);
+    assert.equal(shouldPersistKey(['copy-stage-3d', 'abc']), false);
   });
 
   it('never keeps what SoundCloud sent, which its terms forbid storing', () => {

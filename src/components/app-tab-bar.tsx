@@ -11,6 +11,7 @@ import { Keyboard, Platform, StyleSheet, View, useWindowDimensions } from 'react
 import Animated, { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import { MINI_PLAYER_FOOTPRINT } from '@/constants/player';
@@ -190,7 +191,11 @@ export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
               onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
               scaleTo={0.94}
               style={StyleSheet.flatten([styles.tab, { width: tabWidth }])}>
-              {options.tabBarIcon?.({ focused, color, size: 24 })}
+              {/* The icon wobbles under the finger — Convx's navigation icons
+                  (`pressWobble`) — and pops as its tab is chosen. */}
+              <PressGlyph pop={focused}>
+                {options.tabBarIcon?.({ focused, color, size: 24 })}
+              </PressGlyph>
               <Text variant="bodySmall" numberOfLines={1} style={{ color }}>
                 {label}
               </Text>

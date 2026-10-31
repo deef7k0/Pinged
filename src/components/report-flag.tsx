@@ -28,6 +28,13 @@ export function reportHref(target: ReportTarget, game?: string) {
       };
     case 'review':
       return { pathname, params: { kind: 'review', id: target.logId } };
+    case 'comment':
+    case 'wall_post':
+    case 'profile':
+      return {
+        pathname,
+        params: { kind: target.kind, id: target.targetId, author: target.authorId },
+      };
   }
 }
 

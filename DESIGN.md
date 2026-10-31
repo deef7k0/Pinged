@@ -1639,6 +1639,49 @@ act now is dimmed where it stands.
 turns and no more, until its console has a cartridge of its own drawn. The
 inside of an open case holds what the owner recorded and nothing else.
 
+### In 3D (2026-10-30)
+
+At the owner's request ("a 3D effect for the CD and game case… a dazzling,
+iridescent sheen that shifts as the disc/case tilts back and forth… the back
+of the CD should have a transparent, clear-plastic appearance… physically
+accurate lighting"), the same stage is drawn on the GPU wherever the build can
+(`<CopyStageGL>`, three.js on expo-gl). The faces above stay as the stage
+until it has drawn, and wherever it cannot be. Every number in this section
+still holds; what changes is the material:
+
+- **It rocks.** A few degrees back and forth (7°, every 11.5 s) and less side
+  to side (2.2°, 17.3 s), so the light runs over it. The phone's forward tilt
+  adds 4°. Not under Reduce Motion or a screen reader.
+- **A studio, not a painted gloss.** Four softboxes in a dark room — a strip
+  just over the camera, the lamp up and to the left (tinted with the game's
+  M3 `primary`, as the floor's lamp is), a tall strip to the right, one
+  overhead — and, behind the reader, a soft grey room. The case's plastic and
+  the disc's reflect them; nothing else is lit by anything.
+- **The case's sheen** is its clear plastic's reflection (4% head on, all of
+  it edge-on) carrying a thin film's colours, which lie in soft diagonal bands
+  and slide as the angle changes. Square on, the strip's reflection is a band
+  near the top of the face; the rock sweeps it down and back. A printed face
+  square on to the reader is lit at exactly its own colours.
+- **Shrink-wrap** (a sealed copy): more film, uneven, faintly crinkled.
+- **The disc's label**: varnished print with a faint pearl laminate; the
+  console's silver printing (the rim, the hub ring) as holographic foil with
+  glitter; the hub clear.
+- **The disc's playing side**: clear polycarbonate over aluminium. From the
+  centre: a clear hub with its moulded stacking ring and clamp ridge, a plain
+  mirror band, the data (cooler, darker where written, faint rings), a thin
+  clear lip showing the label's ink through it. Its highlights stretch along
+  the radius, and its rainbow is the track grating's ±1 and ±2 orders, lit by
+  the whole studio — at the **real track pitch of the format**: a CD's
+  (1.6 µm) is the familiar bow-tie, a DVD's (0.74 µm) throws colour out to
+  steep angles, a **Blu-ray's (0.32 µm) is a plain mirror** — no visible
+  first order near head on, which is how one looks. A PlayStation disc is
+  **black** under its dyed plastic.
+- **The disc's edge** pipes the label's colour round its rim.
+
+> Rendered here in a browser through the same shaders; not yet seen on a
+> phone. Its strength — the studio's powers, the film's colour, the rock —
+> is in `lib/copy-scene/optics.ts`, to be tuned on a device.
+
 > Built without a device to run it on: the geometry is under test and was
 > checked on a still, and none of it has been seen moving. The lamp's strength,
 > the springs and the direction of the tilt are to be tuned on a phone.
@@ -1841,7 +1884,7 @@ after artwork fades in without sliding, and Home's row does not fold.
 
 **Apple's glass bar — a game, a studio, a collection, and nowhere else**
 (`<FrostedTopBar glass>`, the owner's direction of 2026-10-23). The three pages
-whose hero melts into its key colour (§ 13.1) take Apple Music's bar instead of
+whose hero is pinned behind the page (§ 13.1) take Apple Music's bar instead of
 the one above:
 
 ```ts
@@ -2163,69 +2206,42 @@ softer, and for the row to be set into it (§ 14). The curve is fitted to the
 reference's own backdrop at the three points it could be measured, drawn as
 fourteen stops, and held by `constants/game-masthead.test.ts`.
 
-## 13.1 The Apple Music hero — a game, a studio, a collection
+## 13.1 The pinned hero — a game, a studio, a collection
 
-The owner's direction (2026-10-23): Apple Music's artist page — its hero, its
-key colour, its blur and its colour shift — on the game page, a studio and a
-collection. `<KeyColorHero>` draws it; CLAUDE.md § Apple Music's hero is the
-code-level statement.
+The owner's direction (2026-10-27), after Apple Music's artist page, and the
+one part of it the owner kept (2026-10-28): the hero is **pinned behind the
+page**, and the page slides over it. `<PinnedHero>` draws it; CLAUDE.md § One
+colour method is the code-level statement.
 
-**The key colour is the colour the art ends in**, not the colour of the art:
-read off the edges of the part of the image on screen, the foot above all
-(`lib/key-color`, iTunes 11's algorithm — crop the border, sample the edges,
-cluster, take the largest, prefer a colour to black or white at 30%). Stardew
-Valley's is the teal of its hills where its dominant colour is the navy of its
-sky — the dominant colour would have drawn a seam under every hero.
-
-**The page is one colour, and that colour is the page's** (`<Screen tone>`):
-from the top of the page to its foot, the artwork's key colour, which darkens
-as the page is read. It is not a wash behind the masthead and not a gradient —
-the owner's direction, 2026-10-23: "The page must be one color, all the same."
-
-```ts
-bright:  the key colour, darkened only as far as the quietest type on the page
-         needs — the page carries grey body copy, which is the ceiling on how
-         bright a bright page can be
-dark:    that tone again, 45% toward black in Oklab: the same hue, read as the
-         same colour, plainly darker
-```
-
-Every layer that paints the page's colour reads those two off the screen's
-chrome and crosses between them on one value — the page's fill and its wash,
-the hero's foot fade, the veil under a synopsis — so no two of them can
-disagree about what colour the page is at any moment.
+**The page is one colour, and it is Material 3's** — the game's scheme, seeded
+by its box art (a studio's by its banner, a collection's by its cover's box
+art): the scheme's background, from the top of the page to its foot, and it
+does not change as the page is read. The cards on it are the scheme's
+`primaryContainer` at half brightness, the controls its `primary` (§ 14).
 
 ```
-          the art, sharp — travelling slower than the page
+          the art, sharp — drifting up at a fifth of the page's speed
           ─ its foot gives way to the page's colour (the game page's soft
             dissolve, a studio's and a collection's 70%)
-          the page: one colour, bright → dark
+          the masthead floating over it, then the page's solid part rising
 ```
 
-**As the page scrolls**, over one distance — rest to the hero's foot reaching
-the bar's:
+**As the page scrolls**, over one distance — rest to the lines under the name
+reaching the bar's foot (`solidAt`):
 
 | Share of the way | What happens |
 | --- | --- |
-| 0 → 1 | The whole page darkens from `bright` to `dark`, eased flat at both ends |
-| 0 → 1 | The picture travels at 60% of the page's speed, so the page slides over it |
-| 0.55 → 1 | It softens and grows to 1.08: a blurred copy (radius fixed, a further 10% out) fades in over the picture — or over the trailer playing in its place |
-| 1 | The glass bar fades in over a page that is already its own colour (§ 7) |
+| 0 → 1 | The art drifts up at 0.2 of the page's speed; the page slides over it |
+| 0.15 → 0.75 | A blurred copy (radius fixed) fades in over the art — or over the trailer playing in its place |
+| 0.35 → 1 | The art drains into the page's colour, slowly |
+| 1 | Solid page colour; the glass bar fades in (§ 7) |
 
 Every step is an opacity or a transform read off the scroll on the UI thread.
 **Pulled past the top on iOS the hero stretches**, its top pinned to the display
 and its foot with the page; Android's own stretch does that for the whole page.
 
-**The type keeps its colour; the page is darkened to fit it.** Apple sets dark
-type on a light key colour; this is a dark room, so the colour is taken toward
-black in Oklab — hue kept — until the quiet ink holds 4.5:1. A dark key is
-never lightened, and a game whose art is already dark has two tones close
-together and a page that barely changes: that is right.
-
-**Where there is no key colour** — square art from SteamGridDB (400px, too
-large to read on the phone), a legacy Steam hero, game colours switched off —
-the page keeps the colour it had (a game's Material 3 page, a collection's
-immersive one), and everything else is the same.
+**With game colours off** the page is the app's own grey room, and everything
+else is the same.
 
 ---
 

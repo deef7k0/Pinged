@@ -48,6 +48,9 @@ const SIZES = {
   radius: (w: number) => Math.max(3, Math.round(w * 0.025)),
 };
 
+/** The corner of the case's back, which the 3D stage's back, tray and cover share. */
+export const backCornerRadius = SIZES.radius;
+
 export type CopyCaseBackProps = {
   copy: CopyWithRelations;
   platform: PlatformKey;
@@ -64,6 +67,12 @@ export type CopyCaseBackProps = {
    * drawn in place of the printed record when there is one.
    */
   scan?: CopyArtImage | null;
+  /**
+   * Without the painted sheen: the 3D stage takes a picture of this face
+   * (`<CopyStageSheet>`) and lights its plastic for real, so a drawn
+   * reflection would be a second, fixed one.
+   */
+  unlit?: boolean;
 };
 
 /**
@@ -91,7 +100,14 @@ export type CopyCaseBackProps = {
  * whole sleeve (GameTDB's Wii and GameCube) is cropped to its back: the image
  * is drawn as tall as the face and slid so only `crop` shows.
  */
-export function CopyCaseBack({ copy, platform, width, height: given, scan }: CopyCaseBackProps) {
+export function CopyCaseBack({
+  copy,
+  platform,
+  width,
+  height: given,
+  scan,
+  unlit = false,
+}: CopyCaseBackProps) {
   /* The front's own height: each platform's case is drawn at its template's
      proportions, and the two faces must be one rectangle. */
   const size = hasCase(platform) ? CASE_TEMPLATES[platform].templateSize : CASE_TEMPLATE_SIZE;
@@ -233,13 +249,15 @@ export function CopyCaseBack({ copy, platform, width, height: given, scan }: Cop
       </View>
 
       {/* The same diagonal sheen as both other faces. */}
-      <LinearGradient
-        colors={['rgba(255,255,255,0.20)', 'rgba(255,255,255,0.04)', 'rgba(255,255,255,0)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0.9, y: 0.55 }}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
+      {!unlit && (
+        <LinearGradient
+          colors={['rgba(255,255,255,0.20)', 'rgba(255,255,255,0.04)', 'rgba(255,255,255,0)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.9, y: 0.55 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+      )}
     </View>
   );
 }

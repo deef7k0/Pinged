@@ -4,7 +4,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { QuoteBlock } from '@/components/quote-block';
 import { Avatar } from '@/components/ui/avatar';
-import { CARD_INSET, CardInks, useCardMaterial } from '@/components/ui/card-material';
+import { CARD_INSET, cardShape, useCardMaterial } from '@/components/ui/card-material';
 import { Text } from '@/components/ui/text';
 import { scoreColor } from '@/constants/score';
 import { Spacing, Type } from '@/constants/theme';
@@ -100,55 +100,21 @@ export const ReviewQuote = memo(function ReviewQuote({
   size,
   style,
 }: ReviewQuoteProps) {
-  const material = useCardMaterial();
-  const body = (
-    <ReviewQuoteBody
-      text={text}
-      byline={byline}
-      avatarUrl={avatarUrl}
-      score={score}
-      lines={lines}
-      quoted={quoted}
-      pullQuote={pullQuote}
-      spoiler={spoiler}
-    />
-  );
-
-  return (
-    <View
-      style={[
-        size,
-        material.shape,
-        styles.card,
-        { backgroundColor: fill ?? material.fill, borderColor: material.edge },
-        style,
-        material.strip,
-      ]}>
-      {/* The card's own inks under it, when it is in the filled colour — and
-          not when the caller painted it another fill. */}
-      {fill ? body : <CardInks material={material}>{body}</CardInks>}
-    </View>
-  );
-});
-
-/** Everything on the card, drawn inside its inks (see `MemberReviewBody`). */
-function ReviewQuoteBody({
-  text,
-  byline,
-  avatarUrl,
-  score,
-  lines,
-  quoted,
-  pullQuote,
-  spoiler,
-}: Omit<ReviewQuoteProps, 'fill' | 'size' | 'style'>) {
   const theme = useTheme();
+  const material = useCardMaterial();
 
   const rounded = score === null ? null : Math.round(score);
   const words = text.trim();
 
   return (
-    <>
+    <View
+      style={[
+        size,
+        cardShape,
+        styles.card,
+        { backgroundColor: fill ?? material.fill, borderColor: material.edge },
+        style,
+      ]}>
       {spoiler ? (
         <View style={styles.covered}>
           {/* `danger`, as `<SpoilerNotice>` uses it: read this before you act.
@@ -185,9 +151,9 @@ function ReviewQuoteBody({
           )}
         </View>
       )}
-    </>
+    </View>
   );
-}
+});
 
 /** The writer's picture beside their name: the size of the name's own line. */
 const AVATAR = 20;

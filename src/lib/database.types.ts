@@ -855,6 +855,59 @@ export type SuggestionReportQueueRow = {
   first_reported: string;
 };
 
+// --- 0045 blocks, reports on comments / wall posts / profiles ---------------
+
+/** Who blocked whom. Readable only by the blocker; written by `block_user`. */
+export type BlockRow = {
+  id: string;
+  blocker_id: string;
+  blocked_id: string;
+  created_at: string;
+};
+
+/** What can be reported in `user_content_reports`. */
+export type UserContentKind = 'comment' | 'wall_post' | 'profile';
+
+/** 0031's reasons, and one only a profile can be: pretending to be somebody. */
+export type UserContentReportReason = ContentReportReason | 'impersonation';
+
+/**
+ * A report on a comment, a wall post or a profile. `author_id` is filled in by
+ * the database from the thing reported; whatever the client sends is replaced.
+ */
+export type UserContentReportRow = {
+  id: string;
+  kind: UserContentKind;
+  target_id: string;
+  author_id: string;
+  user_id: string;
+  reason: UserContentReportReason;
+  note: string | null;
+  status: 'open' | 'resolved';
+  created_at: string;
+};
+
+/** One row of `user_content_reports_queue()`. */
+export type UserContentReportQueueRow = {
+  kind: UserContentKind;
+  target_id: string;
+  author_id: string;
+  author_name: string;
+  author_username: string;
+  /** A comment's or wall post's words; a profile's name and bio. */
+  body: string | null;
+  /** A profile's picture, for a profile report. */
+  avatar_url: string | null;
+  /** Where a comment is (`log`, `list`, `post`) or `wall` for a wall post. */
+  context_type: string | null;
+  /** The log or list a comment is on, or whose wall a post is on. */
+  context_id: string | null;
+  report_count: number;
+  report_reasons: UserContentReportReason[];
+  latest_note: string | null;
+  first_reported: string;
+};
+
 /** One row of `review_reports_queue()` — a reported review, in full. */
 export type ReviewReportQueueRow = {
   log_id: string;
@@ -1434,6 +1487,20 @@ export type Database = {
         Update: Partial<ReviewReportRow>;
         Relationships: [];
       };
+      // --- 0045 ------------------------------------------------------------
+      // Both keyed on their own `id`, never on two keys into `profiles`.
+      blocks: {
+        Row: BlockRow;
+        Insert: Insert<BlockRow, 'id' | 'created_at'>;
+        Update: Partial<BlockRow>;
+        Relationships: [FK<'blocks_blocked_id_fkey', 'blocked_id', 'profiles', 'id'>];
+      };
+      user_content_reports: {
+        Row: UserContentReportRow;
+        Insert: Insert<UserContentReportRow, 'id' | 'created_at' | 'note' | 'status'>;
+        Update: Partial<UserContentReportRow>;
+        Relationships: [];
+      };
       moderators: {
         Row: ModeratorRow;
         Insert: Insert<ModeratorRow, 'created_at'>;
@@ -1718,6 +1785,18 @@ export type Database = {
         Args: { p_log: string; p_action: 'remove' | 'dismiss' };
         Returns: undefined;
       };
+      // --- 0045 ---------------------------------------------------------------
+      block_user: { Args: { p_target: string }; Returns: undefined };
+      unblock_user: { Args: { p_target: string }; Returns: undefined };
+      user_content_reports_queue: {
+        Args: Record<string, never>;
+        Returns: UserContentReportQueueRow[];
+      };
+      moderate_user_content: {
+        Args: { p_kind: UserContentKind; p_target: string; p_action: 'remove' | 'dismiss' };
+        Returns: undefined;
+      };
+      delete_my_account: { Args: Record<string, never>; Returns: undefined };
       // --- 0026 ---------------------------------------------------------------
       game_review_stats: {
         Args: { p_game: string };

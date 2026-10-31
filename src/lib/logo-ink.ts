@@ -156,3 +156,51 @@ export function logoTreatment(ink: LogoInk | null): LogoTreatment {
   if (ink.dark >= DARK_SHARE) return { kind: 'silhouette' };
   return { kind: 'asis' };
 }
+
+/**
+ * The mean WCAG relative luminance of a logo's opaque pixels (alpha ≥ 50%), or
+ * null when it has none. `stride` samples every nth pixel of a large image.
+ */
+export function meanOpaqueLuminance(
+  data: Uint8Array | Uint8ClampedArray,
+  stride = 1
+): number | null {
+  let sum = 0;
+  let count = 0;
+  const step = Math.max(1, Math.floor(stride)) * 4;
+  for (let i = 0; i + 3 < data.length; i += step) {
+    if (data[i + 3] < 128) continue;
+    sum +=
+      0.2126 * toLinear(data[i] / 255) +
+      0.7152 * toLinear(data[i + 1] / 255) +
+      0.0722 * toLinear(data[i + 2] / 255);
+    count += 1;
+  }
+  return count > 0 ? sum / count : null;
+}
+
+/**
+ * Whether a studio's Commons logo has to be drawn as a light silhouette to be
+ * seen on `page`.
+ *
+ * A logo is drawn as it is when its own ink holds 3:1 against the page — the
+ * WCAG floor for a graphic — and as a light silhouette otherwise. Measured, not
+ * assumed: of the first public-domain studio logos tried, FromSoftware's is
+ * pure black and would vanish on a dark page, while Mojang's is white type on a
+ * red block, which a silhouette would turn into a blank rectangle. One rule for
+ * both is only possible because it reads the pixels.
+ *
+ * An unmeasured logo (null) is drawn light: unreadable is the worse failure.
+ */
+export function logoNeedsLightInk(logoLuminance: number | null, page: string): boolean {
+  if (logoLuminance === null) return true;
+  const hex = /^#[0-9a-f]{6}$/i.test(page) ? parseInt(page.slice(1), 16) : null;
+  if (hex === null) return true;
+  const pageLuminance =
+    0.2126 * toLinear(((hex >> 16) & 255) / 255) +
+    0.7152 * toLinear(((hex >> 8) & 255) / 255) +
+    0.0722 * toLinear((hex & 255) / 255);
+  const light = Math.max(logoLuminance, pageLuminance);
+  const dark = Math.min(logoLuminance, pageLuminance);
+  return (light + 0.05) / (dark + 0.05) < 3;
+}

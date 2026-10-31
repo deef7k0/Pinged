@@ -119,16 +119,33 @@ export const CopyCaseFront = memo(function CopyCaseFront({
 
       <Gloss />
 
-      {!!edition && (
-        <View style={[styles.edition, { backgroundColor: theme.scrim }]}>
-          <Text variant="caseEdition" color="text" style={styles.editionText} numberOfLines={1}>
-            {edition.toUpperCase()}
-          </Text>
-        </View>
-      )}
+      {!!edition && <CopyCaseEditionBand edition={edition} />}
     </View>
   );
 });
+
+/**
+ * The edition band across the foot of the cover. Exported for the 3D stage,
+ * which takes a picture of it (`<CopyStageSheet>`) to print on its cover:
+ * `floating={false}` lays it out on its own, as wide as its parent.
+ */
+export function CopyCaseEditionBand({
+  edition,
+  floating = true,
+}: {
+  edition: string;
+  floating?: boolean;
+}) {
+  const theme = useTheme();
+  return (
+    <View
+      style={[styles.edition, !floating && styles.editionAlone, { backgroundColor: theme.scrim }]}>
+      <Text variant="caseEdition" color="text" style={styles.editionText} numberOfLines={1}>
+        {edition.toUpperCase()}
+      </Text>
+    </View>
+  );
+}
 
 /** The case's own diagonal sheen, at the values DESIGN.md § 4.1.7 fixes for it. */
 function Gloss() {
@@ -157,5 +174,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     alignItems: 'center',
   },
+  editionAlone: { position: 'relative' },
   editionText: { letterSpacing: 1 },
 });

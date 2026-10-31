@@ -2,10 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { decode } from 'jpeg-js';
 
 import { atLuminance, hexToRgb, rgbToHex, saturate } from '@/lib/color';
-import { dominantSwatch } from '@/lib/immersive-color';
 
 /**
- * The dominant colour of a piece of box art, read from the actual pixels.
+ * The dominant colour of a piece of box art, read from the actual pixels — the
+ * seed `use-album-art-color` hands Material 3 wherever the native extractor
+ * (`react-native-image-colors`) cannot load, which is Expo Go.
  *
  * ## Why this is done in JavaScript
  *
@@ -94,18 +95,8 @@ const TARGET_LUMINANCE = 0.34;
 export type ArtworkColor = {
   /** The extracted hue, normalised into the accent band. */
   color: string;
-  /** The raw colour as it appears in the art, before normalisation. Diagnostics. */
+  /** The raw colour as it appears in the art, before normalisation: the M3 seed. */
   raw: string;
-  /**
-   * The same hue at three depths, brightest first.
-   *
-   * For the scroll-reactive page background, which needs a *ramp* rather than a
-   * single accent. Derived from the one extracted hue rather than pulling the
-   * second and third most common hues out of the image, deliberately: a cover
-   * with a red logo on a blue field would otherwise produce a background that
-   * fights itself. One hue at three depths always resolves as one atmosphere.
-   */
-  palette: readonly [vibrant: string, deep: string, dark: string];
 };
 
 /**
@@ -161,7 +152,7 @@ export async function extractArtworkColor(uri: string): Promise<ArtworkColor | n
   if (!raw) return null;
 
   const color = atLuminance(saturate(raw, SATURATION_FLOOR), TARGET_LUMINANCE);
-  const result: ArtworkColor = { color, raw, palette: paletteFor(color) };
+  const result: ArtworkColor = { color, raw };
   await writeCache(uri, result);
   return result;
 }
@@ -170,9 +161,7 @@ export async function extractArtworkColor(uri: string): Promise<ArtworkColor | n
  * The swatch-sized thumbnail of `uri`, decoded to RGBA — or null when there is
  * no thumbnail to read or it could not be fetched or decoded.
  *
- * Shared by the accent (`extractArtworkColor`) and the immersive page colour
- * (`extractDominantColor`): the same 3 KB file, the same size caps, two
- * different questions asked of its pixels.
+ * The 3 KB file, under the size caps above.
  */
 async function decodeSwatch(uri: string): Promise<Uint8Array | null> {
   const swatch = swatchUrl(uri);
@@ -199,56 +188,6 @@ async function decodeSwatch(uri: string): Promise<Uint8Array | null> {
        the plain page colour, and looks entirely normal. */
     return null;
   }
-}
-
-/** A separate namespace, so the two extractions never read each other's answers. */
-const DOMINANT_PREFIX = 'artwork-dominant:v1:';
-
-/** Stored when the image decoded and no swatch survived Palette's filter. */
-const NO_SWATCH = 'none';
-
-const DOMINANT_MEMORY_CACHE = new Map<string, string | null>();
-
-/**
- * The colour covering the most of an image — Android Palette's dominant swatch,
- * ported in `lib/immersive-color.ts` — for a page whose background is the
- * artwork's own tone. Blacks, whites and greys included, unlike the accent.
- *
- * Cached for good, the way the accent is. "No swatch" is cached too: an
- * all-black cover will be all-black next time. A failed fetch is not — it
- * returns null and the next visit asks again.
- */
-export async function extractDominantColor(uri: string): Promise<string | null> {
-  if (DOMINANT_MEMORY_CACHE.has(uri)) {
-    return DOMINANT_MEMORY_CACHE.get(uri) ?? null;
-  }
-
-  try {
-    const stored = await AsyncStorage.getItem(DOMINANT_PREFIX + uri);
-    if (stored === NO_SWATCH) {
-      DOMINANT_MEMORY_CACHE.set(uri, null);
-      return null;
-    }
-    if (stored && hexToRgb(stored)) {
-      DOMINANT_MEMORY_CACHE.set(uri, stored);
-      return stored;
-    }
-  } catch {
-    /* An unreadable cache is an empty one. */
-  }
-
-  const pixels = await decodeSwatch(uri);
-  if (!pixels) return null;
-
-  const color = dominantSwatch(pixels)?.color ?? null;
-  DOMINANT_MEMORY_CACHE.set(uri, color);
-
-  try {
-    await AsyncStorage.setItem(DOMINANT_PREFIX + uri, color ?? NO_SWATCH);
-  } catch {
-    /* A full disk should not stop a page from having a colour. */
-  }
-  return color;
 }
 
 /**
@@ -325,67 +264,6 @@ function dominantOf(data: Uint8Array | Uint8ClampedArray): string | null {
   });
 }
 
-/**
- * One hue at three depths: what the page fades *through* as you scroll it.
- *
- * All three stops are placed by **luminance**, not by mixing toward the page.
- * Mixing was the first approach and it misbehaved in the middle: `mix` works in
- * sRGB, so 35% of a bright accent into `#121212` lands much lighter than it
- * reads on paper, and the middle stop — the one most of the screen actually sits
- * on — put `textSecondary` at 4.14:1, under AA. Setting each stop's luminance
- * directly makes the ramp say what it means, and the middle stop now measures
- * 5.49:1 while the top is *brighter* than the mixed version was.
- *
- * Saturation is raised first, and that part is free: contrast depends only on
- * relative luminance, so a more vivid colour at the same lightness reads as
- * dramatically more solid at exactly zero cost to legibility. That is most of
- * where this ramp's strength comes from — the luminances moved a little, the
- * chroma moved a lot.
- */
-export function paletteFor(color: string): readonly [string, string, string] {
-  const vivid = saturate(color, PALETTE_SATURATION);
-  return [
-    atLuminance(vivid, VIBRANT_LUMINANCE),
-    atLuminance(vivid, DEEP_LUMINANCE),
-    atLuminance(vivid, DARK_LUMINANCE),
-  ];
-}
-
-/**
- * Saturation floor for the backdrop ramp, well above the accent's own 0.5.
- *
- * The accent has to survive as a button label and a 2px underline, where a
- * screaming hue is a liability. A backdrop has the opposite job: it is a large
- * flat field that has to read as a colour at all, and a field is where low
- * chroma looks like a rendering fault rather than a choice.
- */
-const PALETTE_SATURATION = 0.78;
-
-/**
- * Lightness of the three stops, as WCAG relative luminance.
- *
- * Chosen against what has to stay readable, measured across every hue the
- * extractor can produce:
- *
- *  - `vibrant` (0.11) reads 2.87:1 against the page — the loud end, and the
- *    reason the backdrop looks like a colour rather than a tint.
- *  - `deep` (0.052) is the middle of the diagonal and therefore most of the
- *    screen.
- *  - `dark` (0.016) is close to the page's own 0.0055, so the bottom of a
- *    scrolled page resolves into the ordinary dark room.
- *
- * **These are only reachable because the game page stopped putting grey on
- * them.** Against `textSecondary` the ceiling was 0.065; the token measures
- * 2.75:1 at 0.11 and no amount of tuning fixes that, because #A8A8A8 was chosen
- * against a near-black page. `accentRoles().quietInk` — near-white carrying the
- * hue — holds 4.66:1 on the brightest stop and 7.33:1 on the middle one, and
- * `text` holds 5.99:1. Put grey back on this backdrop and the ceiling comes
- * back with it.
- */
-const VIBRANT_LUMINANCE = 0.11;
-const DEEP_LUMINANCE = 0.052;
-const DARK_LUMINANCE = 0.016;
-
 const ARTWORK_MEMORY_CACHE = new Map<string, ArtworkColor>();
 
 async function readCache(uri: string): Promise<ArtworkColor | null> {
@@ -396,10 +274,8 @@ async function readCache(uri: string): Promise<ArtworkColor | null> {
     const stored = await AsyncStorage.getItem(CACHE_PREFIX + uri);
     if (!stored) return null;
     const parsed = JSON.parse(stored) as ArtworkColor;
-    if (!hexToRgb(parsed.color)) return null;
-    // Older cache entries predate `palette`; derive it rather than discarding an
-    // extraction that is still perfectly good.
-    const result = parsed.palette ? parsed : { ...parsed, palette: paletteFor(parsed.color) };
+    if (!hexToRgb(parsed.color) || !hexToRgb(parsed.raw)) return null;
+    const result = { color: parsed.color, raw: parsed.raw };
     ARTWORK_MEMORY_CACHE.set(uri, result);
     return result;
   } catch {

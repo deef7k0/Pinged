@@ -9,6 +9,7 @@ import Animated, {
   useAnimatedProps,
   useAnimatedReaction,
   useAnimatedStyle,
+  useDerivedValue,
   useReducedMotion,
   useSharedValue,
   withSpring,
@@ -17,9 +18,11 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { MarqueeText } from '@/components/ui/marquee-text';
+import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
-import { MaxContentWidth, Spacing, withAlpha } from '@/constants/theme';
+import { PRESS_MOTION } from '@/constants/press-motion';
+import { MaxContentWidth, Palette, Spacing, withAlpha } from '@/constants/theme';
 import {
   BAR_SLIDE,
   BAR_SPRING,
@@ -34,8 +37,11 @@ import {
   TOP_BAR_SIDE,
   TOP_BAR_TITLE_GAP,
   TOP_BAR_TITLE_INSET,
+  barTitleOpacity,
   discShift,
   frostStrength,
+  glassIn,
+  handoffWeight,
   isScrolled,
   revealOffset,
 } from '@/constants/top-bar';
@@ -221,7 +227,7 @@ export type FrostedTopBarProps = {
   intensity?: number;
   /**
    * Apple Music's bar, on a page that opens on artwork: the three pages whose
-   * hero melts into its key colour (`<KeyColorHero>`) — a game, a studio, a
+   * hero is pinned behind the page (`<PinnedHero>`) — a game, a studio, a
    * collection — and no other.
    *
    * The back and the page's controls stay where they are, glass discs, and
@@ -237,6 +243,14 @@ export type FrostedTopBarProps = {
    * Apple's frosted bar. To take it back here, drop the prop.
    */
   glass?: boolean;
+  /**
+   * With `glass`: the page offsets over which the page's own name goes under
+   * the bar (`handoffBand`) — the glass and the bar's name follow the scroll
+   * across it, and the page wraps its name in `<HandoffTitle>` with the same
+   * band so the two are never seen together. Without it, the last half-row
+   * before `header`'s reveal.
+   */
+  handoff?: { from: number; to: number };
 };
 
 export const FrostedTopBar = memo(function FrostedTopBar({
@@ -250,6 +264,7 @@ export const FrostedTopBar = memo(function FrostedTopBar({
   variant,
   intensity = 60,
   glass = false,
+  handoff,
 }: FrostedTopBarProps) {
   const router = useRouter();
   const chrome = useScreenChrome();
@@ -282,6 +297,7 @@ export const FrostedTopBar = memo(function FrostedTopBar({
         title={title}
         right={right}
         header={header}
+        handoff={handoff}
         intensity={intensity}
       />
     );
@@ -486,13 +502,17 @@ function ArtBar({
  *    never a stretch of scroll with no way back, which there is on every
  *    other artwork page (§ The top bar, "no back control on screen").
  *  - **The glass fades in, it does not slide.** An Apple bar's material
- *    arrives as content reaches it; it does not drop from above. Over 300ms,
- *    as the page reaches `revealAt` — which on these pages is the moment the
- *    hero has finished draining to the page's colour, so the glass comes in
- *    over the colour it is tinted with.
+ *    arrives as content reaches it; it does not drop from above. **It follows
+ *    the scroll** across the band where the page's own name goes under the
+ *    bar (`handoff`, `HANDOFF` in `constants/top-bar`) — FancyScrollView's
+ *    large-title handoff — and is whole at the band's end, which is where the
+ *    hero has finished draining to the page's colour. It was a 300ms fade set
+ *    off at that one point, and a slow scroll left the page's name lying in
+ *    the bar's row under the glass while the bar's own name faded in on top.
  *  - **The name is centred** between the controls — inset on both sides by
  *    the wider of the two, so it is centred on the display — and scrolls when
- *    it does not fit. It fades with the glass.
+ *    it does not fit. It comes in over the band's second half, once the
+ *    page's name (`<HandoffTitle>`) has gone in its first.
  *
  * The bar takes touches once it is in, so a press on it does not reach a row
  * the glass is hiding; the discs, above it, take theirs throughout.
@@ -502,12 +522,14 @@ function GlassBar({
   title,
   right,
   header,
+  handoff,
   intensity,
 }: {
   leading: Leading;
   title?: string;
   right?: ReactNode;
   header?: number;
+  handoff?: { from: number; to: number };
   intensity: number;
 }) {
   const theme = useTheme();
@@ -519,30 +541,31 @@ function GlassBar({
 
   const barHeight = inset + TOP_BAR_ROW;
   const revealAt = revealOffset(header ?? Math.round(display * DEFAULT_HEADER), barHeight);
+  const from = handoff?.from ?? Math.max(0, revealAt - TOP_BAR_ROW / 2);
+  const to = handoff?.to ?? Math.max(from + 1, revealAt);
 
-  const shown = useSharedValue(0);
+  /* 1 before the band, 0 after it: everything here is a function of this. */
+  const weight = useDerivedValue(() => handoffWeight(scrollY.get(), from, to), [from, to]);
+  const shown = useDerivedValue(() => glassIn(weight.get()));
   const [pinned, setPinned] = useState(false);
   /* How far the right-hand discs reach in from the edge, so the name can be
      centred on the display and still clear them. Read off their own layout. */
   const [rightWidth, setRightWidth] = useState(0);
 
+  /* "Pinned" — what can be touched, what a screen reader is offered, and the
+     marquee mounted — once the bar's name has begun to come in. Scrubbed by
+     the scroll, so it is the same under Reduce Motion: nothing moves. */
   useAnimatedReaction(
-    () => {
-      const offset = scrollY.get();
-      return isScrolled(offset) && offset >= revealAt;
-    },
+    () => weight.get() < 0.5,
     (past, was) => {
       if (past === was || (was === null && !past)) return;
-      /* A fade, so it is the same under Reduce Motion: nothing moves. */
-      shown.set(withTiming(past ? 1 : 0, { duration: FROST.ms, easing: FROST_EASING }));
       runOnJS(setPinned)(past);
-    },
-    [revealAt]
+    }
   );
 
   const titleStyle = useAnimatedStyle(() => {
     pulse.get();
-    return { opacity: shown.get(), transform: [{ translateY: 0 }] };
+    return { opacity: barTitleOpacity(weight.get()), transform: [{ translateY: 0 }] };
   });
 
   const leftWidth = TOP_BAR_EDGE + (leading ? DISC : 0);
@@ -858,7 +881,14 @@ function BarKey({ icon, label, onPress, nudge = 0 }: TopBarDiscProps) {
          nothing so there is a colour for the press to ease in from. */
       pressedColor={theme.controlPressed}
       style={StyleSheet.flatten([styles.key, { backgroundColor: withAlpha(theme.text, 0) }])}>
-      <Ionicons name={icon} size={TOP_BAR_GLYPH} color={theme.text} style={{ marginLeft: nudge }} />
+      <PressGlyph>
+        <Ionicons
+          name={icon}
+          size={TOP_BAR_GLYPH}
+          color={theme.text}
+          style={{ marginLeft: nudge }}
+        />
+      </PressGlyph>
     </PressableScale>
   );
 }
@@ -867,13 +897,33 @@ function BarKey({ icon, label, onPress, nudge = 0 }: TopBarDiscProps) {
 function GlassDisc({ icon, label, onPress, intensity = 60, nudge = 0 }: TopBarDiscProps) {
   const theme = useTheme();
   const chrome = useScreenChrome();
+  const reduceMotion = useReducedMotion();
+
+  /* The glass lighting where it is touched — Convx's `InteractiveHighlight`
+     (`PRESS_MOTION.sheen`): a white wash and a soft spot under the finger,
+     in and out on a springy 0.5 / 300. The spot is placed where the press
+     began; it does not follow a finger that slides. Not motion, so it runs
+     under Reduce Motion too, at once rather than on the spring. */
+  const lit = useSharedValue(0);
+  const [spot, setSpot] = useState({ x: DISC / 2, y: DISC / 2 });
+  const sheenStyle = useAnimatedStyle(() => ({ opacity: lit.get(), transform: [{ scale: 1 }] }));
+  const sheenSpring = {
+    mass: PRESS_MOTION.sheen.mass,
+    stiffness: PRESS_MOTION.sheen.stiffness,
+    damping: PRESS_MOTION.sheen.damping,
+  };
 
   return (
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
-      scaleTo={0.9}
+      onPressIn={(event) => {
+        setSpot({ x: event.nativeEvent.locationX, y: event.nativeEvent.locationY });
+        lit.set(reduceMotion ? 1 : withSpring(1, sheenSpring));
+      }}
+      onPressOut={() => lit.set(reduceMotion ? 0 : withSpring(0, sheenSpring))}
+      scaleTo={0.96}
       style={StyleSheet.flatten(styles.disc)}>
       {/* The rim. It fills the disc; the pane over it is one dp smaller all
           round, so one dp of this is what shows. */}
@@ -898,11 +948,36 @@ function GlassDisc({ icon, label, onPress, intensity = 60, nudge = 0 }: TopBarDi
             much detail has been smeared away. */}
         <View style={[styles.fill, { backgroundColor: withAlpha(theme.shadowInk, PANE_SCRIM) }]} />
         <View style={[styles.fill, { experimental_backgroundImage: SHEEN }]} />
+        <Animated.View
+          style={[
+            styles.fill,
+            {
+              backgroundColor: withAlpha(Palette.white, PRESS_MOTION.sheen.wash),
+              experimental_backgroundImage: sheenSpot(spot.x, spot.y),
+            },
+            sheenStyle,
+          ]}
+        />
       </View>
 
-      <Ionicons name={icon} size={24} color={theme.text} style={{ marginLeft: nudge }} />
+      <PressGlyph>
+        <Ionicons name={icon} size={24} color={theme.text} style={{ marginLeft: nudge }} />
+      </PressGlyph>
     </PressableScale>
   );
+}
+
+/**
+ * The glass sheen's spot under a finger at (`x`, `y`) in the disc: white at
+ * `PRESS_MOTION.sheen.spot`, even to half its radius and gone at its edge —
+ * `InteractiveHighlight`'s radial, 1.5× the disc. Measured in the pane, which
+ * sits a dp inside the disc.
+ */
+function sheenSpot(x: number, y: number): string {
+  const { spot, radius } = PRESS_MOTION.sheen;
+  const ink = (alpha: number) => `rgba(255, 255, 255, ${alpha})`;
+  const r = Math.round(DISC * radius);
+  return `radial-gradient(circle ${r}px at ${Math.round(x - 1)}px ${Math.round(y - 1)}px, ${ink(spot)} 0%, ${ink(spot)} 50%, ${ink(0)} 100%)`;
 }
 
 /** The title's start when no control is in front of it, less the row's own padding. */

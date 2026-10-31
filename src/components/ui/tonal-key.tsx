@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
+import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import { Elevation, Radius, Spacing } from '@/constants/theme';
@@ -106,7 +107,7 @@ export function TonalKey({
       }
       disabled={busy}
       onPress={onPress}
-      scaleTo={0.92}
+      scaleTo={0.95}
       style={StyleSheet.flatten([
         styles.key,
         keyCorners(position),
@@ -121,7 +122,10 @@ export function TonalKey({
         busy && styles.busy,
         style,
       ])}>
-      <Ionicons name={lit ? icon : (outline ?? icon)} size={caption ? 20 : 22} color={ink} />
+      {/* Favourite and Wishlist pop as they turn on or off (Convx's like). */}
+      <PressGlyph pop={active === undefined ? undefined : lit}>
+        <Ionicons name={lit ? icon : (outline ?? icon)} size={caption ? 20 : 22} color={ink} />
+      </PressGlyph>
       {caption && (
         <Text variant="tab" numberOfLines={1} style={{ color: ink }}>
           {caption}

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { MemberReviewCard } from '@/components/member-review-card';
-import { CARD_INSET, CardInks, useCardMaterial } from '@/components/ui/card-material';
+import { CARD_INSET, cardShape, useCardMaterial } from '@/components/ui/card-material';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Skeleton } from '@/components/ui/surface';
 import { Text } from '@/components/ui/text';
@@ -154,9 +154,8 @@ function Shell({
   /* The review card's material: this stands where one would, and the two must
      read as the same object. */
   const card = StyleSheet.flatten([
-    material.shape,
+    cardShape,
     { backgroundColor: material.fill, borderColor: material.edge, padding: CARD_INSET },
-    material.strip,
   ]);
 
   if (!onPress) return <View style={card}>{children}</View>;
@@ -168,8 +167,7 @@ function Shell({
       onPress={onPress}
       scaleTo={0.99}
       style={card}>
-      {/* The card's own inks under it, when it is in the filled colour. */}
-      <CardInks material={material}>{children}</CardInks>
+      {children}
     </PressableScale>
   );
 }

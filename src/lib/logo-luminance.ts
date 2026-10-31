@@ -1,7 +1,6 @@
 import { decode as decodeJpeg } from 'jpeg-js';
 
-import { meanOpaqueLuminance } from '@/lib/immersive-color';
-import { logoInkOf, type LogoInk } from '@/lib/logo-ink';
+import { logoInkOf, meanOpaqueLuminance, type LogoInk } from '@/lib/logo-ink';
 import { decodePng, type DecodedImage } from '@/lib/png';
 import { USER_AGENT } from '@/lib/wikidata/client';
 

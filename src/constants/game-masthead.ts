@@ -42,7 +42,7 @@ export const COVER_GUTTER = 16;
  * Where the art starts to go, as a fraction of the hero's height from its top.
  *
  * Shrunk down to 0.60 so the top 60% of the artwork remains completely crisp,
- * sharp, and visible, while the bottom 40% dissolves into the page key colour.
+ * sharp, and visible, while the bottom 40% dissolves into the page's colour.
  */
 export const DISSOLVE_STARTS_AT = 0.6;
 

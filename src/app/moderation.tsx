@@ -14,7 +14,7 @@ import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/sc
 import { TabBar } from '@/components/ui/tab-bar';
 import { Text } from '@/components/ui/text';
 import { PHOTO_KIND_LABEL, releaseLine } from '@/constants/physical';
-import { CONTENT_REPORT_REASON_LABEL } from '@/constants/reports';
+import { USER_CONTENT_REASON_LABEL } from '@/constants/reports';
 import { REPORT_REASON_LABEL, SIMILARITY_REASON_LABEL } from '@/constants/similarity';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -23,18 +23,22 @@ import {
   getReviewReports,
   getSimilarityReports,
   getSuggestionReports,
+  getUserContentReports,
   isModerator,
   moderateContribution,
   moderateReview,
   moderateSimilarity,
   moderateSuggestion,
+  moderateUserContent,
   type ContributionWithRelations,
 } from '@/lib/api';
 import type {
-  ContentReportReason,
   ReviewReportQueueRow,
   SimilarityReportQueueRow,
   SuggestionReportQueueRow,
+  UserContentKind,
+  UserContentReportQueueRow,
+  UserContentReportReason,
 } from '@/lib/database.types';
 import { displayBarcode } from '@/lib/barcode';
 import { displayNameFor, timeAgo } from '@/lib/format';
@@ -72,6 +76,7 @@ const TABS = [
   { key: 'picks' as const, label: 'Picks' },
   { key: 'suggestions' as const, label: 'Suggestions' },
   { key: 'reviews' as const, label: 'Reviews' },
+  { key: 'people' as const, label: 'Comments & people' },
 ];
 
 type ModerationTab = (typeof TABS)[number]['key'];
@@ -130,6 +135,13 @@ export default function ModerationScreen() {
     enabled: moderator.data === true && tab === 'reviews',
   });
 
+  /* Comments, wall posts and profiles (0045). `null` is a database without it. */
+  const peopleReports = useQuery({
+    queryKey: ['user-content-reports'],
+    queryFn: getUserContentReports,
+    enabled: moderator.data === true && tab === 'people',
+  });
+
   if (moderator.isLoading) {
     return (
       <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="Moderation" />}>
@@ -181,6 +193,13 @@ export default function ModerationScreen() {
           {reviewReports.data.length === 0
             ? 'NO OPEN REPORTS'
             : `${reviewReports.data.length} REPORTED · OLDEST FIRST`}
+        </Text>
+      )}
+      {tab === 'people' && peopleReports.data && (
+        <Text variant="label" color="textMuted">
+          {peopleReports.data.length === 0
+            ? 'NO OPEN REPORTS'
+            : `${peopleReports.data.length} REPORTED · OLDEST FIRST`}
         </Text>
       )}
     </View>
@@ -288,6 +307,39 @@ export default function ModerationScreen() {
               />
             ) : (
               <EmptyState title="No open reports" message="Nobody has reported a review." />
+            )
+          }
+        />
+      );
+      break;
+    case 'people':
+      list = (
+        <PageFlatList
+          data={peopleReports.data ?? []}
+          keyExtractor={(entry) => `${entry.kind}:${entry.target_id}`}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={header}
+          renderItem={({ item }) => <UserContentReportCard entry={item} />}
+          ItemSeparatorComponent={Separator}
+          ListEmptyComponent={
+            peopleReports.isLoading ? (
+              <LoadingState />
+            ) : peopleReports.isLoadingError ? (
+              <ErrorState
+                error={peopleReports.error}
+                onRetry={() => void peopleReports.refetch()}
+              />
+            ) : peopleReports.data === null ? (
+              <EmptyState
+                title="Not set up yet"
+                message="Reports on comments, wall posts and profiles arrive with migration 0045."
+              />
+            ) : (
+              <EmptyState
+                title="No open reports"
+                message="Nobody has reported a comment, a wall post or a profile."
+              />
             )
           }
         />
@@ -593,6 +645,133 @@ function ReviewReportCard({ entry }: { entry: ReviewReportQueueRow }) {
   );
 }
 
+/** What each of 0045's kinds is called on its card, and what removing it does. */
+const PEOPLE_KIND: Record<
+  UserContentKind,
+  { noun: string; remove: string; explain: (name: string) => string }
+> = {
+  comment: {
+    noun: 'COMMENT',
+    remove: 'Remove words',
+    explain: (name) =>
+      `${name}’s words are replaced by “This comment was removed by a moderator.” Replies to it stay. This cannot be undone.`,
+  },
+  wall_post: {
+    noun: 'WALL POST',
+    remove: 'Delete post',
+    explain: (name) => `${name}’s wall post is deleted. This cannot be undone.`,
+  },
+  profile: {
+    noun: 'PROFILE',
+    remove: 'Reset profile',
+    explain: (name) =>
+      `${name}’s display name, bio, pictures and location are cleared, and their handle goes back to the one a new account gets, so they are asked for a new one. Their reviews and logs stay. This cannot be undone.`,
+  },
+};
+
+/**
+ * A reported comment, wall post or profile (0045). The words, a way to see
+ * them where they are, what the reporters said, and the two verdicts.
+ */
+function UserContentReportCard({ entry }: { entry: UserContentReportQueueRow }) {
+  const theme = useTheme();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const kind = PEOPLE_KIND[entry.kind];
+
+  const decide = useMutation({
+    mutationFn: (action: 'remove' | 'dismiss') =>
+      moderateUserContent(entry.kind, entry.target_id, action),
+    onSuccess: (_result, action) => {
+      queryClient.invalidateQueries({ queryKey: ['user-content-reports'] });
+      if (action !== 'remove') return;
+      if (entry.kind === 'profile') {
+        queryClient.invalidateQueries({ queryKey: ['profile', entry.author_id] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['comments'] });
+        queryClient.invalidateQueries({ queryKey: ['wall'] });
+      }
+    },
+  });
+
+  function askRemove() {
+    Alert.alert(`${kind.remove}?`, kind.explain(entry.author_name), [
+      { text: 'Cancel', style: 'cancel' },
+      { text: kind.remove, style: 'destructive', onPress: () => decide.mutate('remove') },
+    ]);
+  }
+
+  function open() {
+    if (entry.kind === 'comment' && entry.context_type && entry.context_id) {
+      router.push({
+        pathname: '/comments/[type]/[id]',
+        params: { type: entry.context_type, id: entry.context_id },
+      });
+    } else if (entry.kind === 'wall_post' && entry.context_id) {
+      router.push({ pathname: '/profile/[id]', params: { id: entry.context_id } });
+    } else {
+      router.push({ pathname: '/profile/[id]', params: { id: entry.author_id } });
+    }
+  }
+
+  return (
+    <View
+      style={[
+        cardShape,
+        styles.card,
+        { backgroundColor: theme.surface, borderColor: theme.border },
+      ]}>
+      <View style={styles.cardHead}>
+        <Text variant="label" color="textMuted" numberOfLines={1} style={styles.shrink}>
+          {`${kind.noun} · @${entry.author_username.toUpperCase()}`}
+        </Text>
+        <Text variant="label" color="textMuted">
+          {`${entry.report_count} ${entry.report_count === 1 ? 'REPORT' : 'REPORTS'}`}
+        </Text>
+      </View>
+      <Text variant="h4">{entry.author_name}</Text>
+
+      {entry.kind === 'profile' && entry.avatar_url && (
+        <Image source={{ uri: entry.avatar_url }} style={styles.reportedAvatar} />
+      )}
+      {entry.body?.trim() ? (
+        <Quoted text={entry.body.trim()} lines={REVIEW_LINES} />
+      ) : (
+        <Text variant="bodySmall" color="textMuted">
+          {entry.kind === 'profile' ? 'No name or bio — look at the profile.' : 'No words.'}
+        </Text>
+      )}
+      <View style={styles.readAll}>
+        <Button
+          title={entry.kind === 'comment' ? 'Open the thread' : 'Open the profile'}
+          variant="ghost"
+          size="small"
+          onPress={open}
+        />
+      </View>
+
+      <ReportFacts
+        reasons={entry.report_reasons}
+        note={entry.latest_note}
+        since={entry.first_reported}
+      />
+
+      {decide.isError && (
+        <Text variant="bodySmall" color="danger">
+          {decide.error instanceof Error ? decide.error.message : 'Could not record that.'}
+        </Text>
+      )}
+
+      <RemoveOrDismiss
+        removeTitle={kind.remove}
+        pending={decide.isPending ? decide.variables : null}
+        onRemove={askRemove}
+        onDismiss={() => decide.mutate('dismiss')}
+      />
+    </View>
+  );
+}
+
 /** Somebody's words, set off by a rule down the left — what is being judged. */
 function Quoted({
   text,
@@ -625,7 +804,7 @@ function ReportFacts({
   note,
   since,
 }: {
-  reasons: ContentReportReason[];
+  reasons: UserContentReportReason[];
   note: string | null;
   since: string;
 }) {
@@ -633,7 +812,7 @@ function ReportFacts({
   return (
     <View style={[styles.facts, { borderTopColor: theme.border }]}>
       <Text variant="bodySmall" color="textSecondary">
-        {`Reported as ${reasons.map((reason) => CONTENT_REPORT_REASON_LABEL[reason]).join(' · ')}`}
+        {`Reported as ${reasons.map((reason) => USER_CONTENT_REASON_LABEL[reason]).join(' · ')}`}
       </Text>
       {note && (
         <Text variant="bodySmall" color="textSecondary">
@@ -873,5 +1052,6 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
   quote: { borderLeftWidth: 2, paddingLeft: Spacing.x12 },
   readAll: { alignItems: 'flex-start' },
+  reportedAvatar: { width: 56, height: 56, borderRadius: 28 },
   facts: { gap: Spacing.x4, paddingTop: Spacing.x12, borderTopWidth: StyleSheet.hairlineWidth },
 });

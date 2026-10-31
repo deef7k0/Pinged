@@ -87,7 +87,7 @@ export type HeroArtProps = {
    *  - `false` — no fade at all. The caller is covering the edge some other way.
    *
    * There was a `'mask'`, dissolving the art's own alpha, for the game page;
-   * that page's hero is `<KeyColorHero>` now, which fades to a known colour
+   * that page's hero is `<PinnedHero>` now, which fades to a known colour
    * and needs no mask.
    */
   fade?: 'color' | false;
@@ -104,10 +104,11 @@ export type HeroArtProps = {
 /**
  * Full-bleed key art that dissolves into the page.
  *
- * The Top 10's. The game page, a studio and a collection draw Apple Music's
- * hero instead (`<KeyColorHero>`, CLAUDE.md § Apple Music's hero), which melts
- * into the art's own key colour and answers the scroll. The caller supplies the bleed: cancel any
- * horizontal padding on the container around it.
+ * The Top 10's. The game page, a studio and a collection pin their hero
+ * behind the page instead (`<PinnedHero>`, CLAUDE.md § The pinned hero), which
+ * drifts, blurs and drains into the page's Material 3 colour as it scrolls.
+ * The caller supplies the bleed: cancel any horizontal padding on the
+ * container around it.
  *
  * A missing image is a flat block of the same height rather than nothing, so
  * the layout below does not jump when art arrives.

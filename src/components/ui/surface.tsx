@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 
-import { CARD_INSET, CardInks, useCardMaterial } from '@/components/ui/card-material';
+import { CARD_INSET, cardShape, useCardMaterial } from '@/components/ui/card-material';
 import { Shimmer } from '@/components/ui/shimmer';
 import { Text } from '@/components/ui/text';
 import { labelFor, scoreColor } from '@/constants/score';
@@ -64,17 +64,14 @@ export function Card({ children, elevated = false, padded = true, style }: CardP
   return (
     <View
       style={[
-        material.shape,
+        cardShape,
         {
           backgroundColor: elevated ? theme.surfaceElevated : material.fill,
           borderColor: material.edge,
         },
         style,
       ]}>
-      <View style={[styles.cardClip, padded && styles.cardPadded, material.strip]}>
-        {/* The card's own inks under it, when it is in the filled colour. */}
-        {elevated ? children : <CardInks material={material}>{children}</CardInks>}
-      </View>
+      <View style={[styles.cardClip, padded && styles.cardPadded]}>{children}</View>
     </View>
   );
 }

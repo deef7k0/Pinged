@@ -40,6 +40,7 @@ import { PlayerHost } from '@/components/player/player-host';
 import { GameColoursWarmup } from '@/hooks/use-game-colours';
 import { primeSteamArtwork } from '@/hooks/use-steam-artwork';
 import { queryClient } from '@/lib/query-client';
+import { forgetRetiredColourStores } from '@/lib/retired-colour-stores';
 import { forgetAppleMusicCache } from '@/lib/soundcloud/legacy';
 import { useAuth } from '@/store/auth';
 import { takeAfterOnboarding, useOnboarding } from '@/store/onboarding';
@@ -143,6 +144,8 @@ export default function RootLayout() {
     /* Soundtracks used to be kept on the device, a row per game. They are not
        kept anywhere now; this clears what earlier versions left. */
     void forgetAppleMusicCache();
+    /* So were the answers of the colour methods Material 3 replaced. */
+    void forgetRetiredColourStores();
   }, []);
 
   useEffect(() => {
@@ -259,6 +262,8 @@ export default function RootLayout() {
                 <Stack.Screen name="soundtrack/[id]" />
                 <Stack.Screen name="notifications/index" />
                 <Stack.Screen name="settings" />
+                <Stack.Screen name="blocked" />
+                <Stack.Screen name="delete-account" />
                 {/* How the GameLog score is weighted (0041), and the reader's own
                   weight — from the reviews sheet and from Settings. */}
                 <Stack.Screen name="how-ratings-work" />
@@ -307,6 +312,11 @@ export default function RootLayout() {
                     carousel and the three sign-in screens behind it. */}
                 <Stack.Screen name="welcome" />
               </Stack.Protected>
+
+              {/* Readable signed in or out: the sign-up page links to the terms
+                  and the privacy policy (0045, store release). Last, so it is
+                  never the first screen a guard falls back to. */}
+              <Stack.Screen name="legal/[doc]" />
             </Stack>
 
             {/*

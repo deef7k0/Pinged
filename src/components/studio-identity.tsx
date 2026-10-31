@@ -4,7 +4,7 @@ import { StyleSheet } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { useTheme } from '@/hooks/use-theme';
-import { logoNeedsLightInk } from '@/lib/immersive-color';
+import { logoNeedsLightInk } from '@/lib/logo-ink';
 import type { StudioLogo } from '@/lib/wikidata/commons';
 import { USER_AGENT } from '@/lib/wikidata/client';
 

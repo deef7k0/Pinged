@@ -1,4 +1,8 @@
-import type { ContentReportReason, SimilarityReportReason } from '@/lib/database.types';
+import type {
+  ContentReportReason,
+  SimilarityReportReason,
+  UserContentReportReason,
+} from '@/lib/database.types';
 
 /**
  * What can be reported — and the route segment that names it on
@@ -6,11 +10,20 @@ import type { ContentReportReason, SimilarityReportReason } from '@/lib/database
  *
  * A **pick** is a pair of games the community says are alike (0025): nobody's
  * writing, so its reasons are about the claim. A **suggestion** (0029) and a
- * **review** are one person's words, and share one vocabulary (0031).
+ * **review** are one person's words, and share one vocabulary (0031). A
+ * **comment**, a **wall post** and a **profile** (0045) share it too, and a
+ * profile adds impersonation.
  */
-export type ReportKind = 'pick' | 'suggestion' | 'review';
+export type ReportKind = 'pick' | 'suggestion' | 'review' | 'comment' | 'wall_post' | 'profile';
 
-export const REPORT_KINDS: readonly ReportKind[] = ['pick', 'suggestion', 'review'];
+export const REPORT_KINDS: readonly ReportKind[] = [
+  'pick',
+  'suggestion',
+  'review',
+  'comment',
+  'wall_post',
+  'profile',
+];
 
 export function isReportKind(value: string | undefined): value is ReportKind {
   return (REPORT_KINDS as readonly string[]).includes(value ?? '');
@@ -48,6 +61,36 @@ export const CONTENT_REPORT_REASON_HINT: Record<ContentReportReason, string> = {
   inappropriate: 'Hateful, sexual or violent',
   harassment: 'Goes after a person rather than the game',
   off_topic: 'Not about the game at all',
+};
+
+/**
+ * What 0045's table accepts, in its CHECK's order; `reports.test.ts` holds
+ * the two together. A comment or a wall post is offered the content reasons;
+ * a profile the ones that can be true of a person's page.
+ */
+export const USER_CONTENT_REPORT_REASONS: readonly UserContentReportReason[] = [
+  ...CONTENT_REPORT_REASONS,
+  'impersonation',
+];
+
+export const PROFILE_REPORT_REASONS: readonly UserContentReportReason[] = [
+  'impersonation',
+  'harassment',
+  'inappropriate',
+  'spam',
+];
+
+export const USER_CONTENT_REASON_LABEL: Record<UserContentReportReason, string> = {
+  ...CONTENT_REPORT_REASON_LABEL,
+  impersonation: 'Pretending to be someone',
+};
+
+export const PROFILE_REPORT_REASON_HINT: Record<UserContentReportReason, string> = {
+  ...CONTENT_REPORT_REASON_HINT,
+  impersonation: 'Uses another person’s name, picture or identity',
+  harassment: 'Exists to go after a person',
+  inappropriate: 'A hateful, sexual or violent name, picture or bio',
+  spam: 'Advertising, or an account that only posts links',
 };
 
 /** A pick's reasons (0025), in the order the form offers them. */

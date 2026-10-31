@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -7,10 +8,13 @@ import { HomeChips, type OpenChip } from '@/components/home/home-chips';
 import { AnchoredMenu, AnchoredMenuItem, useAnchoredMenu } from '@/components/ui/anchored-menu';
 import { FoldingTopBar } from '@/components/ui/frosted-top-bar';
 import { PressableScale } from '@/components/ui/pressable-scale';
-import { Spacing } from '@/constants/theme';
+import { Text } from '@/components/ui/text';
+import { Radius, Spacing } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
+import { getUnreadCount } from '@/lib/api';
 import type { HomeView } from '@/lib/home-view';
+import { useAuth } from '@/store/auth';
 
 /**
  * The header's row. SimpMusic's is 56; the owner had it thicker (2026-10-22:
@@ -41,8 +45,9 @@ const KEY = 48;
  *   their own between the margin and the keys, clipped at its edges, and an
  *   open chip that is wider than that scrolls.
  * - **Create** (+, the reference's grey disc with a rim) drops a menu — log a
- *   game, review one, start a collection — and **Settings** is the plain glyph
- *   beside it. The reference's Create is a bottom sheet; here a sheet would be
+ *   game, review one, start a collection — and **the bell** is the plain glyph
+ *   beside it, in the reference's Settings place. Settings is the profile
+ *   tab's alone. The reference's Create is a bottom sheet; here a sheet would be
  *   under the floating tab bar, so it is the anchored menu the profile's +
  *   already is.
  */
@@ -68,7 +73,7 @@ export function HomeHeader({
         </ScrollView>
         <View style={styles.keys}>
           <CreateKey />
-          <SettingsKey />
+          <NotificationsKey />
         </View>
       </View>
     </FoldingTopBar>
@@ -139,22 +144,47 @@ function CreateKey() {
   );
 }
 
-/** Settings: the bare glyph, Material's `IconButton` — 48 to touch, nothing drawn round it. */
-function SettingsKey() {
+/**
+ * The bell, where Settings was (2026-10-28, the owner: "Place the notification
+ * button where the settings icon is, and remove the settings icon from the
+ * home section, it will only be in the profile tab"). The bare glyph,
+ * Material's `IconButton` — 48 to touch, nothing drawn round it — with the
+ * unread count on its shoulder, ringed in the page's colour.
+ */
+function NotificationsKey() {
   const theme = useTheme();
   const accent = useAccent();
   const router = useRouter();
+  const userId = useAuth((state) => state.session?.user.id);
+  const unread = useQuery({
+    queryKey: ['notifications', 'unread', userId],
+    queryFn: () => getUnreadCount(userId!),
+    enabled: !!userId,
+    refetchInterval: 60_000,
+  });
+  const count = unread.data ?? 0;
 
   return (
     <PressableScale
       accessibilityRole="button"
-      accessibilityLabel="Settings"
-      onPress={() => router.push('/settings')}
+      accessibilityLabel={count > 0 ? `Notifications, ${count} unread` : 'Notifications'}
+      onPress={() => router.push('/notifications')}
       scaleTo={0.92}
       pressedColor={theme.controlPressed}
       focusRing={accent.ring}
       style={StyleSheet.flatten([styles.key, styles.round])}>
-      <Ionicons name="settings-outline" size={24} color={theme.text} />
+      <Ionicons name="notifications-outline" size={24} color={theme.text} />
+      {count > 0 && (
+        <View
+          style={[
+            styles.badge,
+            { backgroundColor: theme.primary, borderColor: theme.homeBackground },
+          ]}>
+          <Text variant="caption" style={{ color: theme.onPrimary }}>
+            {count > 99 ? '99+' : count}
+          </Text>
+        </View>
+      )}
     </PressableScale>
   );
 }
@@ -175,6 +205,19 @@ const styles = StyleSheet.create({
   keys: { flexDirection: 'row', alignItems: 'center', paddingRight: Spacing.x4 },
   key: { width: KEY, height: KEY, alignItems: 'center', justifyContent: 'center' },
   round: { borderRadius: KEY / 2 },
+  /* On the bell's upper-right shoulder, inside the 48 key. */
+  badge: {
+    position: 'absolute',
+    top: Spacing.x4,
+    right: Spacing.x4,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: Spacing.x4,
+    borderRadius: Radius.pill,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   createDisc: {
     width: CREATE_DISC,
     height: CREATE_DISC,

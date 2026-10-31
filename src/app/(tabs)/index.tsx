@@ -31,17 +31,20 @@ import { Skeleton } from '@/components/ui/surface';
 import { Text } from '@/components/ui/text';
 import { useTabBarClearance } from '@/components/app-tab-bar';
 import { footHeight } from '@/constants/cover-rail';
-import { HeroAspectRatio, Radius, Spacing, TapTarget } from '@/constants/theme';
-import { useAccent } from '@/hooks/use-accent';
+import { HeroAspectRatio, Spacing } from '@/constants/theme';
+import { extractSeedColor } from '@/hooks/use-album-art-color';
 import { useGameColours } from '@/hooks/use-game-colours';
 import { useTopBarInset } from '@/hooks/use-header-height';
 import { useTheme } from '@/hooks/use-theme';
-import { getHomeActivity, getUnreadCount, getUserLogs } from '@/lib/api';
-import { extractDominantColor } from '@/lib/artwork-color';
+import { getHomeActivity, getUserLogs } from '@/lib/api';
+import { startNewRound, useAppRound } from '@/lib/app-round';
 import { recommendFromLogs } from '@/lib/games/recommend';
+import { loadRecommendHistory, recordRecommended } from '@/lib/games/recommend-history';
+import { hashString, seededRandom } from '@/lib/games/recommend-rules';
 import { getLatestEvents } from '@/lib/games/browse';
 import { ALL, feedFor, sameView, type HomeView } from '@/lib/home-view';
 import { GLOW_OVERFLOW, glowTone } from '@/lib/home-glow';
+import { generateDynamicTheme } from '@/theme/dynamic-color';
 import { getGamingNews, getNewReleases, getUpcomingReleases } from '@/lib/news';
 import { displayNameFor } from '@/lib/format';
 import { useAuth } from '@/store/auth';
@@ -99,16 +102,19 @@ function newsCardHeight(width: number): number {
  * bar", and its tabs with moods. Read from its source, not its screens:
  *
  * - **The top bar is `<HomeHeader>`**: All, Mood and Genre, Create and
- *   Settings on one row, fixed over the page, clear at the top and the
+ *   the bell on one row, fixed over the page, clear at the top and the
  *   page's colour once the page is under it. The reference puts the avatar
  *   there too; the owner had it brought back onto the page (2026-10-22) as
- *   the "Welcome back" row it was — on All, with the bell beside the name —
- *   so the chips have the row to themselves.
+ *   the "Welcome back" row it was — on All — so the chips have the row to
+ *   themselves. The bell was beside the name until the owner had it moved
+ *   into the bar, in Settings' place (2026-10-28); Settings is the profile
+ *   tab's alone.
  * - **The glow is `<HomeGlow>`**: the background of the page's first block —
  *   the bar's room and the first section — and 140dp past it, scrolling with
- *   the page. Its colour is the dominant colour of the first game in the first
- *   section — "Games for you", or a mood's or a genre's first shelf — times 0.5, as the
- *   reference takes it from its first shelf's first song (`lib/home-glow`).
+ *   the page. Its colour is the Material 3 primary of the first game in the
+ *   first section — "Games for you", or a mood's or a genre's first shelf —
+ *   times 0.45, `AmbientThemeGlow`'s, as the reference takes its tint from its
+ *   first shelf's first song (`lib/home-glow`).
  *   It replaced the soft light in the top-left corner (`<AmbientLight>`).
  *   **Its length is the first block's**, which on All is the greeting and
  *   Surprise Me and stops there — see `leadHeight`.
@@ -176,7 +182,6 @@ export default function HomeScreen() {
   const { width } = useWindowDimensions();
   const userId = useAuth((state) => state.session?.user.id);
   const profile = useAuth((state) => state.profile);
-  const accent = useAccent();
   const name = displayNameFor(profile);
   const colours = useGameColours();
 
@@ -246,12 +251,37 @@ export default function HomeScreen() {
     .map((log) => `${log.game_id}:${log.rating ?? ''}`)
     .join(',');
 
+  /*
+   * A new round every time the app is opened (`useAppRound`), and no game the
+   * band has shown before until the unseen ones run out
+   * (`lib/games/recommend-rules`). The history is read once a round, so a
+   * refetch inside it — a log saved — excludes the same games and draws the
+   * same seeds rather than reshuffling the band under somebody looking at it.
+   * Neither query is written to the device: a restored round is last time's.
+   */
+  const appRound = useAppRound();
+  const shownBefore = useQuery({
+    queryKey: ['recommend-history', userId, appRound],
+    queryFn: () => loadRecommendHistory(userId!),
+    enabled: !!userId,
+    staleTime: Infinity,
+  });
   const recommended = useQuery({
-    queryKey: ['recommended', userId, seedKey],
-    queryFn: ({ signal }) => recommendFromLogs(logs.data ?? [], RECOMMENDED_LIMIT, signal),
+    queryKey: ['recommended', userId, seedKey, appRound],
+    queryFn: async ({ signal }) => {
+      const answer = await recommendFromLogs(logs.data ?? [], RECOMMENDED_LIMIT, signal, {
+        random: seededRandom(hashString(`${userId}:${appRound}`)),
+        recent: shownBefore.data ?? [],
+      });
+      void recordRecommended(
+        userId!,
+        answer.games.map((game) => game.id)
+      );
+      return answer;
+    },
     // Only once the seeds are in hand: running this on an empty array would
     // cache an empty result under a key that never re-runs.
-    enabled: (logs.data?.length ?? 0) > 0,
+    enabled: (logs.data?.length ?? 0) > 0 && shownBefore.isSuccess,
     staleTime: 30 * 60_000,
   });
 
@@ -289,14 +319,6 @@ export default function HomeScreen() {
     staleTime: 30 * 60_000,
   });
 
-  const unread = useQuery({
-    queryKey: ['notifications', 'unread', userId],
-    queryFn: () => getUnreadCount(userId!),
-    enabled: !!userId,
-    refetchInterval: 60_000,
-  });
-  const unreadCount = unread.data ?? 0;
-
   /* Watches every band the pull actually refetches, so the spinner stops when
      the page is done rather than when the first four queries are. A mood's
      pull is its own three. */
@@ -318,7 +340,8 @@ export default function HomeScreen() {
       return;
     }
     logs.refetch();
-    recommended.refetch();
+    /* A pull is a new round of "Games for you", not the same one again. */
+    startNewRound();
     activity.refetch();
     news.refetch();
     releases.refetch();
@@ -337,7 +360,9 @@ export default function HomeScreen() {
    * library is gone.
    */
   const isFirstRun = logs.isSuccess && (logs.data?.length ?? 0) === 0;
-  const seedsPending = logs.isLoading || (logs.isSuccess && !isFirstRun && recommended.isLoading);
+  /* `isPending`, not `isLoading`: the band's query waits on the history read,
+     and a query that is waiting is not fetching — but is not empty either. */
+  const seedsPending = logs.isLoading || (logs.isSuccess && !isFirstRun && recommended.isPending);
 
   /* Just out, then what is next — one continuous timeline rather than two rails
      of near-identical posters with a 48dp gap and a 19px heading between them.
@@ -381,24 +406,29 @@ export default function HomeScreen() {
    * `mainHomeThumbnail`. On All that is "Games for you" (Releases on a first
    * run, where there is none); in a mood, its first shelf.
    *
-   * The same query, key and decoder a collection's page colour reads
-   * (`useImmersiveBackground`), so a cover is decoded once for both. The last
-   * colour holds while the next is worked out, as the reference's animated
-   * colour does — a mood's feed loading does not drop the glow to nothing.
+   * Its Material 3 primary: the seed the same query, key and extractor give
+   * that game's own page (`useAlbumArtColor`), so a cover is read once for
+   * both. The last colour holds while the next is worked out, as the
+   * reference's animated colour does — a mood's feed loading does not drop
+   * the glow to nothing.
    */
+  /* Nothing while the round is on its way: the band is no longer restored
+     from the device, and Releases' colour would show and then be replaced. */
   const seedCover = inFeed
     ? (feed.shelves.data?.[feed.leadIndex]?.[0]?.coverUrl ?? null)
-    : ((recommendedGames[0] ?? releaseRail[0])?.coverUrl ?? null);
-  const dominant = useQuery({
-    queryKey: ['artwork-dominant', seedCover],
-    queryFn: () => extractDominantColor(seedCover!),
+    : seedsPending
+      ? null
+      : ((recommendedGames[0] ?? releaseRail[0])?.coverUrl ?? null);
+  const seed = useQuery({
+    queryKey: ['album-art-color', seedCover],
+    queryFn: () => extractSeedColor(seedCover!),
     enabled: !!seedCover && colours.on,
     staleTime: Infinity,
     gcTime: Infinity,
     retry: false,
     placeholderData: keepPreviousData,
   });
-  const tone = glowTone(dominant.data ?? null, {
+  const tone = glowTone(seed.data ? generateDynamicTheme(seed.data, true).primary : null, {
     gameColours: colours.on,
     primary: theme.primary,
   });
@@ -473,9 +503,10 @@ export default function HomeScreen() {
           ) : (
             <>
               {/*
-                Who you are, a way into your profile, and the bell — the row the
+                Who you are and a way into your profile — the row the
                 reference's avatar replaced, brought back by the owner
-                (2026-10-22) to give the chips the bar. On All only: a mood or a
+                (2026-10-22) to give the chips the bar. The bell that ended
+                it is in the bar now, where Settings was (2026-10-28). On All only: a mood or a
                 genre is a page about games, and opens on its strapline. Two
                 lines rather than one because "Welcome back, Ada" buries the
                 name inside a sentence.
@@ -498,35 +529,6 @@ export default function HomeScreen() {
                         </Text>
                       </PressableScale>
                     </Link>
-                    {/* Round, in the action grey, as every icon-only control is.
-                        Not `<IconButton>`, which has nowhere to hang the badge. */}
-                    <PressableScale
-                      accessibilityRole="button"
-                      accessibilityLabel={
-                        unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'
-                      }
-                      onPress={() => router.push('/notifications')}
-                      scaleTo={0.92}
-                      pressedColor={theme.controlPressed}
-                      focusRing={accent.ring}
-                      style={StyleSheet.flatten([
-                        styles.key,
-                        { backgroundColor: theme.controlFill },
-                      ])}>
-                      <Ionicons name="notifications-outline" size={20} color={theme.text} />
-                      {unreadCount > 0 && (
-                        /* Ringed in the page colour, so the badge reads as on the key. */
-                        <View
-                          style={[
-                            styles.badge,
-                            { backgroundColor: theme.primary, borderColor: theme.homeBackground },
-                          ]}>
-                          <Text variant="caption" style={{ color: theme.onPrimary }}>
-                            {unreadCount > 99 ? '99+' : unreadCount}
-                          </Text>
-                        </View>
-                      )}
-                    </PressableScale>
                   </View>
                 </View>
               )}
@@ -581,8 +583,8 @@ export default function HomeScreen() {
             {/*
              * What you might play. From your own logs — not "rated highest":
              * `recommendFromLogs` seeds from logs with a null rating too.
-             * SimpMusic's "Your daily discover" carousel (`<DiscoverCarousel>`,
-             * the owner's, 2026-10-22).
+             * BitChord's lead shelf of big cards (`<DiscoverCarousel>`, the
+             * owner's, 2026-10-28; it was SimpMusic's "Your daily discover").
              * Its first cover is the glow's colour.
              */}
             {!isFirstRun && (recommendedGames.length > 0 || seedsPending) && (
@@ -767,31 +769,9 @@ const styles = StyleSheet.create({
   lead: { gap: Spacing.x32 },
   welcome: { paddingHorizontal: Spacing.x16, gap: Spacing.x8 },
   welcomeUser: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
-  /* Shrinks rather than pushing the row wide — a long display name truncates
-     instead of shoving the bell off the right edge. */
+  /* Shrinks rather than pushing the row wide — a long display name truncates. */
   welcomeLink: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
   welcomeName: { flex: 1 },
-  /* A round key at the tap floor itself — 44 on iOS, 48 on Android. */
-  key: {
-    width: TapTarget,
-    height: TapTarget,
-    borderRadius: TapTarget / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  /* On the key's upper-right shoulder, as a badge on an app icon is. */
-  badge: {
-    position: 'absolute',
-    top: -Spacing.x4,
-    right: -Spacing.x4,
-    minWidth: 20,
-    height: 20,
-    paddingHorizontal: Spacing.x4,
-    borderRadius: Radius.pill,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   /* `EmptyState` centres on `flex: 1`, which resolves to nothing inside a
      content-driven scroll container. The explicit height is what gives it space
      to centre in. */

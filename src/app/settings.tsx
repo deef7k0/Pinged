@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'expo-router';
+import { Link, type Href } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
@@ -14,6 +14,8 @@ import { SelectionCard } from '@/components/ui/selection-card';
 import { Text } from '@/components/ui/text';
 import { Radius, Spacing, TapTarget } from '@/constants/theme';
 import { useAnimatedArtwork } from '@/hooks/use-animated-artwork';
+import { useCopyStage3d } from '@/hooks/use-copy-stage-3d';
+import { STAGE_3D_AVAILABLE, THIRTY_TWO_BIT } from '@/lib/copy-stage-3d';
 import { useGameColours } from '@/hooks/use-game-colours';
 import { useTheme } from '@/hooks/use-theme';
 import { isModerator } from '@/lib/api';
@@ -36,9 +38,10 @@ import { useAuth } from '@/store/auth';
  * Settings rather than on the Surprise Me screen because it is an account-shaped
  * thing you visit occasionally, not part of a roll.
  *
- * The next real candidates are still the ones the product owes: account deletion
- * and a privacy policy, both of which PRODUCT.md records as store-release
- * requirements that do not exist yet. Neither is a row here until it works.
+ * **Privacy and safety** and **Delete account** (0045, 2026-10-29) are the
+ * ones the product owed for a store release: the people you blocked, the
+ * privacy policy and terms of use (`constants/legal.ts`), and deleting the
+ * account — each a working screen, not a promise.
  *
  * **Review languages** passes it too, and is here for the same reason the
  * hidden list is: it is the control for something the app otherwise does by
@@ -69,6 +72,13 @@ import { useAuth } from '@/store/auth';
  * owner's (2026-10-21); changed here. The game page's Animated button is not
  * governed by it — that is somebody asking for one game's animation by hand.
  *
+ * **Copies in 3D** passes it too: a physical copy's case and disc are drawn
+ * on the GPU, which is the heaviest drawing in the app. The owner's
+ * (2026-10-30): a setting to turn it off, off by default on a 32-bit phone
+ * and still able to be turned on there. Not offered on a build that cannot
+ * draw it — a choice that changes nothing is the inert control this screen
+ * avoids.
+ *
  * **Moderation** passes the same test from the other side: it is a row only for
  * the people it works for. Everyone else never sees it — a link to a queue the
  * database would refuse them is exactly the inert control this screen avoids.
@@ -83,6 +93,7 @@ export default function SettingsScreen() {
   const theme = useTheme();
   const gameColours = useGameColours();
   const animatedArtwork = useAnimatedArtwork();
+  const copyStage3d = useCopyStage3d();
   const [signingOut, setSigningOut] = useState(false);
 
   function confirmSignOut() {
@@ -171,6 +182,32 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {STAGE_3D_AVAILABLE && (
+          <View style={styles.group}>
+            <Text variant="label" color="textMuted" accessibilityRole="header">
+              PHYSICAL COPIES
+            </Text>
+            <View style={styles.choices} accessibilityRole="radiogroup">
+              <SelectionCard
+                title="In 3D"
+                hint={
+                  THIRTY_TWO_BIT
+                    ? 'A copy’s case and disc are drawn in 3D, catching the light as they turn. Off by default on this phone: it is 32-bit, and 3D is heavy for it.'
+                    : 'A copy’s case and disc are drawn in 3D, catching the light as they turn.'
+                }
+                selected={copyStage3d.on}
+                onPress={() => copyStage3d.setOn(true)}
+              />
+              <SelectionCard
+                title="Flat"
+                hint="A copy’s case and disc are drawn flat. Lighter on the phone; they still turn and open."
+                selected={!copyStage3d.on}
+                onPress={() => copyStage3d.setOn(false)}
+              />
+            </View>
+          </View>
+        )}
+
         <View style={styles.group}>
           <Text variant="label" color="textMuted">
             REVIEWS
@@ -255,6 +292,30 @@ export default function SettingsScreen() {
 
         <View style={styles.group}>
           <Text variant="label" color="textMuted">
+            PRIVACY AND SAFETY
+          </Text>
+          <NavRow
+            href="/blocked"
+            icon="ban-outline"
+            title="Blocked accounts"
+            hint="People you and they can’t see or reach"
+          />
+          <NavRow
+            href={{ pathname: '/legal/[doc]', params: { doc: 'privacy' } }}
+            icon="shield-outline"
+            title="Privacy policy"
+            hint="What GameLog keeps, who sees it, and deleting it"
+          />
+          <NavRow
+            href={{ pathname: '/legal/[doc]', params: { doc: 'terms' } }}
+            icon="document-text-outline"
+            title="Terms of use"
+            hint="The rules for what is posted here"
+          />
+        </View>
+
+        <View style={styles.group}>
+          <Text variant="label" color="textMuted">
             ACCOUNT
           </Text>
           {/* Confirmed first, and its failure reported — see `confirmSignOut`. */}
@@ -275,9 +336,55 @@ export default function SettingsScreen() {
             </View>
             {signingOut && <ActivityIndicator size="small" color={theme.textMuted} />}
           </PressableScale>
+          {/* Google Play's requirement for any app an account can be made in. */}
+          <NavRow
+            href="/delete-account"
+            icon="trash-outline"
+            title="Delete account"
+            hint="Your account and everything in it, for good"
+            danger
+          />
         </View>
       </PageScrollView>
     </Screen>
+  );
+}
+
+/** A row that opens another screen, in the action grey, as the others here. */
+function NavRow({
+  href,
+  icon,
+  title,
+  hint,
+  danger = false,
+}: {
+  href: Href;
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  hint: string;
+  danger?: boolean;
+}) {
+  const theme = useTheme();
+  return (
+    <Link href={href} asChild>
+      <PressableScale
+        accessibilityRole="link"
+        accessibilityLabel={`${title}. ${hint}`}
+        scaleTo={0.98}
+        pressedColor={theme.controlPressed}
+        style={StyleSheet.flatten([styles.row, { backgroundColor: theme.controlFill }])}>
+        <Ionicons name={icon} size={20} color={danger ? theme.danger : theme.textSecondary} />
+        <View style={styles.rowText}>
+          <Text variant="h5" color={danger ? 'danger' : undefined}>
+            {title}
+          </Text>
+          <Text variant="caption" color="textMuted">
+            {hint}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+      </PressableScale>
+    </Link>
   );
 }
 

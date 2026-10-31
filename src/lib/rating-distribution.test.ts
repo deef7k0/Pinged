@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { DISTRIBUTION_BANDS, barShare, distributionOf, toneScore } from './rating-distribution.ts';
+import {
+  DISTRIBUTION_BANDS,
+  barShare,
+  distributionOf,
+  shownBands,
+  toneScore,
+} from './rating-distribution.ts';
 
 describe('the bands', () => {
   it('are the reference’s eleven rows, 100 at the top and 0–9 at the foot', () => {
@@ -61,5 +67,23 @@ describe('barShare', () => {
     assert.equal(barShare(251, [50, 251, 146]), 1);
     assert.equal(barShare(0, [0, 0]), 0);
     assert.ok(Math.abs(barShare(50, [50, 251]) - 50 / 251) < 1e-12);
+  });
+});
+
+describe('shownBands', () => {
+  it('draws only the rows that hold a score, highest first', () => {
+    const rows = shownBands(distributionOf([100, 95, 95, 41]));
+    assert.deepEqual(
+      rows.map((row) => [row.band.label, row.count]),
+      [
+        ['100', 1],
+        ['90–99', 2],
+        ['40–49', 1],
+      ]
+    );
+  });
+
+  it('draws nothing for no scores', () => {
+    assert.deepEqual(shownBands(distributionOf([])), []);
   });
 });

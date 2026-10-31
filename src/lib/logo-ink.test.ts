@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { logoInkOf, logoTreatment, type LogoPixels } from './logo-ink.ts';
+import {
+  logoInkOf,
+  logoNeedsLightInk,
+  logoTreatment,
+  meanOpaqueLuminance,
+  type LogoPixels,
+} from './logo-ink.ts';
 
 /**
  * Run with `npm test`.
@@ -123,5 +129,38 @@ describe('logoTreatment', () => {
   it('lightens a filled shape that is dark all over', () => {
     const roundel = image(10, 10, (x, y) => ((x === 0 || x === 9) && y === 0 ? CLEAR : BLACK));
     assert.deepEqual(treat(roundel), { kind: 'silhouette' });
+  });
+});
+
+describe('a studio logo on its page', () => {
+  /** One pixel of each run, `[r, g, b, alpha]`. */
+  const solid = (r: number, g: number, b: number, alpha: number, count: number) => {
+    const data = new Uint8Array(count * 4);
+    for (let i = 0; i < count; i += 1) data.set([r, g, b, alpha], i * 4);
+    return data;
+  };
+
+  it('measures the ink of the opaque pixels only', () => {
+    assert.equal(meanOpaqueLuminance(solid(0, 0, 0, 255, 100)), 0);
+    assert.equal(meanOpaqueLuminance(solid(255, 255, 255, 255, 100)), 1);
+    assert.equal(meanOpaqueLuminance(solid(255, 255, 255, 0, 100)), null);
+    const half = meanOpaqueLuminance(new Uint8Array([255, 255, 255, 255, 0, 0, 0, 0]));
+    assert.equal(half, 1);
+  });
+
+  it('draws a dark logo light, and leaves a legible one as it is', () => {
+    const page = '#1B1B1B';
+    /* FromSoftware: pure black type. */
+    assert.equal(logoNeedsLightInk(0, page), true);
+    /* Mojang Studios: white type on a red block, mean luminance 0.46. */
+    assert.equal(logoNeedsLightInk(0.461, page), false);
+    /* Valve: bright red-orange, 0.25. */
+    assert.equal(logoNeedsLightInk(0.248, page), false);
+    /* Supergiant Games: dark red, 0.133 — 3.0:1 on this page, just on the floor. */
+    assert.equal(logoNeedsLightInk(0.133, page), false);
+    /* A navy wordmark (#1A2A5A, 0.025) would be 1.4:1: drawn light. */
+    assert.equal(logoNeedsLightInk(0.025, page), true);
+    /* Not measured (the web build has no decoder): drawn light. */
+    assert.equal(logoNeedsLightInk(null, page), true);
   });
 });

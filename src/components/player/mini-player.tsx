@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TAB_BAR_FOOTPRINT, useKeyboardShown } from '@/components/app-tab-bar';
 import { PlayerArtwork } from '@/components/player/player-bar';
+import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import {
@@ -149,12 +150,14 @@ export function MiniPlayer() {
           {loading ? (
             <ActivityIndicator size="small" color={theme.text} />
           ) : (
-            <Ionicons
-              name={playing ? 'pause' : 'play'}
-              size={20}
-              color={theme.text}
-              style={playing ? undefined : styles.playNudge}
-            />
+            <PressGlyph motion="play">
+              <Ionicons
+                name={playing ? 'pause' : 'play'}
+                size={20}
+                color={theme.text}
+                style={playing ? undefined : styles.playNudge}
+              />
+            </PressGlyph>
           )}
         </PressableScale>
 
@@ -166,7 +169,9 @@ export function MiniPlayer() {
             pressedColor={theme.pressed}
             scaleTo={0.9}
             style={styles.key}>
-            <Ionicons name="play-skip-forward" size={18} color={theme.text} />
+            <PressGlyph motion="skip">
+              <Ionicons name="play-skip-forward" size={18} color={theme.text} />
+            </PressGlyph>
           </PressableScale>
         )}
 
@@ -177,7 +182,9 @@ export function MiniPlayer() {
           pressedColor={theme.pressed}
           scaleTo={0.9}
           style={styles.key}>
-          <Ionicons name="close" size={20} color={theme.textSecondary} />
+          <PressGlyph>
+            <Ionicons name="close" size={20} color={theme.textSecondary} />
+          </PressGlyph>
         </PressableScale>
 
         <Progress />

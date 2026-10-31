@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { Share, StyleSheet, View } from 'react-native';
 
+import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import { Spacing } from '@/constants/theme';
@@ -139,9 +140,11 @@ function Action({
       accessibilityState={selected === undefined ? undefined : { selected }}
       hitSlop={ACTION_SLOP}
       onPress={onPress}
-      scaleTo={0.9}
+      scaleTo={0.96}
       style={styles.action}>
-      <Ionicons name={icon} size={size} color={tint} />
+      <PressGlyph pop={selected}>
+        <Ionicons name={icon} size={size} color={tint} />
+      </PressGlyph>
       {count !== undefined && count > 0 && (
         <Text variant="bodySmall" color="textMuted">
           {count}

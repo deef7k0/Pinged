@@ -44,7 +44,7 @@ export default function AchievementsScreen() {
     enabled: !!id,
   });
 
-  const accent = useGameAccent(game.data?.coverUrl ?? game.data?.heroUrl, game.data?.genres);
+  const accent = useGameAccent(game.data?.heroUrl ?? game.data?.coverUrl, game.data?.genres);
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ['game-achievements', id] });
@@ -107,7 +107,7 @@ export default function AchievementsScreen() {
   const error = load.error ?? sync.error ?? toggle.error;
 
   return (
-    <AccentProvider artwork={game.data?.coverUrl ?? game.data?.heroUrl} genres={game.data?.genres}>
+    <AccentProvider artwork={game.data?.heroUrl ?? game.data?.coverUrl} genres={game.data?.genres}>
       <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="Achievements" />}>
         <PageFlatList
           data={list}

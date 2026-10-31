@@ -18,6 +18,9 @@ import {
   MAX_REPORT_NOTE,
   PICK_REPORT_REASONS,
   PICK_REPORT_REASON_HINT,
+  PROFILE_REPORT_REASONS,
+  PROFILE_REPORT_REASON_HINT,
+  USER_CONTENT_REASON_LABEL,
   isReportKind,
   type ReportKind,
 } from '@/constants/reports';
@@ -28,15 +31,21 @@ import { useTheme } from '@/hooks/use-theme';
 import {
   getLogById,
   getMyReport,
+  getReportedContent,
   getSimilarPair,
   getSimilaritySuggestions,
   reportReview,
   reportSimilarity,
   reportSuggestion,
+  reportUserContent,
   type MyReport,
   type ReportTarget,
 } from '@/lib/api';
-import type { ContentReportReason } from '@/lib/database.types';
+import type {
+  ContentReportReason,
+  UserContentKind,
+  UserContentReportReason,
+} from '@/lib/database.types';
 import { displayNameFor, timeAgoLong } from '@/lib/format';
 import { getGameById } from '@/lib/games';
 import { useAuth } from '@/store/auth';
@@ -49,6 +58,15 @@ const CONTENT_CHOICES: readonly Choice<ContentReportReason>[] = CONTENT_REPORT_R
     value: reason,
     label: CONTENT_REPORT_REASON_LABEL[reason],
     hint: CONTENT_REPORT_REASON_HINT[reason],
+  })
+);
+
+/** A profile's (0045): what can be true of a person's page. */
+const PROFILE_CHOICES: readonly Choice<UserContentReportReason>[] = PROFILE_REPORT_REASONS.map(
+  (reason) => ({
+    value: reason,
+    label: USER_CONTENT_REASON_LABEL[reason],
+    hint: PROFILE_REPORT_REASON_HINT[reason],
   })
 );
 
@@ -126,8 +144,10 @@ export default function ReportScreen() {
     body = <PickReport userId={userId} target={target} game={params.game} onSent={onSent} />;
   } else if (target.kind === 'suggestion') {
     body = <SuggestionReport userId={userId} target={target} onSent={onSent} />;
-  } else {
+  } else if (target.kind === 'review') {
     body = <ReviewReport userId={userId} target={target} onSent={onSent} />;
+  } else {
+    body = <UserContentReport userId={userId} target={target} onSent={onSent} />;
   }
 
   return (
@@ -146,6 +166,9 @@ const REPORT_TITLE: Record<ReportKind, string> = {
   pick: 'Report this pick',
   suggestion: 'Report this suggestion',
   review: 'Report this review',
+  comment: 'Report this comment',
+  wall_post: 'Report this post',
+  profile: 'Report this account',
 };
 
 function targetFrom(params: Params): ReportTarget | null {
@@ -159,6 +182,12 @@ function targetFrom(params: Params): ReportTarget | null {
         : null;
     case 'review':
       return { kind: 'review', logId: params.id };
+    case 'comment':
+    case 'wall_post':
+    case 'profile':
+      return params.author
+        ? { kind: params.kind, targetId: params.id, authorId: params.author }
+        : null;
   }
 }
 
@@ -274,6 +303,42 @@ function ReviewReport({
       send={(reason, note) => reportReview(userId, target.logId, reason, note)}
       onSent={onSent}
       promise={`Only moderators see reports, and ${name ?? 'its author'} is never told who sent one. Nothing comes down until a moderator has read it.`}
+    />
+  );
+}
+
+/** What each of 0045's kinds is called in the form's head. */
+const USER_CONTENT_NOUN: Record<UserContentKind, string> = {
+  comment: 'comment',
+  wall_post: 'wall post',
+  profile: 'account',
+};
+
+function UserContentReport({
+  userId,
+  target,
+  onSent,
+}: {
+  userId: string;
+  target: Extract<ReportTarget, { kind: UserContentKind }>;
+  onSent: () => void;
+}) {
+  const content = useQuery({
+    queryKey: ['reported-content', target.kind, target.targetId],
+    queryFn: () => getReportedContent(target),
+  });
+
+  const name = content.data?.authorName ?? null;
+  const profile = target.kind === 'profile';
+
+  return (
+    <ReportForm<UserContentReportReason>
+      context={name ? (profile ? name : `${name}’s ${USER_CONTENT_NOUN[target.kind]}`) : null}
+      quote={content.data?.quote ?? null}
+      choices={profile ? PROFILE_CHOICES : CONTENT_CHOICES}
+      send={(reason, note) => reportUserContent(userId, target, reason, note)}
+      onSent={onSent}
+      promise={`Only moderators see reports, and ${name ?? 'they'} ${name ? 'is' : 'are'} never told who sent one. Nothing comes down until a moderator has read it.${profile ? ' To stop seeing them now, block them from their profile.' : ''}`}
     />
   );
 }

@@ -230,6 +230,7 @@ describe('where the mini player is drawn', () => {
     const names = [...outside.matchAll(/<Stack\.Screen\s+name="([^"]+)"/g)].map((m) => m[1]);
 
     assert.ok(names.includes('onboarding') && names.includes('welcome'), names.join(', '));
-    for (const name of names) assert.ok(MINI_PLAYER_HIDDEN_ROUTES.has(name), name);
+    /* By its first segment, as `hidesMiniPlayer` reads a route. */
+    for (const name of names) assert.ok(MINI_PLAYER_HIDDEN_ROUTES.has(name.split('/')[0]), name);
   });
 });
