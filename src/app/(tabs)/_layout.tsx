@@ -4,30 +4,21 @@ import { Tabs } from 'expo-router';
 import { AppTabBar, TabBarClearanceProvider } from '@/components/app-tab-bar';
 
 /**
- * Bottom navigation. Four tabs, icons above labels — drawn by `<AppTabBar>`,
- * SimpMusic's floating capsule, over the page. Every tab screen pads its
- * scroll content by `useTabBarClearance()` so it ends above the capsule.
+ * Bottom navigation. Four tabs, a glyph over a word — drawn by `<AppTabBar>`,
+ * expo-glass-tabs' floating glass bar (2026-11-02), over the page. Every tab
+ * screen pads its scroll content by `useTabBarClearance()` so it ends above
+ * the bar, and the bar minimizes as a tab's page is read downward.
  *
- * Labels are shown, not hidden. An icon-only bar asks every new user to guess
- * what a newspaper glyph leads to; a word under each glyph removes the
- * guessing. Five is the ceiling — a sixth destination means something belongs
- * one level down, not that the bar should get denser.
+ * Labels are shown, not hidden — until the bar is minimized, when every glyph
+ * stays and the words fold away. Five is the ceiling.
  *
- * Selection is the house blue, on both the glyph and the label. That is
- * the single loudest use of colour in the chrome and it is deliberate: where
- * you are is the one thing the chrome should always be shouting.
- *
- * **The bar never takes a game's colour.** Everything else in the app can shift
- * to the identity hue of whatever you are looking at; this stays the house
- * blue on every screen, because it is the one fixed thing you navigate by.
- * A bottom bar that changed colour with the content above it would be the app
- * losing its own identity rather than expressing the game's.
- *
- * `primaryText`, not `primary`: the label is 11px, and the fill blue measures
- * 3.69:1 against the bar's surface where its type twin measures 5.69.
+ * The chosen tab is white under a sliding highlight, the package's own look;
+ * it was the house blue while the bar was SimpMusic's capsule. **The bar
+ * never takes a game's colour** — it is the one fixed thing you navigate by.
  *
  * Notifications used to live here; it now opens from an icon in Home's header
- * instead, freeing the slot for News.
+ * instead, freeing the slot for News — and News gave it to Pings
+ * (2026-10-31), opening from Home's "Latest news" and "Latest events".
  *
  * **There is no composer route any more.** `create` was registered here with
  * `href: null` — in the group, off the bar — and it composed user posts and
@@ -53,10 +44,10 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            title: 'GameLog',
+            title: 'Home',
             tabBarAccessibilityLabel: 'Home',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+            tabBarIcon: ({ color, focused, size }) => (
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
             ),
           }}
         />
@@ -66,23 +57,25 @@ export default function TabsLayout() {
           options={{
             title: 'Search',
             tabBarAccessibilityLabel: 'Search',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'search' : 'search-outline'} size={24} color={color} />
+            tabBarIcon: ({ color, focused, size }) => (
+              <Ionicons name={focused ? 'search' : 'search-outline'} size={size} color={color} />
             ),
           }}
         />
 
+        {/*
+          Pings, where News was (the owner's, 2026-10-31): asking everybody
+          what to play next, and answering. News and events open from Home's
+          two sections now (`/news`). The glyph is a dot with waves either side
+          of it — a ping going out.
+        */}
         <Tabs.Screen
-          name="news"
+          name="pings"
           options={{
-            title: 'News',
-            tabBarAccessibilityLabel: 'News',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons
-                name={focused ? 'newspaper' : 'newspaper-outline'}
-                size={24}
-                color={color}
-              />
+            title: 'Pings',
+            tabBarAccessibilityLabel: 'Pings',
+            tabBarIcon: ({ color, focused, size }) => (
+              <Ionicons name={focused ? 'radio' : 'radio-outline'} size={size} color={color} />
             ),
           }}
         />
@@ -92,8 +85,8 @@ export default function TabsLayout() {
           options={{
             title: 'Profile',
             tabBarAccessibilityLabel: 'Profile',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
+            tabBarIcon: ({ color, focused, size }) => (
+              <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />
             ),
           }}
         />

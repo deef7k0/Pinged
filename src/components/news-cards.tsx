@@ -11,7 +11,7 @@ import { HeroAspectRatio, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { timeAgo } from '@/lib/format';
 import type { LatestEvent } from '@/lib/games/browse';
-import type { Article, GameEvent, Trailer } from '@/lib/news';
+import type { Article, GameEvent } from '@/lib/news';
 
 /** Diameter of the play glyph centred on a trailer thumbnail. */
 const PLAY_BADGE = 52;
@@ -111,42 +111,6 @@ export function ArticleCard({ article }: { article: Article }) {
               handles it. */}
           <Text variant="label" style={[styles.readStory, { color: theme.text }]}>
             Read story
-          </Text>
-        </View>
-      </Card>
-    </PressableScale>
-  );
-}
-
-export function TrailerCard({ trailer }: { trailer: Trailer }) {
-  const theme = useTheme();
-
-  return (
-    <PressableScale
-      accessibilityRole="link"
-      accessibilityLabel={`${trailer.gameTitle} — ${trailer.name}`}
-      onPress={() => openExternal(`https://www.youtube.com/watch?v=${trailer.videoId}`)}
-      scaleTo={0.98}>
-      <Card padded={false}>
-        <View>
-          <Image
-            source={{ uri: trailer.thumbnailUrl }}
-            style={[styles.articleImage, { backgroundColor: theme.surfaceElevated }]}
-            contentFit="cover"
-            transition={200}
-            accessibilityIgnoresInvertColors
-          />
-          <View style={[styles.playBadge, { backgroundColor: theme.scrim }]}>
-            <Ionicons name="play" size={22} color={theme.white} />
-          </View>
-        </View>
-
-        <View style={styles.articleBody}>
-          <Text variant="h5" numberOfLines={2}>
-            {trailer.gameTitle}
-          </Text>
-          <Text variant="bodySmall" color="textMuted" numberOfLines={1}>
-            {trailer.name}
           </Text>
         </View>
       </Card>

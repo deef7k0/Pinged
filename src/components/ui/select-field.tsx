@@ -1,13 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { SelectionCard } from '@/components/ui/selection-card';
 import { Text } from '@/components/ui/text';
-import { ControlHeight, Elevation, Radius, Spacing, Type } from '@/constants/theme';
+import { Tray } from '@/components/ui/tray';
+import { ControlHeight, Radius, Spacing, Type } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -68,7 +68,6 @@ export function SelectField({
 }: SelectFieldProps) {
   const theme = useTheme();
   const accent = useAccent();
-  const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
 
   const selected = options.find((option) => option.value === value) ?? null;
@@ -114,33 +113,8 @@ export function SelectField({
         </Text>
       )}
 
-      <Modal
-        visible={open}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setOpen(false)}
-        statusBarTranslucent>
-        {/* Tapping the scrim closes, which is the gesture every sheet in every
-            app on the phone already answers to. */}
-        <Pressable
-          style={[styles.scrim, { backgroundColor: theme.scrim }]}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-          onPress={() => setOpen(false)}
-        />
-
-        <View
-          style={[
-            styles.sheet,
-            Elevation.overlay,
-            {
-              backgroundColor: theme.surface,
-              borderColor: theme.border,
-              paddingBottom: insets.bottom + Spacing.x16,
-            },
-          ]}>
-          <View style={[styles.grabber, { backgroundColor: theme.borderStrong }]} />
-
+      <Tray visible={open} onClose={() => setOpen(false)} maxHeightRatio={0.55}>
+        <View style={styles.sheet}>
           <Text variant="h4" style={styles.sheetTitle}>
             {sheetTitle ?? label ?? 'Select'}
           </Text>
@@ -193,7 +167,7 @@ export function SelectField({
             )}
           </ScrollView>
         </View>
-      </Modal>
+      </Tray>
     </View>
   );
 }
@@ -216,30 +190,14 @@ const styles = StyleSheet.create({
   },
   value: { flex: 1 },
 
-  scrim: { flex: 1 },
-  /* The menu surface: rounded top, hairline edge on the three sides that meet
-     the page. */
+  /* In a tray (`<Tray>`), never taller than about half the screen: this is
+     a short list attached to one field, and a sheet that fills the display
+     reads as a new screen. The tray draws the handle. */
   sheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderTopLeftRadius: Radius.sheet,
-    borderTopRightRadius: Radius.sheet,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: 0,
+    flexShrink: 1,
     paddingHorizontal: Spacing.x16,
-    paddingTop: Spacing.x12,
+    paddingBottom: Spacing.x16,
     gap: Spacing.x12,
-    /* Never taller than half the screen: this is a short list attached to one
-       field, and a sheet that fills the display reads as a new screen. */
-    maxHeight: '55%',
-  },
-  grabber: {
-    alignSelf: 'center',
-    width: 36,
-    height: 4,
-    borderRadius: Radius.pill,
   },
   sheetTitle: { ...Type.h4 },
   list: { flexGrow: 0 },

@@ -111,7 +111,7 @@ export class SteamProvider implements GamingAccountProvider {
         return {
           ok: false,
           reason: 'failed',
-          message: 'That Steam account is already linked to another GameLog profile.',
+          message: 'That Steam account is already linked to another Pinged profile.',
         };
       default:
         return {

@@ -94,7 +94,7 @@ export function RatingsCard({
     <Panel
       title="Ratings"
       onPress={onOpen}
-      accessibilityLabel={`Ratings of ${title} on GameLog: ${verdict.label}, ${shown} out of 100 from ${counted}. Opens the reviews.`}>
+      accessibilityLabel={`Ratings of ${title} on Pinged: ${verdict.label}, ${shown} out of 100 from ${counted}. Opens the reviews.`}>
       {/* The verdict, and under it how many reviews it is from. */}
       <ScoreSummary gameId={gameId} breakdown={data} graphCard={false} />
     </Panel>
@@ -146,7 +146,7 @@ export function GameAudienceCard({ gameId, title }: { gameId: string; title: str
 
   if (audience.isLoadingError) {
     return (
-      <Panel title="On GameLog">
+      <Panel title="On Pinged">
         <View style={styles.failed}>
           <Text variant="body" color="textSecondary">
             These counts couldn’t be loaded.
@@ -191,7 +191,7 @@ export function GameAudienceCard({ gameId, title }: { gameId: string; title: str
     : [];
 
   return (
-    <Panel title="On GameLog">
+    <Panel title="On Pinged">
       {data ? <StatsStrip cells={cells} /> : <StatsStripSkeleton count={3} />}
     </Panel>
   );

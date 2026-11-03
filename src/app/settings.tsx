@@ -2,8 +2,15 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { Link, type Href } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { PingAudienceSetting } from '@/components/pings/ping-audience-setting';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { ReadingLanguages } from '@/components/reading-languages';
 import { SurpriseHiddenList } from '@/components/surprise-hidden-list';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
@@ -20,6 +27,8 @@ import { useGameColours } from '@/hooks/use-game-colours';
 import { useTheme } from '@/hooks/use-theme';
 import { isModerator } from '@/lib/api';
 import { useAuth } from '@/store/auth';
+import { Loader } from '@/components/ui/loader';
+import { showAlert } from '@/components/ui/dialog';
 
 /**
  * Settings — a few sections, and each is a real one.
@@ -79,6 +88,11 @@ import { useAuth } from '@/store/auth';
  * draw it — a choice that changes nothing is the inert control this screen
  * avoids.
  *
+ * **Pings** passes it as the hidden list does — it is the only control for
+ * something the database does on its own: whether a ping reaches you (0046's
+ * `can_ping`). Anyone who follows you, by default; people you follow back; or
+ * friends only. The owner's (2026-10-31).
+ *
  * **Moderation** passes the same test from the other side: it is a row only for
  * the people it works for. Everyone else never sees it — a link to a queue the
  * database would refuse them is exactly the inert control this screen avoids.
@@ -97,7 +111,7 @@ export default function SettingsScreen() {
   const [signingOut, setSigningOut] = useState(false);
 
   function confirmSignOut() {
-    Alert.alert('Sign out?', 'You will need your email and password to sign back in.', [
+    showAlert('Sign out?', 'You will need your email and password to sign back in.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign out',
@@ -110,7 +124,7 @@ export default function SettingsScreen() {
             /* Reported rather than swallowed. The session survives a failed
                sign-out, so silence would leave someone believing they had
                signed out on a shared device. */
-            Alert.alert(
+            showAlert(
               'Could not sign out',
               error instanceof Error ? error.message : 'Check your connection and try again.'
             );
@@ -142,78 +156,99 @@ export default function SettingsScreen() {
   return (
     <Screen edges={['bottom']} insetHeader padded topBar={<FrostedTopBar back title="Settings" />}>
       <PageScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={styles.group}>
-          <Text variant="label" color="textMuted" accessibilityRole="header">
-            GAME COLOURS
-          </Text>
-          <View style={styles.choices} accessibilityRole="radiogroup">
-            <SelectionCard
-              title="The game’s colours"
-              hint="A game’s page, its reviews, Surprise Me, collections and studios take their colours from their art."
-              selected={gameColours.on}
-              onPress={() => gameColours.setOn(true)}
+        {/* The owner's (2026-11-02): reacticx's bouncy accordion wherever it
+            fits. Settings is where it does — six things to set, each a
+            handful of choices; one open at a time, the rest folded to the
+            line that says what is set. */}
+        <Accordion>
+          <AccordionItem value="colours">
+            <AccordionTrigger
+              icon="color-palette-outline"
+              title="Game colours"
+              summary={gameColours.on ? 'The game’s colours' : 'Pinged’s colours'}
             />
-            <SelectionCard
-              title="GameLog’s colours"
-              hint="Every screen in the app’s own dark grey, with a light grey accent, whatever the art."
-              selected={!gameColours.on}
-              onPress={() => gameColours.setOn(false)}
-            />
-          </View>
-        </View>
+            <AccordionContent>
+              <View style={styles.choices} accessibilityRole="radiogroup">
+                <SelectionCard
+                  title="The game’s colours"
+                  hint="A game’s page, its reviews, Surprise Me, collections and studios take their colours from their art."
+                  selected={gameColours.on}
+                  onPress={() => gameColours.setOn(true)}
+                />
+                <SelectionCard
+                  title="Pinged’s colours"
+                  hint="Every screen in the app’s own dark grey, with a light grey accent, whatever the art."
+                  selected={!gameColours.on}
+                  onPress={() => gameColours.setOn(false)}
+                />
+              </View>
+            </AccordionContent>
+          </AccordionItem>
 
-        <View style={styles.group}>
-          <Text variant="label" color="textMuted" accessibilityRole="header">
-            ANIMATED ARTWORK
-          </Text>
-          <View style={styles.choices} accessibilityRole="radiogroup">
-            <SelectionCard
-              title="Animated"
-              hint="Surprise Me and a review’s art play a game’s animated cover when it has one."
-              selected={animatedArtwork.on}
-              onPress={() => animatedArtwork.setOn(true)}
+          <AccordionItem value="animated">
+            <AccordionTrigger
+              icon="play-circle-outline"
+              title="Animated artwork"
+              summary={animatedArtwork.on ? 'Animated' : 'Still'}
             />
-            <SelectionCard
-              title="Still"
-              hint="Every cover stays still, and nothing is downloaded for it. A game’s cover can still be played from its page."
-              selected={!animatedArtwork.on}
-              onPress={() => animatedArtwork.setOn(false)}
-            />
-          </View>
-        </View>
+            <AccordionContent>
+              <View style={styles.choices} accessibilityRole="radiogroup">
+                <SelectionCard
+                  title="Animated"
+                  hint="Surprise Me and a review’s art play a game’s animated cover when it has one."
+                  selected={animatedArtwork.on}
+                  onPress={() => animatedArtwork.setOn(true)}
+                />
+                <SelectionCard
+                  title="Still"
+                  hint="Every cover stays still, and nothing is downloaded for it. A game’s cover can still be played from its page."
+                  selected={!animatedArtwork.on}
+                  onPress={() => animatedArtwork.setOn(false)}
+                />
+              </View>
+            </AccordionContent>
+          </AccordionItem>
 
-        {STAGE_3D_AVAILABLE && (
-          <View style={styles.group}>
-            <Text variant="label" color="textMuted" accessibilityRole="header">
-              PHYSICAL COPIES
-            </Text>
-            <View style={styles.choices} accessibilityRole="radiogroup">
-              <SelectionCard
-                title="In 3D"
-                hint={
-                  THIRTY_TWO_BIT
-                    ? 'A copy’s case and disc are drawn in 3D, catching the light as they turn. Off by default on this phone: it is 32-bit, and 3D is heavy for it.'
-                    : 'A copy’s case and disc are drawn in 3D, catching the light as they turn.'
-                }
-                selected={copyStage3d.on}
-                onPress={() => copyStage3d.setOn(true)}
+          {STAGE_3D_AVAILABLE && (
+            <AccordionItem value="copies">
+              <AccordionTrigger
+                icon="disc-outline"
+                title="Physical copies"
+                summary={copyStage3d.on ? 'In 3D' : 'Flat'}
               />
-              <SelectionCard
-                title="Flat"
-                hint="A copy’s case and disc are drawn flat. Lighter on the phone; they still turn and open."
-                selected={!copyStage3d.on}
-                onPress={() => copyStage3d.setOn(false)}
-              />
-            </View>
-          </View>
-        )}
+              <AccordionContent>
+                <View style={styles.choices} accessibilityRole="radiogroup">
+                  <SelectionCard
+                    title="In 3D"
+                    hint={
+                      THIRTY_TWO_BIT
+                        ? 'A copy’s case and disc are drawn in 3D, catching the light as they turn. Off by default on this phone: it is 32-bit, and 3D is heavy for it.'
+                        : 'A copy’s case and disc are drawn in 3D, catching the light as they turn.'
+                    }
+                    selected={copyStage3d.on}
+                    onPress={() => copyStage3d.setOn(true)}
+                  />
+                  <SelectionCard
+                    title="Flat"
+                    hint="A copy’s case and disc are drawn flat. Lighter on the phone; they still turn and open."
+                    selected={!copyStage3d.on}
+                    onPress={() => copyStage3d.setOn(false)}
+                  />
+                </View>
+              </AccordionContent>
+            </AccordionItem>
+          )}
 
-        <View style={styles.group}>
-          <Text variant="label" color="textMuted">
-            REVIEWS
-          </Text>
-          <ReadingLanguages userId={userId} />
-        </View>
+          <AccordionItem value="pings">
+            <AccordionTrigger icon="radio-outline" title="Pings" summary="Who can ping you" />
+            <AccordionContent>
+              <PingAudienceSetting userId={userId} />
+            </AccordionContent>
+          </AccordionItem>
+
+          <ReadingLanguages value="languages" userId={userId} />
+          <SurpriseHiddenList value="hidden" userId={userId} />
+        </Accordion>
 
         <View style={styles.group}>
           <Text variant="label" color="textMuted">
@@ -236,13 +271,6 @@ export default function SettingsScreen() {
               <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
             </PressableScale>
           </Link>
-        </View>
-
-        <View style={styles.group}>
-          <Text variant="label" color="textMuted">
-            SURPRISE ME
-          </Text>
-          <SurpriseHiddenList userId={userId} />
         </View>
 
         {moderator.data === true && (
@@ -304,7 +332,7 @@ export default function SettingsScreen() {
             href={{ pathname: '/legal/[doc]', params: { doc: 'privacy' } }}
             icon="shield-outline"
             title="Privacy policy"
-            hint="What GameLog keeps, who sees it, and deleting it"
+            hint="What Pinged keeps, who sees it, and deleting it"
           />
           <NavRow
             href={{ pathname: '/legal/[doc]', params: { doc: 'terms' } }}
@@ -334,7 +362,7 @@ export default function SettingsScreen() {
                 Sign out
               </Text>
             </View>
-            {signingOut && <ActivityIndicator size="small" color={theme.textMuted} />}
+            {signingOut && <Loader size="small" color={theme.textMuted} />}
           </PressableScale>
           {/* Google Play's requirement for any app an account can be made in. */}
           <NavRow

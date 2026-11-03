@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Alert, FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 
 import { AwardSlotRow } from '@/components/award-slot';
 import { PressableScale } from '@/components/ui/pressable-scale';
@@ -11,6 +11,7 @@ import { Text } from '@/components/ui/text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { deleteAward, getAwards, reorderAwards, swapAwards, type AwardSlot } from '@/lib/api';
+import { showAlert } from '@/components/ui/dialog';
 
 export type AwardShowProps = {
   listId: string;
@@ -72,7 +73,7 @@ export function AwardShow({ listId, isOwner, header }: AwardShowProps) {
   });
 
   function confirmDelete(award: AwardSlot) {
-    Alert.alert(
+    showAlert(
       `Delete ${award.label}?`,
       award.note
         ? 'The category and what you wrote about it are removed. The game stays in your library.'

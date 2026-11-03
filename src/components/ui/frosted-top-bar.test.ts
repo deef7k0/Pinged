@@ -48,20 +48,22 @@ describe('the top bar', () => {
     for (const gradient of gradients) assert.doesNotMatch(gradient, /transparent/);
   });
 
-  it('is the page’s colour, not a blur — except Apple’s glass bar, on three pages', () => {
-    /* The owner had the bar's blur removed (2026-10-14). The one plain
-       `<BlurView>` is the disc of glass over artwork, which is a button; the
-       one animated blur is the glass bar's (`glass`), which the owner asked
-       for on the three Apple Music pages (2026-10-23) and nowhere else. */
+  it('stands on reacticx’s header fade, never a blur — every bar, the glass one too', () => {
+    /* The owner had the bar's blur removed (2026-10-14), kept Apple's glass
+       on three pages (2026-10-23), then asked for reacticx's header fade
+       "across the app" (2026-11-02). The one `<BlurView>` left is the disc of
+       glass over artwork, which is a button. */
     assert.equal((bar.match(/^\s*<BlurView\b/gm) ?? []).length, 1);
-    assert.equal((bar.match(/^\s*<AnimatedBlurView\b/gm) ?? []).length, 1);
-    assert.match(bar, /function GlassFrost/);
+    assert.doesNotMatch(bar, /AnimatedBlurView|function GlassFrost/);
     assert.doesNotMatch(
       bar.slice(bar.indexOf('function Frost('), bar.indexOf("/** The bar's row")),
       /BlurView/,
-      'every other bar is still a wash and nothing else'
+      'the ground is a fade and nothing else'
     );
+    assert.match(bar, /<LinearGradient colors=\{colours\}/);
 
+    /* The three Apple Music pages keep the glass bar's behaviour — discs that
+       stay, a centred name — on the same fade. */
     const app = (path: string) => read(`../../app/${path}`);
     const glassy = ['game/[id].tsx', 'studio/[id].tsx', 'list/[id].tsx'];
     for (const page of glassy) {

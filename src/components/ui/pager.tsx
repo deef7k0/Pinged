@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { IconButton } from '@/components/ui/icon-button';
 import { PressableScale } from '@/components/ui/pressable-scale';
@@ -9,6 +9,7 @@ import { ControlHeight, Radius, SmallControlSlop, Spacing, Type } from '@/consta
 import { useAccent } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
 import { clampPage, pagerSlots, type PagerSlot } from '@/lib/games/paging';
+import { Loader } from '@/components/ui/loader';
 
 export type PagerProps = {
   /** The page on screen, 1-based. */
@@ -188,7 +189,7 @@ export function Pager({
                 : `Page ${page.toLocaleString()} of …`}
               {known && summary ? ` · ${summary}` : ''}
             </Text>
-            {!known && <ActivityIndicator size="small" color={theme.textMuted} />}
+            {!known && <Loader size="small" color={theme.textMuted} />}
           </View>
 
           <View style={styles.jump}>

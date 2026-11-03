@@ -2,6 +2,9 @@ import { useEffect, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
+  Extrapolation,
+  interpolate,
+  runOnJS,
   useAnimatedReaction,
   useAnimatedStyle,
   useReducedMotion,
@@ -11,14 +14,25 @@ import Animated, {
 
 import { useScreenChrome } from '@/hooks/use-screen-chrome';
 
+/** How far past the top a pull goes before it focuses the field (reacticx's `pullThreshold`). */
+const PULL = 80;
+
 /** Within this of the top, the field is always out. */
 const REVEAL_TOP = 12;
 
-/** How far the page must travel one way before the field changes its mind. */
-const TRAVEL = 24;
+/**
+ * How far the page must travel one way before the field changes its mind —
+ * a deliberate scroll, not a settling list or a resting thumb (it was 24).
+ */
+const TRAVEL = 56;
 
-/** The fold, each way: SimpMusic's expand / shrink, on a gentle ease-out. */
-const FOLD_MS = 240;
+/**
+ * The fold, each way: eased in and out over 450ms — the owner's "smooth, not
+ * instant, not fast, not super slow" (2026-11-02). It was 240ms out, which
+ * read as a snap.
+ */
+const FOLD_MS = 450;
+const FOLD_EASING = Easing.inOut(Easing.cubic);
 
 /**
  * Search's field, folding away as the page is read and coming back on the way
@@ -44,8 +58,24 @@ const FOLD_MS = 240;
  * under the reader's thumbs and nothing to hide it for. Under Reduce Motion
  * it folds and unfolds at once. Must be drawn inside `<Screen>`.
  */
-export function CollapsingField({ pinned, children }: { pinned: boolean; children: ReactNode }) {
-  const scrollY = useScreenChrome()?.scrollY;
+export function CollapsingField({
+  pinned,
+  onPull,
+  children,
+}: {
+  pinned: boolean;
+  /**
+   * reacticx's scrollable search: pulling the page down past `PULL` focuses
+   * the field, which swells a little as it is pulled (1.05 at 120dp). Only
+   * where a scroll can go past its top — iOS's bounce; Android's scroller
+   * stops at zero, and its pull is the page's refresh.
+   */
+  onPull?: () => void;
+  children: ReactNode;
+}) {
+  const chrome = useScreenChrome();
+  const scrollY = chrome?.scrollY;
+  const dragging = chrome?.dragging;
   const reduceMotion = useReducedMotion();
   const duration = reduceMotion ? 0 : FOLD_MS;
 
@@ -59,20 +89,36 @@ export function CollapsingField({ pinned, children }: { pinned: boolean; childre
     held.set(pinned);
     if (pinned && shown.get() === 0) {
       shown.set(1);
-      progress.set(withTiming(1, { duration, easing: Easing.out(Easing.cubic) }));
+      progress.set(withTiming(1, { duration, easing: FOLD_EASING }));
     }
   }, [pinned, held, shown, progress, duration]);
 
+  /*
+   * **Nothing changes while a finger is on the page.** The fold moves the
+   * list's frame; under a held finger the list reads that as the finger
+   * moving, scrolls the other way, and the fold flips back — over and over,
+   * from nothing more than a thumb's pulse (the owner's report, 2026-11-02).
+   * So the field decides only once the finger is up: on release, and through
+   * a fling's coast. The anchor stays where the drag began, so the whole
+   * drag's travel counts at release.
+   */
   useAnimatedReaction(
-    () => scrollY?.get() ?? 0,
-    (y) => {
+    () => ({ y: scrollY?.get() ?? 0, held: (dragging?.get() ?? 0) === 1 }),
+    ({ y, held: touching }) => {
       const show = (next: number) => {
         if (shown.get() === next) return;
         shown.set(next);
-        progress.set(withTiming(next, { duration, easing: Easing.out(Easing.cubic) }));
+        progress.set(withTiming(next, { duration, easing: FOLD_EASING }));
       };
 
-      if (held.get() || y <= REVEAL_TOP) {
+      if (held.get()) {
+        anchor.set(y);
+        show(1);
+        return;
+      }
+      if (touching) return;
+
+      if (y <= REVEAL_TOP) {
         anchor.set(y);
         show(1);
         return;
@@ -94,6 +140,21 @@ export function CollapsingField({ pinned, children }: { pinned: boolean; childre
     [duration]
   );
 
+  const pulled = useSharedValue(false);
+  useAnimatedReaction(
+    () => scrollY?.get() ?? 0,
+    (y) => {
+      if (!onPull) return;
+      if (y < -PULL && !pulled.get()) {
+        pulled.set(true);
+        runOnJS(onPull)();
+      } else if (y >= 0 && pulled.get()) {
+        pulled.set(false);
+      }
+    },
+    [onPull]
+  );
+
   /* Bumped every render and read by the style, so a re-render re-sends it —
      the top bar's remedy (`usePulse` in ui/frosted-top-bar). The transform is
      what makes each send differ from the last. */
@@ -110,6 +171,13 @@ export function CollapsingField({ pinned, children }: { pinned: boolean; childre
     return full > 0
       ? { height: full * amount, opacity: amount, transform: [{ translateY: nudge }] }
       : { opacity: amount, transform: [{ translateY: nudge }] };
+  });
+
+  const swell = useAnimatedStyle(() => {
+    const pull = Math.max(0, -(scrollY?.get() ?? 0));
+    return {
+      transform: [{ scale: interpolate(pull, [0, 60, 120], [1, 1.02, 1.05], Extrapolation.CLAMP) }],
+    };
   });
 
   return (
@@ -129,7 +197,7 @@ export function CollapsingField({ pinned, children }: { pinned: boolean; childre
           const measured = event.nativeEvent.layout.height;
           if (measured > height.get()) height.set(measured);
         }}>
-        {children}
+        <Animated.View style={swell}>{children}</Animated.View>
       </View>
     </Animated.View>
   );

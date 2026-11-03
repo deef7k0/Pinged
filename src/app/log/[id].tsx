@@ -4,7 +4,6 @@ import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
-  Alert,
   BackHandler,
   KeyboardAvoidingView,
   Platform,
@@ -70,6 +69,7 @@ import { platformOptionsFor } from '@/lib/platform-options';
 import { PLAY_FILTERS, type ReviewPlayFilter } from '@/lib/review-facets';
 import { QUOTE_MAX, displayOf, normaliseQuote, type ReviewDisplay } from '@/lib/review-quote';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/components/ui/dialog';
 
 /** How long the form waits after the last keystroke before writing a draft. */
 const DRAFT_DEBOUNCE_MS = 800;
@@ -454,6 +454,8 @@ function LogForm({ game, existing, draft, userId }: LogFormProps) {
     queryClient.invalidateQueries({ queryKey: ['my-log', userId, game.id] });
     queryClient.invalidateQueries({ queryKey: ['game-reviews', game.id] });
     queryClient.invalidateQueries({ queryKey: ['user-logs', userId] });
+    // A status changed what you have played: For You's tiers with it (0046).
+    queryClient.invalidateQueries({ queryKey: ['pings', 'for_you'] });
     queryClient.invalidateQueries({ queryKey: ['profile-stats', userId] });
     queryClient.invalidateQueries({ queryKey: ['achievement-stats', userId] });
     queryClient.invalidateQueries({ queryKey: ['completions', userId] });
@@ -648,7 +650,7 @@ function LogForm({ game, existing, draft, userId }: LogFormProps) {
       return;
     }
 
-    Alert.alert(
+    showAlert(
       'Leave without saving?',
       draft
         ? 'Your draft is kept on this device, so you can pick it up again.'
@@ -671,7 +673,7 @@ function LogForm({ game, existing, draft, userId }: LogFormProps) {
   }, [dirty]);
 
   function confirmRemove() {
-    Alert.alert(
+    showAlert(
       'Remove your log?',
       `Your score and review for ${game.title} are deleted along with it. This cannot be undone.`,
       [
@@ -682,7 +684,7 @@ function LogForm({ game, existing, draft, userId }: LogFormProps) {
   }
 
   function discardDraft() {
-    Alert.alert(
+    showAlert(
       'Discard this draft?',
       'The form goes back to what is saved. The draft cannot be recovered.',
       [

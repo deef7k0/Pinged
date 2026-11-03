@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { PlayerArtwork } from '@/components/player/player-bar';
 import { SoundCloudMark } from '@/components/player/soundcloud-mark';
@@ -11,6 +11,7 @@ import { Radius, Spacing, TapTarget } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
 import type { SoundCloudTrack } from '@/lib/soundcloud/types';
+import { Loader } from '@/components/ui/loader';
 
 const ARTWORK = 44;
 
@@ -196,7 +197,7 @@ export function SurpriseSoundtrack({
             { backgroundColor: playable ? accent.color : accent.m3.surfaceContainerHigh },
           ])}>
           {starting ? (
-            <ActivityIndicator size="small" color={accent.ink} />
+            <Loader size="small" color={accent.ink} />
           ) : (
             <Ionicons
               name={playing ? 'pause' : 'play'}

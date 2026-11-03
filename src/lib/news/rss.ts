@@ -16,7 +16,7 @@ import type { Article } from './types';
  *    `npm run web`, exactly like the Steam store endpoints.
  */
 
-const USER_AGENT = 'GameLog/1.0 (RSS reader)';
+const USER_AGENT = 'Pinged/1.0 (RSS reader)';
 
 export type Feed = { source: string; url: string };
 

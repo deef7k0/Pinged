@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ProfileView } from '@/components/profile-view';
 import { reportHref } from '@/components/report-flag';
@@ -13,6 +13,7 @@ import { Spacing } from '@/constants/theme';
 import { blockUser, getProfile, isBlockedByMe, unblockUser } from '@/lib/api';
 import { displayNameFor } from '@/lib/format';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/components/ui/dialog';
 
 /**
  * Someone else's profile: the bar with their handle in it, then
@@ -65,12 +66,12 @@ export default function ProfileScreen() {
        activity, follows — so everything is asked again. It is rare. */
     onSuccess: () => queryClient.invalidateQueries(),
     onError: (error) =>
-      Alert.alert('That didn’t work', error instanceof Error ? error.message : undefined),
+      showAlert('That didn’t work', error instanceof Error ? error.message : undefined),
   });
 
   function askBlock() {
     menu.close();
-    Alert.alert(
+    showAlert(
       `Block ${name}?`,
       'Neither of you will see the other’s reviews, collections, comments or wall posts, or be able to follow, reply to or like each other. You will stop following each other. They are not told.',
       [

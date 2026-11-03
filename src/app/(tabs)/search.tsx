@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Keyboard, Platform, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Keyboard, Platform, StyleSheet, View, type TextInput } from 'react-native';
 
 import { useTabBarClearance } from '@/components/app-tab-bar';
 import { DiscoverFeed } from '@/components/discover-feed';
@@ -22,12 +22,23 @@ import { ReviewResults } from '@/components/search/review-results';
 import { SEARCH_SCOPE_INFO, scopeInfo } from '@/components/search/search-scopes';
 import { StudioResults } from '@/components/search/studio-results';
 import { SearchHistory } from '@/components/search-history';
+import { HeaderFade } from '@/components/ui/frosted-top-bar';
+import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Screen } from '@/components/ui/screen';
 import { TabBar } from '@/components/ui/tab-bar';
 import { PageScrollView } from '@/components/ui/page-scroll';
+import { Text } from '@/components/ui/text';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { TextField } from '@/components/ui/text-field';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -46,6 +57,7 @@ import {
   type SearchScope,
 } from '@/lib/search-history';
 import { useAuth } from '@/store/auth';
+import { Loader } from '@/components/ui/loader';
 
 /**
  * How long a query has to stand still before it counts as a search worth
@@ -142,6 +154,7 @@ export default function SearchScreen() {
   /* Tracked here rather than read off the input, because the panel it controls
      is a sibling of the field, not a child. */
   const [focused, setFocused] = useState(false);
+  const field = useRef<TextInput>(null);
   const query = useDebouncedValue(input.trim());
   const isQueryable = query.length >= MIN_QUERY_LENGTH;
   const info = scopeInfo(scope);
@@ -255,7 +268,8 @@ export default function SearchScreen() {
    */
   const searching = remote && input.trim() !== query;
 
-  function renderBody() {
+  /** What a focused field brings over the scope: "Search by", a kind's values, the history. */
+  function renderPanel() {
     /* A kind chosen in "Search by": its values, matching what is typed. */
     if (lookup) {
       return (
@@ -269,33 +283,8 @@ export default function SearchScreen() {
       );
     }
 
-    /* Every game a facet holds — none left out for being obscure or new —
-       paged, sorted, narrowed by platform and drawn as rows or a grid, and
-       within them the ones whose names hold what is typed. The platform
-       page's system (`<CatalogueResults>`). */
-    if (facet) {
-      return (
-        <CatalogueResults
-          facets={facets}
-          match={match}
-          term={isQueryable ? query : ''}
-          header={
-            <View>
-              {showSearchBy && searchBy}
-              <FacetBar
-                facets={facets}
-                match={match}
-                onRemove={removeFacet}
-                /* Opens the picker on genres; "Search by" over it changes kind. */
-                onAdd={() => setLookup('genre')}
-                onClearAll={clearFacet}
-                onMatchChange={(next) => router.setParams(facetsParams(facets, next))}
-              />
-            </View>
-          }
-        />
-      );
-    }
+    /* Over a facet's games, "Search by" is in their header instead. */
+    if (facet) return null;
 
     if (showSearchBy && !showHistory) {
       return (
@@ -341,6 +330,38 @@ export default function SearchScreen() {
       );
     }
 
+    return null;
+  }
+
+  function renderScope() {
+    /* Every game a facet holds — none left out for being obscure or new —
+       paged, sorted, narrowed by platform and drawn as rows or a grid, and
+       within them the ones whose names hold what is typed. The platform
+       page's system (`<CatalogueResults>`). */
+    if (facet) {
+      return (
+        <CatalogueResults
+          facets={facets}
+          match={match}
+          term={isQueryable ? query : ''}
+          header={
+            <View>
+              {showSearchBy && searchBy}
+              <FacetBar
+                facets={facets}
+                match={match}
+                onRemove={removeFacet}
+                /* Opens the picker on genres; "Search by" over it changes kind. */
+                onAdd={() => setLookup('genre')}
+                onClearAll={clearFacet}
+                onMatchChange={(next) => router.setParams(facetsParams(facets, next))}
+              />
+            </View>
+          }
+        />
+      );
+    }
+
     switch (scope) {
       case 'reviews':
         return <ReviewResults query={query} />;
@@ -369,6 +390,8 @@ export default function SearchScreen() {
     }
   }
 
+  const panel = renderPanel();
+
   return (
     /*
      * No `topBar` and no `insetHeader`.
@@ -379,9 +402,52 @@ export default function SearchScreen() {
     <Screen edges={['top']}>
       {/* Folds away as the page is read and comes back on the way up; the
           tabs under it stay — SimpMusic's Home (`<CollapsingField>`). */}
-      <CollapsingField pinned={focused}>
+      {/* reacticx's scrollable search (2026-11-02): focusing the field
+          folds the title away on its spring, so the field rises to the top,
+          and the panel under it fades in; pulling the page down past its top
+          focuses the field (iOS — Android's scroller stops at zero). The
+          title folds with the scroll in a fold of its own, so the focus fold
+          never leaves a gap under the field. */}
+      <FocusFold focused={focused}>
+        <CollapsingField pinned={false}>
+          {/* The owner's reference (2026-11-02): the tab's name large at the
+            top left, a capsule of two keys at the right, then the field and
+            the tabs under it. The keys are the two doors this screen has
+            that are not searches — the release calendar and the scanner,
+            which resolves a barcode to a release, so it is its own screen. */}
+          <View style={styles.titleRow}>
+            <Text variant="largeTitle" accessibilityRole="header">
+              Search
+            </Text>
+            <View style={[styles.keys, { backgroundColor: theme.controlFill }]}>
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel="Release calendar"
+                onPress={() => router.push('/calendar')}
+                scaleTo={0.95}
+                style={styles.key}>
+                <PressGlyph>
+                  <Ionicons name="calendar-outline" size={21} color={theme.text} />
+                </PressGlyph>
+              </PressableScale>
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel="Scan a game's barcode"
+                onPress={() => router.push('/scan')}
+                scaleTo={0.95}
+                style={styles.key}>
+                <PressGlyph>
+                  <Ionicons name="barcode-outline" size={22} color={theme.text} />
+                </PressGlyph>
+              </PressableScale>
+            </View>
+          </View>
+        </CollapsingField>
+      </FocusFold>
+      <CollapsingField pinned={focused} onPull={() => field.current?.focus()}>
         <View style={styles.header}>
           <TextField
+            ref={field}
             value={input}
             onChangeText={setInput}
             icon="search"
@@ -413,14 +479,14 @@ export default function SearchScreen() {
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             accessibilityLabel={`Search ${info.label.toLowerCase()}`}
-            /* Three jobs, one slot, and they cannot apply at once: progress
-             while a search is settling, otherwise a way to empty the field,
-             otherwise — in Games, with nothing typed — the barcode scanner.
-             `clearButtonMode` is **iOS-only** — on Android the only way out of
-             a thirty-character query was holding backspace. */
+            /* Two jobs, one slot: progress while a search is settling,
+             otherwise a way to empty the field. `clearButtonMode` is
+             **iOS-only** — on Android the only way out of a thirty-character
+             query was holding backspace. The scanner moved to the keys beside
+             the title. */
             trailing={
               searching ? (
-                <ActivityIndicator size="small" color={theme.textMuted} />
+                <Loader size="small" color={theme.textMuted} />
               ) : Platform.OS !== 'ios' && input.length > 0 ? (
                 <PressableScale
                   accessibilityRole="button"
@@ -429,28 +495,16 @@ export default function SearchScreen() {
                   scaleTo={0.85}>
                   <Ionicons name="close-circle" size={20} color={theme.textMuted} />
                 </PressableScale>
-              ) : scope === 'games' && input.length === 0 ? (
-                /* Search by the box in your hand. A barcode resolves to a
-                 specific release rather than a title, so it is its own screen
-                 (`/scan`) rather than a mode of this one — and a field with a
-                 query in it has no use for the button. */
-                <PressableScale
-                  accessibilityRole="button"
-                  accessibilityLabel="Scan a game's barcode"
-                  onPress={() => router.push('/scan')}
-                  hitSlop={Spacing.x8}
-                  scaleTo={0.85}>
-                  <Ionicons name="barcode-outline" size={22} color={theme.textSecondary} />
-                </PressableScale>
               ) : undefined
             }
           />
         </View>
       </CollapsingField>
 
-      {/* Under the field, iOS scope-bar style: the placeholder already names
-          the scope, so the two agree wherever the eye lands first. Outside the
-          header's padding: the bar brings the page margin itself. */}
+      {/* Under the field, as the reference has them: a segmented control
+          (`<TabBar>`) that scrolls, since six scopes are wider than a phone.
+          The placeholder names the scope too. Outside the header's padding:
+          the bar brings the page margin itself. */}
       <TabBar
         tabs={SCOPE_TABS}
         value={scope}
@@ -462,12 +516,81 @@ export default function SearchScreen() {
         label="What to search"
       />
 
-      {renderBody()}
+      {/* The scope stays mounted, keeping its place, and what a focused
+          field brings fades in over it — 350ms in, 400 out — on the page's
+          own colour: reacticx's overlay and focused screen. */}
+      <View style={styles.body}>
+        {renderScope()}
+        {/* The list dissolving into the header as it scrolls — reacticx's
+            header fade, which every other page's bar has. */}
+        <HeaderFade />
+        {panel && (
+          <Animated.View
+            entering={FadeIn.duration(350)}
+            exiting={FadeOut.duration(400)}
+            style={[styles.panelLayer, { backgroundColor: theme.background }]}>
+            {panel}
+          </Animated.View>
+        )}
+      </View>
     </Screen>
   );
 }
 
+/** reacticx's search spring: 18 / 120 at 0.6. */
+const FOCUS_SPRING = { damping: 18, stiffness: 120, mass: 0.6 } as const;
+
+/**
+ * Folds its content away while the field is focused, on reacticx's spring,
+ * and back when it is not. Unfocused it is as tall as its content (which
+ * folds with the scroll on its own); focused, it springs to nothing from
+ * the height it last had.
+ */
+function FocusFold({ focused, children }: { focused: boolean; children: ReactNode }) {
+  const reduceMotion = useReducedMotion();
+  const progress = useSharedValue(focused ? 1 : 0);
+  const measured = useSharedValue(0);
+
+  useEffect(() => {
+    progress.set(reduceMotion ? (focused ? 1 : 0) : withSpring(focused ? 1 : 0, FOCUS_SPRING));
+  }, [focused, progress, reduceMotion]);
+
+  const style = useAnimatedStyle(() => {
+    const p = Math.min(1, Math.max(0, progress.get()));
+    if (p === 0 || measured.get() === 0) return { opacity: 1, transform: [{ translateY: 0 }] };
+    return {
+      height: measured.get() * (1 - p),
+      opacity: 1 - p,
+      transform: [{ translateY: -12 * p }],
+    };
+  });
+
+  return (
+    <Animated.View style={[styles.fold, style]}>
+      <View
+        onLayout={(event) => {
+          if (progress.get() === 0) measured.set(event.nativeEvent.layout.height);
+        }}>
+        {children}
+      </View>
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: Spacing.x16, paddingTop: Spacing.x8 },
+  fold: { overflow: 'hidden' },
+  body: { flex: 1 },
+  panelLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.x16,
+    paddingTop: Spacing.x8,
+  },
+  /* The reference's capsule: two 44dp keys in one pill. */
+  keys: { flexDirection: 'row', borderRadius: Radius.pill, paddingHorizontal: Spacing.x4 },
+  key: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  header: { paddingHorizontal: Spacing.x16, paddingTop: Spacing.x12 },
   panel: { paddingHorizontal: Spacing.x16, paddingTop: Spacing.x16 },
 });

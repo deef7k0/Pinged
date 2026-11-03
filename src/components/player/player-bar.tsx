@@ -1,13 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  StyleSheet,
-  View,
-  type GestureResponderEvent,
-  type LayoutChangeEvent,
-} from 'react-native';
+import { StyleSheet, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SoundCloudMark } from '@/components/player/soundcloud-mark';
@@ -20,6 +14,7 @@ import { useAccent } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
 import { clockOf, firstPlayable, nextPlayable, noticeText, progressOf } from '@/lib/player-queue';
 import { player, useNowPlaying, usePlayer, type PlayerQueue } from '@/store/player';
+import { Loader } from '@/components/ui/loader';
 
 /** The artwork beside the title. */
 const ARTWORK = 44;
@@ -179,7 +174,7 @@ export function PlayerBar({ queue }: PlayerBarProps) {
             scaleTo={0.94}
             style={StyleSheet.flatten([styles.play, { backgroundColor: accent.color }])}>
             {loading ? (
-              <ActivityIndicator color={accent.ink} />
+              <Loader color={accent.ink} />
             ) : (
               /* Shrinks toward nothing under the finger and springs back as
                  the other glyph (Convx's `playGlyphPress`). */

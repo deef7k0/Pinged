@@ -32,7 +32,7 @@ export const GAME_LABEL_TEXT: Record<GameLabel, GameLabelText> = {
   must_play: {
     title: 'Must Play',
     description:
-      'Picked by hand by GameLog’s moderators: the games worth playing whatever you usually play.',
-    spoken: 'Must Play, picked by GameLog’s moderators',
+      'Picked by hand by Pinged’s moderators: the games worth playing whatever you usually play.',
+    spoken: 'Must Play, picked by Pinged’s moderators',
   },
 };

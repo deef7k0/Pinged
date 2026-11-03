@@ -2,11 +2,13 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { useEffect, type ReactNode } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Directions, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
+  Extrapolation,
   FadeIn,
   ReduceMotion,
+  interpolate,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -250,31 +252,30 @@ export type SurpriseRevealProps = {
  * The dealt game: its art on a strip that slides, and under it what the card
  * says and what can be done with it.
  *
- * ## A simple slide
+ * ## A filling stack
  *
- * The owner's direction (2026-10-21): "Remove the way the artwork moves as a
- * card out of the screen, just make it a simple slide like SimpMusic when
- * sliding to the next song inside the now playing screen." So the art is a
- * pager — SimpMusic's `HorizontalPager` round its artwork — and nothing else
- * about it moves: the cards either side are already laid out a display's
- * width away, the strip follows the finger one for one, and a release springs
- * to the next page or back (`useDealGesture`). The card no longer lifts,
- * leans, turns, flies off or springs in, and the face-down deck behind it and
- * the light that caught its surface are gone with that.
+ * The owner's direction (2026-11-02): reacticx's filling stack
+ * (`<StackCard>`). The card in front, and three behind it, each 18 higher and
+ * 5% smaller, sunk under the page's colour; a deal sends the front card down
+ * and away as the next comes forward. A fling down deals, a fling up goes
+ * back, and the sideways swipe still works — it moves the deck one for one,
+ * and the stack follows it, since every card is drawn from the deck's one
+ * position (`pageX`). It replaced SimpMusic's plain pager (2026-10-21), which
+ * had replaced a card that lifted and flew off.
  *
  * What stays is what is not the artwork moving: the room's light behind it
- * (`<SurpriseBloom>`) and the screen's edge lights, which say what letting go
- * will do. The words under the art change when the deck moves on, with a
- * short fade.
+ * (`<SurpriseBloom>`) and the screen's edge lights. The words under the art
+ * change when the deck moves on, with a short fade.
  *
- * Three cards are mounted — the one in front and one either side — each keyed
- * by its place in the deck, so the card that slides in is the one that was
- * already there, still and looked up. Only the card in front may load its
- * animation (`settled`), and it holds its frame while a finger is on the deck.
+ * Five cards are mounted — the one dealt away, the one in front and three
+ * behind — each keyed by its place in the deck, so the card that comes
+ * forward is the one that was already there, still and looked up. Only the
+ * card in front may load its animation (`settled`), and it holds its frame
+ * while a finger is on the deck.
  *
  * ## Reduce Motion
  *
- * A swipe is an *input*, so the strip still follows the finger; the release
+ * A swipe is an *input*, so the stack still follows the finger; the release
  * lands at once rather than springing, and the words crossfade. The visible
  * `Another game` key is not the gesture's fallback, it is a primary path —
  * and `accessibilityActions` puts both directions in the rotor besides.
@@ -307,7 +308,22 @@ export function SurpriseReveal({
 
   /* The room is lit from the first frame: nothing lands any more. */
   const lit = useSharedValue(1);
-  const stripStyle = useAnimatedStyle(() => ({ transform: [{ translateX: -pageX.get() }] }));
+
+  /*
+   * The filling stack's own gesture: a fling down deals the next card, a fling
+   * up brings the last one back (reacticx's `FlingStack`, which reads them the
+   * same way round). Beside the sideways swipe, not instead of it — that one
+   * still drives the deck one for one, and the stack follows it.
+   */
+  const flingNext = Gesture.Fling()
+    .runOnJS(true)
+    .direction(Directions.DOWN)
+    .onStart(() => onDeal(1));
+  const flingBack = Gesture.Fling()
+    .runOnJS(true)
+    .direction(Directions.UP)
+    .enabled(canGoBack)
+    .onStart(() => onDeal(-1));
 
   const families = platformFamilies(game.platforms);
 
@@ -338,53 +354,61 @@ export function SurpriseReveal({
           exitDistance={layout.exitDistance}
         />
 
-        <Animated.View
-          style={[
-            styles.strip,
-            /* As wide as every card on it, from the deck's first to the one
-               after the card in front: Android hands a touch only to a child
-               inside its parent's bounds, so the strip must contain the card
-               being pressed. Its left edge never moves, so growing it moves
-               nothing. */
-            { top: BLOOM_BLEED, height: cardHeight, width: (base + cursor + 2) * pageWidth },
-            stripStyle,
-          ]}>
-          {[cursor - 1, cursor, cursor + 1].map((index) => {
-            const place = base + index;
-            const slot = [styles.slot, { left: place * pageWidth, width: pageWidth }];
-            /* Past the batch's last card: the next batch, on its way. */
-            if (index === games.length) {
+        <GestureDetector gesture={Gesture.Race(flingNext, flingBack)}>
+          <View style={[styles.stack, { top: BLOOM_BLEED, height: cardHeight }]}>
+            {[cursor - 1, cursor, cursor + 1, cursor + 2, cursor + 3].map((index) => {
+              const place = base + index;
+              /* Past the batch's last card: the next batch, on its way. */
+              if (index === games.length) {
+                return (
+                  <StackCard
+                    key={`slot-${place}-next`}
+                    place={place}
+                    pageX={pageX}
+                    pageWidth={pageWidth}
+                    height={cardHeight}
+                    importantForAccessibility="no">
+                    {(veil) => (
+                      <View>
+                        <Skeleton width={cardHeight} height={cardHeight} radius={SQUARE_RADIUS} />
+                        {veil({ width: cardHeight, height: cardHeight, radius: SQUARE_RADIUS })}
+                      </View>
+                    )}
+                  </StackCard>
+                );
+              }
+              const slotGame = games[index];
+              if (!slotGame) return null;
+              const current = index === cursor;
               return (
-                <View key={`slot-${place}-next`} style={slot} importantForAccessibility="no">
-                  <Skeleton width={cardHeight} height={cardHeight} radius={SQUARE_RADIUS} />
-                </View>
+                <StackCard
+                  key={`slot-${place}-${slotGame.id}`}
+                  place={place}
+                  pageX={pageX}
+                  pageWidth={pageWidth}
+                  height={cardHeight}
+                  importantForAccessibility={current ? 'auto' : 'no-hide-descendants'}
+                  accessibilityElementsHidden={!current}>
+                  {(veil) => (
+                    <CardSlot
+                      veil={veil}
+                      game={slotGame}
+                      current={current}
+                      layout={layout}
+                      load={current && settled}
+                      paused={dragging}
+                      hidden={current && hidden}
+                      canGoBack={canGoBack}
+                      onDeal={onDeal}
+                      onOpenGame={onOpenGame}
+                      onHide={onHide}
+                    />
+                  )}
+                </StackCard>
               );
-            }
-            const slotGame = games[index];
-            if (!slotGame) return null;
-            const current = index === cursor;
-            return (
-              <View
-                key={`slot-${place}-${slotGame.id}`}
-                style={slot}
-                importantForAccessibility={current ? 'auto' : 'no-hide-descendants'}
-                accessibilityElementsHidden={!current}>
-                <CardSlot
-                  game={slotGame}
-                  current={current}
-                  layout={layout}
-                  load={current && settled}
-                  paused={dragging}
-                  hidden={current && hidden}
-                  canGoBack={canGoBack}
-                  onDeal={onDeal}
-                  onOpenGame={onOpenGame}
-                  onHide={onHide}
-                />
-              </View>
-            );
-          })}
-        </Animated.View>
+            })}
+          </View>
+        </GestureDetector>
       </View>
 
       {/*
@@ -492,6 +516,113 @@ export function SurpriseReveal({
 }
 
 /**
+ * How the filling stack stands, from reacticx's `FlingStack`
+ * (`molecules/filling-stack`, MIT): four cards in view, each one behind the
+ * card in front 18 higher and 5% smaller, the card dealt away falling a card
+ * and a quarter down as it fades, and the one coming forward from behind
+ * growing to 1.06 on its way out of the deck's top.
+ */
+const STACK = {
+  visible: 4,
+  offset: 18,
+  scaleStep: 0.05,
+  /** The card in front is clear; one behind is under the page's colour at this. */
+  veil: 0.38,
+  veilBack: 0.62,
+} as const;
+
+/**
+ * One card of the filling stack, placed by how deep in the deck it is.
+ *
+ * The deck has one position, `pageX` in pages — the same number the sideways
+ * swipe moves one for one and a deal springs — so a card's depth is its
+ * place less that, a fraction while the deck moves: 0 in front, 1, 2, 3
+ * behind it, −1 dealt away. Every card is drawn from that one number, which
+ * is why the stack follows the finger and a deal alike, and why the batches,
+ * the prefetch and the gestures did not change when the strip became a stack.
+ *
+ * reacticx blurs the cards behind with an `expo-blur` view over each; on
+ * Android a blur with no target is a flat slab (CLAUDE.md, gotchas), and the
+ * target is the page, which these cards are part of. So the cards behind sink
+ * under the page's own colour instead, by the same depths.
+ */
+function StackCard({
+  place,
+  pageX,
+  pageWidth,
+  height,
+  children,
+  importantForAccessibility,
+  accessibilityElementsHidden,
+}: {
+  place: number;
+  pageX: SharedValue<number>;
+  pageWidth: number;
+  height: number;
+  /** The card, handed the veil to lay over its art's own box. */
+  children: (veil: (box: CardArtBox) => ReactNode) => ReactNode;
+  importantForAccessibility?: 'auto' | 'no' | 'no-hide-descendants';
+  accessibilityElementsHidden?: boolean;
+}) {
+  const accent = useAccent();
+
+  const cardStyle = useAnimatedStyle(() => {
+    const depth = place - pageX.get() / Math.max(1, pageWidth);
+    const back = Math.max(STACK.visible - 1, 2);
+    const translateY = interpolate(
+      depth,
+      [-1, 0, 1, back],
+      [height * 1.25, 0, -STACK.offset, -STACK.offset * back],
+      Extrapolation.CLAMP
+    );
+    const scale = interpolate(
+      depth,
+      [-1, 0, 1, back],
+      [1.06, 1, 1 - STACK.scaleStep, 1 - STACK.scaleStep * back],
+      Extrapolation.CLAMP
+    );
+    const opacity = interpolate(
+      depth,
+      [-1, -0.35, 0, back, back + 0.65],
+      [0, 1, 1, 1, 0],
+      Extrapolation.CLAMP
+    );
+    return { transform: [{ translateY }, { scale }], opacity };
+  });
+
+  const veilStyle = useAnimatedStyle(() => {
+    const depth = place - pageX.get() / Math.max(1, pageWidth);
+    return {
+      opacity: interpolate(
+        depth,
+        [-1, 0, 1, STACK.visible - 1],
+        [0, 0, STACK.veil, STACK.veilBack],
+        Extrapolation.CLAMP
+      ),
+    };
+  });
+
+  return (
+    <Animated.View
+      style={[styles.stackCard, { zIndex: 1000 - place }, cardStyle]}
+      importantForAccessibility={importantForAccessibility}
+      accessibilityElementsHidden={accessibilityElementsHidden}
+      collapsable={false}>
+      {children((box) => (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.stackVeil,
+            { backgroundColor: accent.page, borderRadius: box.radius },
+            veilStyle,
+          ]}
+        />
+      ))}
+    </Animated.View>
+  );
+}
+
+/**
  * One card on the strip: its art, and — for the card in front — the two taps
  * on it and everything a screen reader is told.
  *
@@ -505,6 +636,7 @@ export function SurpriseReveal({
  * the recogniser through React Native's own responder system.
  */
 function CardSlot({
+  veil,
   game,
   current,
   layout,
@@ -516,6 +648,7 @@ function CardSlot({
   onOpenGame,
   onHide,
 }: {
+  veil: (box: CardArtBox) => ReactNode;
   game: GameSearchResult;
   current: boolean;
   layout: RevealLayout;
@@ -557,7 +690,7 @@ function CardSlot({
       accessibilityLabel={current ? `${game.title}. Open game page.` : undefined}
       accessibilityHint={
         current
-          ? 'Swipe left anywhere for another game, right to go back. Double tap the cover to hide this game from future rolls.'
+          ? 'Swipe left anywhere or fling the card down for another game; swipe right or fling up to go back. Double tap the cover to hide this game from future rolls.'
           : undefined
       }
       accessibilityActions={current ? ACTIONS : undefined}
@@ -577,7 +710,12 @@ function CardSlot({
             layout={layout}
             load={load}
             paused={paused}
-            overlay={current ? (box) => <HiddenNotice showing={hidden} box={box} /> : undefined}
+            overlay={(box) => (
+              <>
+                {veil(box)}
+                {current && <HiddenNotice showing={hidden} box={box} />}
+              </>
+            )}
           />
         </View>
       </GestureDetector>
@@ -729,8 +867,19 @@ const styles = StyleSheet.create({
    * moving the strip by `-pageX` is the whole slide, and the cards either side
    * are a page away, off the screen until dragged in.
    */
-  strip: { position: 'absolute', left: 0 },
-  slot: { position: 'absolute', top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  /* The stack: every card in one box the card's size, centred on the well. */
+  stack: { position: 'absolute', left: 0, right: 0 },
+  stackCard: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /* Over the art's own box, which `SurpriseCardArt` hands its overlay. */
+  stackVeil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   card: { alignItems: 'center' },
   /*
    * **Exactly as wide as the artwork**, set inline from `layout.squareWidth`.

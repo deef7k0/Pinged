@@ -174,6 +174,17 @@ export const Colors = {
      */
     controlInk: '#D6D6D6',
     /**
+     * The segmented control (`<TabBar>`, reacticx's `SegmentedControl`): its
+     * track and the thumb that slides along it. reacticx's dark preset is
+     * #27272A under a #3F3F46 thumb; the track here is translucent like every
+     * control fill, so it is the same step over the page, a glow or artwork,
+     * and the thumb is solid — it casts the reference's small shadow — one
+     * blue-grey step past `surfaceSelected`. `text` on it is 10:1;
+     * `textSecondary` on the track over the page 6.6:1.
+     */
+    segmentTrack: 'rgba(255, 255, 255, 0.08)',
+    segmentThumb: '#3A3F4B',
+    /**
      * The resting edge of a *choice* — a selection card, a filter or sort pill,
      * an unchosen segment: the reference's `onSurfaceVariant` at 20%. Choices
      * are outlined and actions are filled; the edge is what says "one of
@@ -1174,6 +1185,12 @@ export const Radius = {
  * lets Compose synthesise the rest, which says nothing worth copying.
  */
 export const Type = {
+  /**
+   * A root tab's own name, iOS's large title — Search's, after the owner's
+   * reference (2026-11-02), where it stands about 1.7 times the section
+   * heading (`h2`). Nowhere else: a pushed screen's name is its bar's title.
+   */
+  largeTitle: { fontSize: 32, lineHeight: 38, fontFamily: FontFamily.bold, letterSpacing: -0.7 },
   display: { fontSize: 25, lineHeight: 30, fontFamily: FontFamily.bold, letterSpacing: -0.55 },
   h1: { fontSize: 23, lineHeight: 28, fontFamily: FontFamily.bold, letterSpacing: -0.39 },
   h2: { fontSize: 20, lineHeight: 25, fontFamily: FontFamily.bold, letterSpacing: -0.22 },

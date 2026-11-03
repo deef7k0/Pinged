@@ -23,13 +23,13 @@ export function ScoreMethodNote() {
     <Link href="/how-ratings-work" asChild>
       <PressableScale
         accessibilityRole="link"
-        accessibilityLabel="How the GameLog score works"
+        accessibilityLabel="How the Pinged score works"
         accessibilityHint="Opens a page explaining how ratings are weighted"
         hitSlop={SLOP}
         scaleTo={0.98}
         style={StyleSheet.flatten(styles.note)}>
         <Text variant="bodySmall" color="textMuted">
-          How the GameLog score works
+          How the Pinged score works
         </Text>
         <Ionicons name="chevron-forward" size={12} color={theme.textMuted} />
       </PressableScale>

@@ -1,10 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter, useSegments } from 'expo-router';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { TAB_BAR_FOOTPRINT, useKeyboardShown } from '@/components/app-tab-bar';
+import { useKeyboardShown, useTabBarFootprint } from '@/components/app-tab-bar';
 import { PlayerArtwork } from '@/components/player/player-bar';
 import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
@@ -26,6 +26,7 @@ import {
   progressOf,
 } from '@/lib/player-queue';
 import { player, useMiniPlayerActive, useNowPlaying, usePlayer } from '@/store/player';
+import { Loader } from '@/components/ui/loader';
 
 const ARTWORK = 40;
 const KEY = 40;
@@ -72,6 +73,7 @@ export function MiniPlayer() {
   const router = useRouter();
   const segments = useSegments();
   const insets = useSafeAreaInsets();
+  const footprint = useTabBarFootprint();
   const reduceMotion = useReducedMotion();
   const keyboardShown = useKeyboardShown();
 
@@ -123,7 +125,7 @@ export function MiniPlayer() {
           {
             backgroundColor: theme.surface,
             borderColor: theme.border,
-            transform: [{ translateY: onTabs ? -TAB_BAR_FOOTPRINT : 0 }],
+            transform: [{ translateY: onTabs ? -footprint : 0 }],
             transitionDuration: reduceMotion ? 0 : MINI_PLAYER_MOVE_MS,
           },
         ]}>
@@ -148,7 +150,7 @@ export function MiniPlayer() {
           scaleTo={0.9}
           style={styles.key}>
           {loading ? (
-            <ActivityIndicator size="small" color={theme.text} />
+            <Loader size="small" color={theme.text} />
           ) : (
             <PressGlyph motion="play">
               <Ionicons

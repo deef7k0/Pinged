@@ -172,7 +172,7 @@ export function SoundtrackUnavailable({
     return (
       <EmptyState
         title="Soundtracks are not connected yet"
-        message="GameLog plays soundtracks from SoundCloud, and that connection has not been set up."
+        message="Pinged plays soundtracks from SoundCloud, and that connection has not been set up."
         footnote={
           __DEV__
             ? 'Deploy the soundcloud function and set SOUNDCLOUD_CLIENT_ID and SOUNDCLOUD_CLIENT_SECRET. EXPO_PUBLIC_SOUNDCLOUD_FIXTURE=true shows sample tracks.'

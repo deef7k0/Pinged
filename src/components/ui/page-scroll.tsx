@@ -1,4 +1,15 @@
-import { useCallback, useEffect, useRef, type Component, type Ref } from 'react';
+import {
+  createElement,
+  isValidElement,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Component,
+  type ComponentType,
+  type ReactElement,
+  type Ref,
+} from 'react';
 import {
   FlatList,
   ScrollView,
@@ -9,10 +20,20 @@ import {
   type NativeSyntheticEvent,
   type ScrollViewProps,
   type SectionListProps,
+  View,
 } from 'react-native';
-import { useAnimatedRef, useScrollOffset } from 'react-native-reanimated';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedRef,
+  useAnimatedStyle,
+  useScrollOffset,
+} from 'react-native-reanimated';
 
-import { HANDOFF, settleOffset } from '@/constants/top-bar';
+import { Text } from '@/components/ui/text';
+import { Spacing } from '@/constants/theme';
+import { HANDOFF, HEADER_FADE, settleOffset } from '@/constants/top-bar';
+import { usePulse } from '@/hooks/use-pulse';
 import { useScreenChrome } from '@/hooks/use-screen-chrome';
 
 /**
@@ -103,8 +124,99 @@ function usePageContentSize(own?: (width: number, height: number) => void) {
   );
 }
 
+/**
+ * The page's name, large, at the top of its content — reacticx's animated
+ * header scroll view (2026-11-02). It scrolls with the page and fades out
+ * over the first sixty dp, as the bar's small name fades in
+ * (`<FrostedTopBar>`); `<Screen>` decides which pages have one
+ * (`ScreenChrome.largeTitle`). Lines itself up with the page's margin
+ * wherever the content container starts.
+ */
+function LargeTitle() {
+  const chrome = useScreenChrome();
+  const pulse = usePulse();
+  const title = chrome?.largeTitle ?? null;
+  const drawn = chrome?.largeTitleDrawn;
+  const scrollY = chrome?.scrollY;
+  const box = useRef<View>(null);
+  const [nudge, setNudge] = useState(0);
+
+  useEffect(() => {
+    if (!title || !drawn) return;
+    drawn.set(1);
+    return () => drawn.set(0);
+  }, [title, drawn]);
+
+  const style = useAnimatedStyle(() => {
+    pulse.get();
+    const y = scrollY?.get() ?? 0;
+    return {
+      opacity: interpolate(y, [0, HEADER_FADE.titleOut], [1, 0], Extrapolation.CLAMP),
+      transform: [{ translateY: 0 }],
+    };
+  });
+
+  if (!title) return null;
+
+  return (
+    <Animated.View
+      ref={box}
+      style={[styles.largeTitle, { paddingLeft: nudge }, style]}
+      onLayout={() =>
+        box.current?.measureInWindow((x) => {
+          const want = Math.max(0, Spacing.x16 - x);
+          if (Math.abs(want - nudge) > 0.5) setNudge(want);
+        })
+      }>
+      <Text variant="largeTitle" numberOfLines={2} accessibilityRole="header">
+        {title}
+      </Text>
+    </Animated.View>
+  );
+}
+
+/** A list's own header, with the large title above it. */
+function withLargeTitle(header: ComponentType | ReactElement | null | undefined): ReactElement {
+  const own = header == null ? null : isValidElement(header) ? header : createElement(header);
+  return (
+    <>
+      <LargeTitle />
+      {own}
+    </>
+  );
+}
+
+const styles = {
+  largeTitle: { paddingRight: Spacing.x16, paddingBottom: Spacing.x16 },
+} as const;
+
 type ScrollEvent = NativeSyntheticEvent<NativeScrollEvent>;
 type ScrollHandler = ((event: ScrollEvent) => void) | undefined;
+
+/**
+ * The page scroller's drag handlers, which also tell the page whether a
+ * finger is on it (`ScreenChrome.dragging`) — keeping the caller's own.
+ */
+function usePageDrag(ownBegin: ScrollHandler, ownEnd: ScrollHandler) {
+  const dragging = useScreenChrome()?.dragging;
+  const begin = useCallback(
+    (event: ScrollEvent) => {
+      dragging?.set(1);
+      ownBegin?.(event);
+    },
+    [dragging, ownBegin]
+  );
+  const end = useCallback(
+    (event: ScrollEvent) => {
+      dragging?.set(0);
+      ownEnd?.(event);
+    },
+    [dragging, ownEnd]
+  );
+  /* A scroller unmounted mid-drag never says the drag ended. */
+  useEffect(() => () => dragging?.set(0), [dragging]);
+  return { begin, end };
+}
 
 /** A band of offsets the page must not come to rest inside — the glass bar's handoff. */
 export type SettleBand = { from: number; to: number } | null | undefined;
@@ -200,6 +312,7 @@ export function PageScrollView({
   onScrollBeginDrag,
   onScrollEndDrag,
   onMomentumScrollEnd,
+  children,
   ...props
 }: ScrollViewProps & { ref?: Ref<ScrollView>; settle?: SettleBand }) {
   const node = useRef<Scrollable | null>(null);
@@ -212,21 +325,18 @@ export function PageScrollView({
   );
   const setRef = usePageScroll(keep);
   const sized = usePageContentSize(onContentSizeChange);
-  const settling = usePageSettle(
-    settle,
-    node,
-    onScrollBeginDrag,
-    onScrollEndDrag,
-    onMomentumScrollEnd
-  );
+  const drag = usePageDrag(onScrollBeginDrag, onScrollEndDrag);
+  const settling = usePageSettle(settle, node, drag.begin, drag.end, onMomentumScrollEnd);
   return (
     <ScrollView
       ref={setRef}
       scrollEventThrottle={scrollEventThrottle}
       onContentSizeChange={sized}
       {...settling}
-      {...props}
-    />
+      {...props}>
+      <LargeTitle />
+      {children}
+    </ScrollView>
   );
 }
 
@@ -250,13 +360,8 @@ export function PageFlatList<ItemT>({
   );
   const setRef = usePageScroll(keep);
   const sized = usePageContentSize(onContentSizeChange);
-  const settling = usePageSettle(
-    settle,
-    node,
-    onScrollBeginDrag,
-    onScrollEndDrag,
-    onMomentumScrollEnd
-  );
+  const drag = usePageDrag(onScrollBeginDrag, onScrollEndDrag);
+  const settling = usePageSettle(settle, node, drag.begin, drag.end, onMomentumScrollEnd);
   return (
     <FlatList
       ref={setRef}
@@ -264,6 +369,7 @@ export function PageFlatList<ItemT>({
       onContentSizeChange={sized}
       {...settling}
       {...props}
+      ListHeaderComponent={withLargeTitle(props.ListHeaderComponent)}
     />
   );
 }
@@ -272,16 +378,22 @@ export function PageSectionList<ItemT, SectionT = DefaultSectionT>({
   ref,
   scrollEventThrottle = 16,
   onContentSizeChange,
+  onScrollBeginDrag,
+  onScrollEndDrag,
   ...props
 }: SectionListProps<ItemT, SectionT> & { ref?: Ref<SectionList<ItemT, SectionT>> }) {
   const setRef = usePageScroll(ref);
   const sized = usePageContentSize(onContentSizeChange);
+  const drag = usePageDrag(onScrollBeginDrag, onScrollEndDrag);
   return (
     <SectionList
       ref={setRef}
       scrollEventThrottle={scrollEventThrottle}
       onContentSizeChange={sized}
+      onScrollBeginDrag={drag.begin}
+      onScrollEndDrag={drag.end}
       {...props}
+      ListHeaderComponent={withLargeTitle(props.ListHeaderComponent)}
     />
   );
 }

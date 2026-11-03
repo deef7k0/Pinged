@@ -177,6 +177,9 @@ export const MINI_PLAYER_HIDDEN_ROUTES: ReadonlySet<string> = new Set([
   'pin-game',
   'quick-log',
   'edit-profile',
+  'new-ping',
+  'suggest-game',
+  'send-ping',
   'welcome',
   'onboarding',
   /* The terms and the privacy policy: readable signed out too. */

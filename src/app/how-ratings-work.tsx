@@ -75,7 +75,7 @@ export default function HowRatingsWorkScreen() {
       topBar={<FrostedTopBar back title="How ratings work" />}>
       <PageScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <Text variant="body" color="textSecondary">
-          A game’s GameLog score is a weighted average of every rating people here have given it. It
+          A game’s Pinged score is a weighted average of every rating people here have given it. It
           is an estimate of what this community thinks — not a measure of how good a game
           objectively is.
         </Text>
@@ -326,8 +326,8 @@ function ModeratorReport() {
   return (
     <Group title="For moderators">
       <Text variant="body" color="textSecondary">
-        The weighting across GameLog, in aggregate. No person’s statistics are shown here or
-        anywhere else.
+        The weighting across Pinged, in aggregate. No person’s statistics are shown here or anywhere
+        else.
       </Text>
       {report.isPending ? (
         <Skeleton width="100%" height={72} radius={Radius.card} />

@@ -185,11 +185,11 @@ export function TopChart({
         </View>
       ) : unavailable ? (
         <Text variant="body" color="textSecondary" style={styles.inset}>
-          GameLog’s chart arrives with the database’s next update.
+          Pinged’s chart arrives with the database’s next update.
         </Text>
       ) : empty ? (
         <Text variant="body" color="textSecondary" style={styles.inset}>
-          Nobody has scored a game on GameLog yet.
+          Nobody has scored a game on Pinged yet.
         </Text>
       ) : (
         <>
@@ -249,7 +249,7 @@ const ChartRow = memo(function ChartRow({
   const score = clampScore(entry.score);
   const credit = [entry.developer, entry.releaseYear].filter(Boolean).join(' · ');
   const made = countLine(basis, entry.count);
-  const whose = basis === 'critics' ? 'by the critics' : 'on GameLog';
+  const whose = basis === 'critics' ? 'by the critics' : 'on Pinged';
 
   return (
     <Link href={{ pathname: '/game/[id]', params: { id: entry.id } }} asChild>

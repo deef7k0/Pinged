@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -11,6 +11,7 @@ import { useAccountLink, useGamingSyncState, useLinkedAccount } from '@/hooks/us
 import { useTheme } from '@/hooks/use-theme';
 import { getGamingStats } from '@/lib/api';
 import { USERNAME_FORM, requireProvider, type UsernameProviderId } from '@/lib/gaming';
+import { showAlert } from '@/components/ui/dialog';
 
 const ICONS: Record<UsernameProviderId, keyof typeof Ionicons.glyphMap> = {
   playstation: 'logo-playstation',
@@ -103,7 +104,7 @@ export function UsernameAccount({
               size="small"
               loading={unlink.isPending}
               onPress={() =>
-                Alert.alert(
+                showAlert(
                   `Disconnect ${instance.label}?`,
                   'The games imported from it are removed from your library. You can connect again at any time.',
                   [
@@ -119,7 +120,7 @@ export function UsernameAccount({
             />
           </View>
           <Text variant="caption" color="textMuted">
-            Linked by username: GameLog reads what your public profile shows and never signs in to
+            Linked by username: Pinged reads what your public profile shows and never signs in to
             your account.
           </Text>
         </>

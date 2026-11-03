@@ -31,6 +31,8 @@ export function reportHref(target: ReportTarget, game?: string) {
     case 'comment':
     case 'wall_post':
     case 'profile':
+    case 'ping':
+    case 'ping_suggestion':
       return {
         pathname,
         params: { kind: target.kind, id: target.targetId, author: target.authorId },

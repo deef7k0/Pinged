@@ -62,6 +62,23 @@ export type ScreenChrome = {
   background: string;
   /** The page reserves the bar's row at its top. */
   insetHeader: boolean;
+  /**
+   * The page's name as a large title at the top of its content —
+   * reacticx's animated header scroll view (2026-11-02). The page scroller
+   * draws it (`ui/page-scroll`); the bar fades its own small title in once
+   * it has scrolled away. `null` when the page has none.
+   */
+  largeTitle: string | null;
+  /** 1 while a page scroller is drawing the large title, so the bar knows to hold its own back. */
+  largeTitleDrawn: SharedValue<number>;
+  /**
+   * 1 while a finger is dragging the page scroller. Anything that changes
+   * the page's layout with the scroll (Search's folding field) waits for it
+   * to be 0: a header that grows or shrinks moves the scroller's frame under
+   * a held finger, the scroller reads that as the finger moving and scrolls
+   * the other way, and the header flips back — the loop the owner saw.
+   */
+  dragging: SharedValue<number>;
 };
 
 const ScreenChromeContext = createContext<ScreenChrome | null>(null);
@@ -70,6 +87,7 @@ export type ScreenChromeProviderProps = {
   modal?: boolean;
   background: string;
   insetHeader?: boolean;
+  largeTitle?: string | null;
   children: (chrome: ScreenChrome & { blurTargetRef: { current: View | null } }) => ReactNode;
 };
 
@@ -85,11 +103,14 @@ export function ScreenChromeProvider({
   modal = false,
   background,
   insetHeader = false,
+  largeTitle = null,
   children,
 }: ScreenChromeProviderProps) {
   const [target, setTarget] = useState<View | null>(null);
   const scrollY = useSharedValue(0);
   const layout = useSharedValue(0);
+  const largeTitleDrawn = useSharedValue(0);
+  const dragging = useSharedValue(0);
 
   /*
    * A ref object that is also a subscription.
@@ -128,8 +149,11 @@ export function ScreenChromeProvider({
       layout,
       background,
       insetHeader,
+      largeTitle,
+      largeTitleDrawn,
+      dragging,
     }),
-    [target, modal, scrollY, layout, background, insetHeader]
+    [target, modal, scrollY, layout, background, insetHeader, largeTitle, largeTitleDrawn, dragging]
   );
 
   return (

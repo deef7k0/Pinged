@@ -1,90 +1,147 @@
 import type { Tabs } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ComponentProps,
   type ReactNode,
 } from 'react';
-import { Keyboard, Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated, { useReducedMotion } from 'react-native-reanimated';
+import { Keyboard, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  interpolateColor,
+  runOnJS,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  type SharedValue,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { PressGlyph } from '@/components/ui/press-glyph';
-import { PressableScale } from '@/components/ui/pressable-scale';
-import { Text } from '@/components/ui/text';
 import { MINI_PLAYER_FOOTPRINT } from '@/constants/player';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { FontFamily, MaxContentWidth, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useMiniPlayerActive } from '@/store/player';
 
 export type AppTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
 /*
- * SimpMusic's bottom bar, measured from `AppBottomNavigationBar.kt`. Fixed dp,
- * not the spacing ladder: the bar is the same object on every screen.
+ * expo-glass-tabs (davidmokos/expo-glass-tabs, MIT), measured from its
+ * `glass-tab-bar.tsx`: a floating pill 12 from the sides, 58 tall with icons
+ * and words, 44 and 34 further in at each side once minimized; a highlight
+ * that slides between tabs; a 21dp glyph over a 9.5 word.
  */
-/** The capsule's height. */
-const BAR_HEIGHT = 64;
-/** The sliding indicator's height. */
-const INDICATOR_HEIGHT = 56;
-/** Between the capsule's edge and its first and last tab. */
-const CAPSULE_INSET = 6;
-/** No tab is wider than this, so a wide display never stretches them into slabs. */
-const MAX_TAB_WIDTH = 96;
-/** How long the indicator takes to slide to a newly chosen tab. */
-const INDICATOR_MS = 260;
-/** The bar's own margins: 16 at the sides, 4 above, 8 above the system inset. */
-const SIDE = 16;
-const TOP = 4;
-const BOTTOM = 8;
+const EXPANDED_HEIGHT = 58;
+const MINIMIZED_HEIGHT = 44;
+const MINIMIZED_INSET = 34;
+const BAR_MARGIN = 12;
+const ROW_PAD_H = 4;
+const ICON_SIZE = 21;
+const ITEM_GAP = 2;
+const LABEL_HEIGHT = 13;
+const LABEL_BLOCK = LABEL_HEIGHT + ITEM_GAP;
+const ITEM_PAD_V = 7;
+const HIGHLIGHT_EXPANDED = ICON_SIZE + LABEL_BLOCK + ITEM_PAD_V * 2;
+const HIGHLIGHT_MINIMIZED = ICON_SIZE + ITEM_PAD_V * 2;
+/** How far the fade under the bar reaches above it. */
+const BLUR_BLEED = 44;
+/** The highlight's slide: interruptible, a touch under-damped (transform only). */
+const SLIDE_SPRING = { duration: 420, dampingRatio: 0.82 } as const;
+/** Minimizing: critically damped, so a scroll that turns round never overshoots. */
+const MINIMIZE_SPRING = { duration: 380, dampingRatio: 1 } as const;
+/** The space between the bar's top and what rests over it. */
+const ABOVE = 8;
 
-/**
- * How much of the display's foot the bar takes above the system's own inset.
- * The mini player rests this far up while a tab is in front, so it sits over
- * the capsule rather than on it.
- */
-export const TAB_BAR_FOOTPRINT = TOP + BAR_HEIGHT + BOTTOM;
+/** Where the bar sits over the system inset: the package's `bottomOffset`. */
+function barOffset(insetBottom: number): number {
+  return Math.max(insetBottom - 16, 12);
+}
 
-/**
- * How much of the bottom of a tab's screen the floating bar covers: its own
- * height plus the system navigation area under it — and, while music is being
- * kept playing, the mini player resting over it (`<MiniPlayer>`).
- *
- * The bar is drawn over the page, so a tab's scroll content runs underneath it
- * and needs this much padding at its foot to end above it. Zero anywhere
- * outside the tab navigator — a stack screen pushed over the tabs has no bar —
- * so a shared list (`<GameSearchResults>`, `<ProfileView>`) can read it
- * unconditionally.
- */
+type MinimizeState = { progress: SharedValue<number>; target: SharedValue<number> };
+
+const MinimizeContext = createContext<MinimizeState | null>(null);
 const TabBarClearanceContext = createContext(0);
 
+/** Retarget the minimize spring, only when the target changes. Either thread. */
+function setMinimized(state: MinimizeState, next: 0 | 1) {
+  'worklet';
+  if (state.target.get() !== next) {
+    state.target.set(next);
+    state.progress.set(withSpring(next, MINIMIZE_SPRING));
+  }
+}
+
+/**
+ * How much of the bottom of a tab's screen the floating bar covers: the bar,
+ * where it floats over the system inset, and — while music is kept playing —
+ * the mini player resting over it. A tab's scroll content ends by this. Zero
+ * outside the tab navigator.
+ */
 export function useTabBarClearance(): number {
   return useContext(TabBarClearanceContext);
 }
 
-/** Wraps the tab navigator, so every tab screen can read `useTabBarClearance`. */
+/**
+ * How far the mini player rises, while a tab is in front, to rest over the
+ * bar instead of on it — measured from where it rests on its own (the
+ * system inset).
+ */
+export function useTabBarFootprint(): number {
+  const insets = useSafeAreaInsets();
+  return barOffset(insets.bottom) + EXPANDED_HEIGHT + ABOVE / 2 - insets.bottom;
+}
+
+/** Wraps the tab navigator: the clearance, and the bar's minimize state. */
 export function TabBarClearanceProvider({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
-  /* A second floating thing over the foot of every tab: the same padding,
-     taller. Tab screens already end their content by this number, so none of
-     them learns that a mini player exists. */
   const miniPlayer = useMiniPlayerActive() ? MINI_PLAYER_FOOTPRINT : 0;
+  const progress = useSharedValue(0);
+  const target = useSharedValue(0);
+  const minimize = useMemo(() => ({ progress, target }), [progress, target]);
   return (
-    <TabBarClearanceContext.Provider value={TAB_BAR_FOOTPRINT + insets.bottom + miniPlayer}>
-      {children}
-    </TabBarClearanceContext.Provider>
+    <MinimizeContext.Provider value={minimize}>
+      <TabBarClearanceContext.Provider
+        value={barOffset(insets.bottom) + EXPANDED_HEIGHT + ABOVE + miniPlayer}>
+        {children}
+      </TabBarClearanceContext.Provider>
+    </MinimizeContext.Provider>
   );
 }
 
 /**
- * Whether the software keyboard is up, on Android only.
- *
- * Android resizes the window for the keyboard (`softwareKeyboardLayoutMode:
- * 'resize'`), so a bar pinned to the bottom of it would ride up and sit on the
- * keyboard, over the results you are typing for. iOS draws the keyboard over
- * the window, which covers the bar by itself.
+ * The bar's minimize-on-scroll, fed by a page's scroll offset — `<Screen>`
+ * calls it with its `scrollY`, so every tab page that scrolls drives it and
+ * none of them knows. Down minimizes, up (or near the top) expands; offsets
+ * past the end are ignored, so an overscroll cannot flicker it. Nothing
+ * outside the tab navigator.
+ */
+export function useMinimizeOnScroll(scrollY: SharedValue<number>) {
+  const state = useContext(MinimizeContext);
+  useAnimatedReaction(
+    () => scrollY.get(),
+    (y, previous) => {
+      if (!state) return;
+      const before = previous ?? y;
+      const dy = y - before;
+      if (y < 24) setMinimized(state, 0);
+      else if (dy > 3) setMinimized(state, 1);
+      else if (dy < -3) setMinimized(state, 0);
+    },
+    [state]
+  );
+}
+
+/**
+ * Whether the software keyboard is up, on Android only. Android resizes the
+ * window for it, so a bar pinned to the bottom would ride up onto it.
  */
 export function useKeyboardShown(): boolean {
   const [shown, setShown] = useState(false);
@@ -103,143 +160,375 @@ export function useKeyboardShown(): boolean {
 }
 
 /**
- * The bottom navigation: a floating capsule of tabs — the owner's reference,
- * SimpMusic, at its dimensions.
+ * The bottom navigation: expo-glass-tabs' floating glass bar (the owner's,
+ * 2026-11-02: "Make the navigation bar like this", Revolut's bar as the
+ * package rebuilds it).
  *
- * The capsule is 64 tall and 6 in from its ends; the tab you are on sits in a
- * 56dp indicator one surface step up, which slides to the tab you pick. Each
- * tab is a glyph over its word, as wide as the capsule allows up to 96. The
- * order is the app's own — Home, Search, News, Profile. SimpMusic gives Search
- * a circle of its own beside the capsule; that was tried and taken back, so
- * the four destinations stay one set.
+ * - **A pill floating over the page**, 12 from the sides, with a fade rising
+ *   from the foot of the screen behind it (blurred too, on iOS).
+ * - **A highlight that slides** between the tabs on an interruptible spring;
+ *   the glyph under it lights, crossfading to its filled form.
+ * - **Minimized by scrolling down** — the pill shrinks in both dimensions and
+ *   the words fold away, every glyph still there — and back by scrolling up
+ *   or touching it.
+ * - **Drag along it to scrub**: the highlight follows the finger, a tick at
+ *   each tab, and the tab is opened on release, so the screen never jumps
+ *   under the finger.
  *
- * ## It floats
- *
- * Positioned over the page rather than below it, with nothing behind the
- * capsule. A tab's content scrolls under the bar and under the system's own
- * navigation keys, so the app runs to the bottom of the display instead of
- * ending in a band of page colour. Tab screens pad their scroll content by
- * `useTabBarClearance()` so the last row still ends above the capsule.
- *
- * The selection colour is the house blue's type twin, never a game's colour, on
- * the glyph and the word.
+ * Its glass is the package's solid fallback — what it draws on Android and
+ * before iOS 26: `UIGlassEffect` is iOS 26's alone, and `expo-glass-effect`
+ * is a native module this build does not link. The words and glyph are white
+ * when chosen, as the package draws them; the house blue had been the bar's
+ * selection colour since it was a capsule.
  */
 export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
-  const reduceMotion = useReducedMotion();
   const keyboardShown = useKeyboardShown();
+  const minimize = useContext(MinimizeContext);
+  const fallbackProgress = useSharedValue(0);
+  const progress = minimize?.progress ?? fallbackProgress;
 
   const routes = state.routes;
-  const available = Math.min(windowWidth, MaxContentWidth) - SIDE * 2 - CAPSULE_INSET * 2;
-  const tabWidth = Math.min(MAX_TAB_WIDTH, available / Math.max(1, routes.length));
+  const tabCount = Math.max(routes.length, 1);
+  const width = Math.min(windowWidth, MaxContentWidth);
+  const slideIndex = useSharedValue(state.index);
+  const isDragging = useSharedValue(false);
+  const lastTicked = useSharedValue(-1);
+
+  const tints = useMemo(
+    () => ({
+      active: theme.white,
+      inactive: theme.textSecondary,
+      highlight: withAlpha(theme.white, 0.14),
+      glass: withAlpha(theme.surface, 0.94),
+    }),
+    [theme]
+  );
+
+  /* The tab in front moved — a tap, a back gesture, a deep link: the
+     highlight follows and the bar opens. Never while a finger is scrubbing. */
+  useEffect(() => {
+    if (!isDragging.get()) slideIndex.set(withSpring(state.index, SLIDE_SPRING));
+    if (minimize) setMinimized(minimize, 0);
+  }, [state.index, slideIndex, isDragging, minimize]);
+
+  const select = useCallback(
+    (index: number) => {
+      const route = routes[index];
+      if (!route) return;
+      const focused = index === state.index;
+      const event = navigation.emit({
+        type: 'tabPress',
+        target: route.key,
+        canPreventDefault: true,
+      });
+      if (!focused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+      if (focused) slideIndex.set(withSpring(index, SLIDE_SPRING));
+    },
+    [routes, state.index, navigation, slideIndex]
+  );
+
+  const tick = useCallback(() => {
+    if (Platform.OS === 'ios') Haptics.selectionAsync().catch(() => {});
+  }, []);
+
+  const indexAtX = (x: number, minimized: number) => {
+    'worklet';
+    const side = interpolate(minimized, [0, 1], [0, MINIMIZED_INSET], Extrapolation.CLAMP);
+    const barWidth = width - BAR_MARGIN * 2 - side * 2;
+    const itemWidth = (barWidth - ROW_PAD_H * 2) / tabCount;
+    const raw = (x - ROW_PAD_H) / itemWidth - 0.5;
+    return Math.min(Math.max(raw, 0), tabCount - 1);
+  };
+
+  const pan = Gesture.Pan()
+    .activeOffsetX([-6, 6])
+    .failOffsetY([-14, 14])
+    .onStart(() => {
+      'worklet';
+      isDragging.set(true);
+      lastTicked.set(Math.round(slideIndex.get()));
+      if (minimize) setMinimized(minimize, 0);
+    })
+    .onUpdate((event) => {
+      'worklet';
+      const index = indexAtX(event.x, progress.get());
+      slideIndex.set(index);
+      const rounded = Math.round(index);
+      if (rounded !== lastTicked.get()) {
+        lastTicked.set(rounded);
+        runOnJS(tick)();
+      }
+    })
+    .onFinalize(() => {
+      'worklet';
+      if (!isDragging.get()) return;
+      const rounded = Math.round(slideIndex.get());
+      slideIndex.set(withSpring(rounded, SLIDE_SPRING));
+      isDragging.set(false);
+      runOnJS(select)(rounded);
+    });
+
+  const tap = Gesture.Tap()
+    .maxDistance(16)
+    .maxDuration(400)
+    .onEnd((event, success) => {
+      'worklet';
+      if (!success) return;
+      const index = Math.round(indexAtX(event.x, progress.get()));
+      slideIndex.set(withSpring(index, SLIDE_SPRING));
+      if (minimize) setMinimized(minimize, 0);
+      runOnJS(select)(index);
+    });
+
+  const gesture = Gesture.Race(pan, tap);
+
+  const barStyle = useAnimatedStyle(() => ({
+    height: interpolate(
+      progress.get(),
+      [0, 1],
+      [EXPANDED_HEIGHT, MINIMIZED_HEIGHT],
+      Extrapolation.CLAMP
+    ),
+    marginHorizontal: interpolate(
+      progress.get(),
+      [0, 1],
+      [0, MINIMIZED_INSET],
+      Extrapolation.CLAMP
+    ),
+  }));
+
+  const shapeStyle = useAnimatedStyle(() => ({
+    borderRadius:
+      interpolate(
+        progress.get(),
+        [0, 1],
+        [EXPANDED_HEIGHT, MINIMIZED_HEIGHT],
+        Extrapolation.CLAMP
+      ) / 2,
+  }));
+
+  const highlightStyle = useAnimatedStyle(() => {
+    const barHeight = interpolate(
+      progress.get(),
+      [0, 1],
+      [EXPANDED_HEIGHT, MINIMIZED_HEIGHT],
+      Extrapolation.CLAMP
+    );
+    const height = interpolate(
+      progress.get(),
+      [0, 1],
+      [HIGHLIGHT_EXPANDED, HIGHLIGHT_MINIMIZED],
+      Extrapolation.CLAMP
+    );
+    const side = interpolate(progress.get(), [0, 1], [0, MINIMIZED_INSET], Extrapolation.CLAMP);
+    const barWidth = width - BAR_MARGIN * 2 - side * 2;
+    const itemWidth = (barWidth - ROW_PAD_H * 2) / tabCount;
+    return {
+      height,
+      width: itemWidth,
+      borderRadius: height / 2,
+      top: (barHeight - height) / 2,
+      transform: [{ translateX: ROW_PAD_H + itemWidth * slideIndex.get() }],
+    };
+  });
 
   if (keyboardShown) return null;
 
+  const bottom = barOffset(insets.bottom);
+
   return (
-    <View
-      accessibilityRole="tablist"
-      pointerEvents="box-none"
-      style={[styles.bar, { paddingBottom: BOTTOM + insets.bottom }]}>
-      <View style={[styles.capsule, { backgroundColor: theme.surface }]}>
-        {/*
-          The indicator slides by a CSS transition, not a shared value: its
-          position is a React prop, so the tab it rests on is always the one
-          React thinks is selected. An animated style keeps only its first
-          render in React's props and can lose its settled value to a stalled
-          JS thread — the game page's buttons did exactly that.
-        */}
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.indicator,
-            {
-              width: tabWidth,
-              backgroundColor: theme.surfaceSelected,
-              transform: [{ translateX: state.index * tabWidth }],
-              transitionDuration: reduceMotion ? 0 : INDICATOR_MS,
-            },
-          ]}
-        />
+    <View pointerEvents="box-none" style={styles.layer} accessibilityRole="tablist">
+      {/* The page dissolving under the bar: the package's progressive blur
+          (stacked thin blurs) on iOS, and its soft black ramp everywhere. */}
+      <View
+        pointerEvents="none"
+        style={[styles.fade, { height: bottom + EXPANDED_HEIGHT + BLUR_BLEED }]}>
+        {Platform.OS === 'ios' &&
+          FADE_LAYERS.map((height, index) => (
+            <BlurView
+              key={index}
+              tint="dark"
+              intensity={5}
+              style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height }}
+            />
+          ))}
+        <View style={[StyleSheet.absoluteFill, { experimental_backgroundImage: FADE_RAMP }]} />
+      </View>
 
-        {routes.map((route, index) => {
-          const { options } = descriptors[route.key];
-          const focused = index === state.index;
-          const color = focused ? theme.primaryText : theme.textMuted;
-          const label =
-            typeof options.tabBarLabel === 'string'
-              ? options.tabBarLabel
-              : (options.title ?? route.name);
-
-          return (
-            <PressableScale
-              key={route.key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: focused }}
-              accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
-              onPress={() => {
-                const event = navigation.emit({
-                  type: 'tabPress',
-                  target: route.key,
-                  canPreventDefault: true,
-                });
-                if (!focused && !event.defaultPrevented) {
-                  navigation.navigate(route.name, route.params);
-                }
-              }}
-              onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
-              scaleTo={0.94}
-              style={StyleSheet.flatten([styles.tab, { width: tabWidth }])}>
-              {/* The icon wobbles under the finger — Convx's navigation icons
-                  (`pressWobble`) — and pops as its tab is chosen. */}
-              <PressGlyph pop={focused}>
-                {options.tabBarIcon?.({ focused, color, size: 24 })}
-              </PressGlyph>
-              <Text variant="bodySmall" numberOfLines={1} style={{ color }}>
-                {label}
-              </Text>
-            </PressableScale>
-          );
-        })}
+      <View
+        pointerEvents="box-none"
+        style={{
+          marginHorizontal: BAR_MARGIN,
+          marginBottom: bottom,
+          alignSelf: 'center',
+          width: width - BAR_MARGIN * 2,
+        }}>
+        <GestureDetector gesture={gesture}>
+          <Animated.View style={barStyle}>
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                {
+                  backgroundColor: tints.glass,
+                  borderColor: withAlpha(theme.white, 0.08),
+                  borderWidth: StyleSheet.hairlineWidth,
+                  borderCurve: 'continuous',
+                },
+                shapeStyle,
+              ]}
+            />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.highlight,
+                { backgroundColor: tints.highlight, borderCurve: 'continuous' },
+                highlightStyle,
+              ]}
+            />
+            <View style={styles.row}>
+              {routes.map((route, index) => {
+                const { options } = descriptors[route.key];
+                const label =
+                  typeof options.tabBarLabel === 'string'
+                    ? options.tabBarLabel
+                    : (options.title ?? route.name);
+                return (
+                  <GlassTab
+                    key={route.key}
+                    index={index}
+                    focused={index === state.index}
+                    label={label}
+                    accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
+                    renderIcon={(focused, color) =>
+                      options.tabBarIcon?.({ focused, color, size: ICON_SIZE })
+                    }
+                    slideIndex={slideIndex}
+                    progress={progress}
+                    tints={tints}
+                    onPress={() => {
+                      if (minimize) setMinimized(minimize, 0);
+                      select(index);
+                    }}
+                  />
+                );
+              })}
+            </View>
+          </Animated.View>
+        </GestureDetector>
       </View>
     </View>
   );
 }
 
+/** The package's progressive blur: ten thin layers, each a little shorter. */
+const FADE_LAYERS = [
+  '100%',
+  '88%',
+  '76%',
+  '64%',
+  '54%',
+  '44%',
+  '36%',
+  '28%',
+  '22%',
+  '16%',
+] as const;
+const FADE_RAMP =
+  'linear-gradient(to top, rgba(0,0,0,0.70) 0%, rgba(0,0,0,0.32) 42%, rgba(0,0,0,0.08) 68%, rgba(0,0,0,0) 88%)';
+
+/** One tab: its glyph (lit as the highlight passes over it) and its word, which folds away when minimized. */
+function GlassTab({
+  index,
+  focused,
+  label,
+  accessibilityLabel,
+  renderIcon,
+  slideIndex,
+  progress,
+  tints,
+  onPress,
+}: {
+  index: number;
+  focused: boolean;
+  label: string;
+  accessibilityLabel: string;
+  renderIcon: (focused: boolean, color: string) => ReactNode;
+  slideIndex: SharedValue<number>;
+  progress: SharedValue<number>;
+  tints: { active: string; inactive: string };
+  onPress: () => void;
+}) {
+  /* What the highlight is over lights up — live while scrubbing, travelling on a tap. */
+  const activeStyle = useAnimatedStyle(() => ({
+    opacity: 1 - Math.min(Math.abs(slideIndex.get() - index), 1),
+  }));
+
+  const labelStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.get(), [0, 0.4], [1, 0], Extrapolation.CLAMP),
+    color: interpolateColor(
+      Math.min(Math.abs(slideIndex.get() - index), 1),
+      [0, 1],
+      [tints.active, tints.inactive]
+    ),
+  }));
+
+  /* The box's height animated explicitly, so the glyph stays centred every frame. */
+  const boxStyle = useAnimatedStyle(() => ({
+    height: interpolate(
+      progress.get(),
+      [0, 1],
+      [HIGHLIGHT_EXPANDED, HIGHLIGHT_MINIMIZED],
+      Extrapolation.CLAMP
+    ),
+  }));
+
+  return (
+    /* The bar's gesture takes the touches; this still answers a screen
+       reader's activation and a keyboard. */
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityState={{ selected: focused }}
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      style={styles.tab}>
+      <Animated.View style={[styles.box, boxStyle]}>
+        <View>
+          {renderIcon(false, tints.inactive)}
+          <Animated.View style={[styles.activeGlyph, activeStyle]}>
+            {renderIcon(true, tints.active)}
+          </Animated.View>
+        </View>
+        <Animated.Text numberOfLines={1} style={[styles.label, labelStyle]}>
+          {label}
+        </Animated.Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  /* Over the page, at its foot, with no fill of its own: the capsule is the
-     only thing drawn, and the page shows around it and under the system keys. */
-  bar: {
+  layer: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  fade: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  highlight: { position: 'absolute', left: 0 },
+  row: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: ROW_PAD_H },
+  tab: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  box: { alignSelf: 'stretch', alignItems: 'center', paddingTop: ITEM_PAD_V, overflow: 'hidden' },
+  activeGlyph: {
     position: 'absolute',
+    top: 0,
     left: 0,
     right: 0,
     bottom: 0,
     alignItems: 'center',
-    paddingHorizontal: SIDE,
-    paddingTop: TOP,
-  },
-  capsule: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: BAR_HEIGHT,
-    borderRadius: BAR_HEIGHT / 2,
-    paddingHorizontal: CAPSULE_INSET,
-  },
-  indicator: {
-    position: 'absolute',
-    left: CAPSULE_INSET,
-    top: (BAR_HEIGHT - INDICATOR_HEIGHT) / 2,
-    height: INDICATOR_HEIGHT,
-    borderRadius: INDICATOR_HEIGHT / 2,
-    transitionProperty: 'transform',
-    transitionTimingFunction: 'ease-out',
-  },
-  tab: {
-    height: INDICATOR_HEIGHT,
-    alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.x4 / 2,
-    borderRadius: INDICATOR_HEIGHT / 2,
+  },
+  label: {
+    fontSize: 9.5,
+    lineHeight: LABEL_HEIGHT,
+    fontFamily: FontFamily.semibold,
+    marginTop: ITEM_GAP,
   },
 });

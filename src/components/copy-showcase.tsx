@@ -221,6 +221,12 @@ export type CopyShowcaseProps = {
    * let go — a screen left open in a pocket should not be working.
    */
   active: boolean;
+  /**
+   * The physical shelf's Cover Flow has already flown the cover to where the
+   * case stands: no landing (no drop, no turn to come square) — the case is
+   * there, square on, and starts to drift.
+   */
+  handedOver?: boolean;
 };
 
 /**
@@ -301,9 +307,13 @@ export const CopyShowcase = memo(function CopyShowcase({
   onSideChange,
   onRefuse,
   active,
+  handedOver = false,
 }: CopyShowcaseProps) {
   const reduceMotion = useReducedMotion();
-  const { progress: landed, landed: settled } = useLandingArrival();
+  const { progress: arrival, landed: arrived } = useLandingArrival();
+  const settled = arrived || handedOver;
+  /* Read by everything that lands; whole at once when the cover was flown in. */
+  const landed = useDerivedValue(() => (handedOver ? 1 : arrival.get()));
 
   /* Somebody listening to the screen has no use for a case that turns round by
      itself, and is told about each side it shows: it stands still for them. */
@@ -364,7 +374,7 @@ export const CopyShowcase = memo(function CopyShowcase({
   /* A disc standing alone rests on the floor, not in the air where its case was. */
   const standDrop = (caseHeight - disc) / 2 - 4;
 
-  const turn = useSharedValue(still ? 0 : ARRIVE_TURN);
+  const turn = useSharedValue(still || handedOver ? 0 : ARRIVE_TURN);
   const discTurn = useSharedValue(0);
   const open = useSharedValue(mode === 'closed' ? 0 : 1);
   const out = useSharedValue(mode === 'disc' ? 1 : 0);
@@ -455,6 +465,13 @@ export const CopyShowcase = memo(function CopyShowcase({
   /* The landing: the case comes square as it drops, then starts to drift. */
   useEffect(() => {
     if (still) return;
+    if (handedOver) {
+      runOnUI(() => {
+        'worklet';
+        drift(turn, DRIFT_START_MS);
+      })();
+      return;
+    }
     turn.set(
       withSpring(0, ARRIVAL_OBJECT, (finished) => {
         'worklet';
@@ -952,12 +969,15 @@ export const CopyShowcase = memo(function CopyShowcase({
 
   /* The landing: a drop and a little growth, on everything that stands on the
      floor. The turn it arrives with is in `turn` itself. */
-  const arriving = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: interpolate(landed.get(), [0, 1], [ARRIVE_DROP, 0]) },
-      { scale: interpolate(landed.get(), [0, 1], [0.94, 1]) },
-    ],
-  }));
+  const arriving = useAnimatedStyle(() => {
+    const at = landed.get();
+    return {
+      transform: [
+        { translateY: interpolate(at, [0, 1], [ARRIVE_DROP, 0]) },
+        { scale: interpolate(at, [0, 1], [0.94, 1]) },
+      ],
+    };
+  });
 
   const title = copy.game?.title ?? 'A copy';
   const coverUrl = copy.game?.cover_url;

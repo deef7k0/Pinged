@@ -76,14 +76,31 @@ describe('reports on comments, wall posts and profiles (0045)', () => {
   });
 });
 
+describe('reports on requests and suggestions (0046)', () => {
+  it('cover the kinds 0046 widens the table to', () => {
+    const pings = readFileSync(
+      new URL('../../supabase/migrations/0046_pings.sql', import.meta.url),
+      'utf8'
+    );
+    const kinds = pings
+      .match(/user_content_reports_kind_check\s+check \(kind in \(([^)]*)\)\)/)![1]
+      .split(',')
+      .map((value) => value.trim().replace(/'/g, ''));
+    for (const kind of kinds) assert.ok(isReportKind(kind), kind);
+    assert.ok(kinds.includes('ping') && kinds.includes('ping_suggestion'));
+  });
+});
+
 describe('isReportKind', () => {
-  it('accepts the six kinds and nothing else', () => {
+  it('accepts the eight kinds and nothing else', () => {
     assert.ok(isReportKind('pick'));
     assert.ok(isReportKind('suggestion'));
     assert.ok(isReportKind('review'));
     assert.ok(isReportKind('comment'));
     assert.ok(isReportKind('wall_post'));
     assert.ok(isReportKind('profile'));
+    assert.ok(isReportKind('ping'));
+    assert.ok(isReportKind('ping_suggestion'));
     assert.equal(isReportKind('post'), false);
     assert.equal(isReportKind(undefined), false);
   });

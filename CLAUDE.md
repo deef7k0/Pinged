@@ -1,5 +1,13 @@
 # CLAUDE.md
 
+> **The app is called Pinged** (the owner's rebrand, 2026-10-31). Every
+> user-facing string says Pinged; the repository, the package id
+> (`com.nomicoprod.gamelog`), the Expo slug, the deep-link scheme, query keys
+> like `'gamelog'`, the `GameLog` row type and the many "GameLog" in these notes
+> are the old name and were left alone on purpose — changing the package id
+> would install a second app, and changing the scheme would break sign-in
+> redirects. See § Pinged.
+
 Working notes for AI agents (and humans) in this repo. For what the product *is*
 and where it is going, read [PROJECT.md](PROJECT.md). For how it should **look**
 — tokens, type scale, surfaces, the game case — read [DESIGN.md](DESIGN.md); its
@@ -82,8 +90,8 @@ npm test           # node:test — pure modules only: the M3 scheme generator, t
                    # and four-cover rows (constants/profile-layout), a row of
                    # covers — the cover's size and how many are in view,
                    # against the reference (constants/cover-rail),
-                   # Search's slider — its shape, and the scrim under its
-                   # words at AA on white art (constants/search-spotlight),
+                   # Search's slider — its parallax, that the art always
+                   # covers its card (constants/search-spotlight),
                    # which games the slider opens on and what each says
                    # about its date (lib/games/spotlight), and the top bar:
                    # its size against Material 3's, the frost, how far the
@@ -175,7 +183,10 @@ npm test           # node:test — pure modules only: the M3 scheme generator, t
                    # against the plastics' indices, the studio's light on a
                    # printed face, the rock, and the 3D camera against the
                    # flat stage's own arithmetic, and the globals three.js
-                   # is lent on Hermes (lib/copy-scene)
+                   # is lent on Hermes (lib/copy-scene); and Pings — every
+                   # vocabulary and limit against 0046's text, what counts as
+                   # played, the familiarity line, the cursor, suggestions by
+                   # game, and that every ping opens a route (lib/pings)
 
 node scripts/discovery-sql.mjs   # 0038's functions on a real Postgres
                    # (PGlite, in-process) over every migration, with seven
@@ -188,6 +199,10 @@ node scripts/community-rating-sql.mjs   # 0041 on PGlite, over ratings
 node scripts/account-safety-sql.mjs   # 0045 on PGlite: blocking both
                    # ways, the new reports, and an account deleted with no
                    # uuid column anywhere still naming it. Same PGlite
+node scripts/pings-sql.mjs   # 0046 on PGlite: who may ping whom, the
+                   # For You tiers and their cursor walked a row at a time,
+                   # the counts and guards on suggestions, blocks, reports,
+                   # and a deleted account leaving nothing. Same PGlite
 node --import ./scripts/esm-register.mjs scripts/legal-pages.mjs
                    # writes public/legal/*.html from constants/legal.ts
 node scripts/community-rating-report.mjs [--out f.md]   # a read-only dry
@@ -339,6 +354,12 @@ PATH via `~/.profile`. SDK 57 needs Node ≥ 22.13.
    `supabase secrets set OPENXBL_API_KEY=…` (xbl.io, free tier 150 requests an
    hour). Without a service's secret its Connect says it is not connected yet.
    See § Linked gaming accounts.
+15. Pings — run migration `0046`. It adds one enum value
+   (`notification_kind.ping_suggestion`) used only inside a trigger body, so it
+   runs whole, as 0005 does. Without it the Pings tab, a request's page, the
+   send sheet and Settings → Pings each say pings arrive with the next update,
+   the inbox's Pings tab is empty, and nothing else breaks. Check it with
+   `node scripts/pings-sql.mjs`. See § Pinged.
 
 ## Adding a route
 
@@ -351,7 +372,15 @@ not by `expo export`. A brand-new route file will fail typecheck until you run
 ```
 src/
   app/               Expo Router routes (file = route)
-    (tabs)/          home, search, news, profile
+    (tabs)/          home, search, pings, profile (Pings took News's slot)
+    ping/[id]        one request to the community: what was asked, its games,
+                     every suggestion grouped by game; the owner's controls
+    new-ping         ask the community, or ?edit= a request (modal)
+    suggest-game/[id]  answer a request: pick a game, say why (modal)
+    send-ping        ping something to people — every Ping button opens it
+                     (?kind=&target=&title=&subtitle=&image=) (modal)
+    news             News and Events, opened from Home's two sections
+    notifications    the inbox behind Home's bell: Pings, then Notifications
     game/[id]        game detail + reviews + action row
     log/[id]         create/edit a log (modal)
     achievements/[id]  per-game achievement list
@@ -368,7 +397,7 @@ src/
                      pinned games, rows (Logged, Favourites, Backlog, Physical,
                      then Steam, PlayStation, Xbox and GOG when linked),
                      Recently added. ?tab= is one list on
-                     its own page — Physical the CD binder. See § The library.
+                     its own page — Physical is Cover Flow (§ The library).
                      Its grids are four across, one line under each — the
                      one screen whose covers are
     pin-game         pick a game to pin to your library (modal, 0043)
@@ -497,10 +526,11 @@ src/
                                         scroller, which is how its bar learns
                                         the page moved. A pushed screen that
                                         scrolls uses one
-                     app-tab-bar        the bottom navigation: SimpMusic's 64dp
-                                        capsule (Home, Search, News, Profile)
-                                        with a sliding 56dp indicator, floating
-                                        over the page. Tab screens pad their
+                     app-tab-bar        the bottom navigation: expo-glass-tabs'
+                                        floating glass bar (Home, Search, Pings,
+                                        Profile) — a sliding highlight, scrub,
+                                        minimized on scroll — floating over the
+                                        page (§ reacticx and glass tabs). Tab screens pad their
                                         scroll content by `useTabBarClearance()`
                                         — a new tab screen must too
                      award-show / award-slot  an award ballot, and one row of it
@@ -655,7 +685,8 @@ src/
                                         the title, developer · year and the
                                         square score beside it, then three lines
                                         of the review. See § Review cards
-                     cd-binder / cd-binder-page  the zip binder of discs
+                     copy-coverflow     the Physical shelf as Cover Flow, and its
+                                        hand-off to a copy's stage (§ The library)
                      cd-disc            a game's art printed on game_cd.png
                      copy-showcase      a copy on its stage: the object, its
                                         gestures and its idle turn. The case is
@@ -801,8 +832,8 @@ src/
                      Home: the reference's measurements, the gradient from the
                      item's hue and the name's ink at AA — pure, tested; see
                      § Home),
-                     cover-rail.ts (a row of covers — pure, tested), search-spotlight.ts (Search's slider, its scrim
-                     and its light — pure, tested),
+                     cover-rail.ts (a row of covers — pure, tested), search-spotlight.ts (Search's carousel, its parallax
+                     and where it moves next — pure, tested),
                      game-labels.ts (the labels a moderator can set — must_play),
                      list-window.ts (how much of a long list is mounted at once;
                      see § Gotchas, performance traps), player.ts (the mini
@@ -1122,7 +1153,9 @@ supabase/
                      0043 library_pins: six pinned games a person,
                      0044 gaming_accounts.linked_by and gaming_service_tokens:
                      PlayStation, Xbox and GOG linked by username,
-                     0045 blocks, user_content_reports, delete_my_account()
+                     0045 blocks, user_content_reports, delete_my_account(),
+                     0046 pings: ping_preferences, direct_pings, pings,
+                     ping_reference_games, ping_suggestions, ping_feed()
                      (0006, 0015, 0019 and 0022 each add an enum value and must
                       run alone — see those files)
   functions/igdb/    Edge Function proxying IGDB
@@ -1654,11 +1687,24 @@ list.
     it moves too little). A heading states what the data is.
   - **"Similar to <game>", not "For you".** Home has "Games for you"; two rows
     with one name and different games would look broken.
-- **The slider is four slides** (`<SpotlightSlider>`, `constants/search-spotlight`,
-  `lib/games/spotlight` — both pure and tested): the two biggest games out this
-  month, the most followed game still to come with its countdown as the badge,
-  and the release calendar. 3:2, edge to edge, a name in two lines with one
-  developer under it, a badge top right, four segments at the foot.
+- **The slider is Home's carousel now** (`<SpotlightSlider>`,
+  `constants/search-spotlight`, `lib/games/spotlight` — pure and tested):
+  the two biggest games out this month, the most followed game still to come
+  with its countdown as the badge, and the release calendar, as "Games for
+  you"'s cards (`discoverGeometry`) under the heading "Out now and coming
+  soon" — the owner's (2026-11-02, with a reference: "will go like the home
+  carousel… scroll automatically with this kind of animation"). The motion
+  is reacticx's `ParallaxCarousel`: the art inside each card lags the row by
+  `k` = 0.35 of a card, drawn `1 + 2k` wide so it covers the card at every
+  offset; every six seconds the row glides (900ms, a Reanimated `scrollTo`
+  on the UI thread, so the parallax runs) to the next card and from the last
+  to the first. The calendar card is drawn and does not drift. It was a
+  full-bleed 3:2 slider with four timer segments until then.
+  **The header is the reference's too**: "Search" in `largeTitle` at the
+  top left, a capsule of two keys (the calendar, the scanner — which left
+  the field's trailing slot) at the right, the field, then the tabs. The
+  title and the field fold together (`<CollapsingField>`); the tabs never
+  move.
   - **Which games is `getSpotlight`**: two requests — the forty most-followed
     games from the start of the window to the end of this month, and the eight
     most-followed with a date ahead — ranked as the calendar ranks
@@ -1676,8 +1722,7 @@ list.
     calendar screen draws one, the days a notable game is out on lit — from the
     spotlight's own request, so it costs nothing. It needs no request to exist,
     so the slider is never empty.
-  - **It moves by itself until it is touched.** Every six seconds, the lit
-    segment filling as the timer. One drag stops it for as long as the screen
+  - **It moves by itself until it is touched.** Every six seconds. One drag stops it for as long as the screen
     stays up; it is still under Reduce Motion, for a screen reader, in the
     background, on another tab, and once scrolled past.
   - **The badge is near-black with white type**, as the word on a cover is. The
@@ -2269,7 +2314,7 @@ was taken is the rules, each restated in this stack. Five of them:
    `initialDataUpdatedAt`): the **game page** from any list fetched with
    `GAME_FIELDS` (`toFullGame` in `igdb.ts` → `games/seen-games.ts`), the
    **review page** from any list of reviews (`rememberLogs` → `api/seen-logs.ts`),
-   and a **copy's screen** from the binder, the copies list or the game page
+   and a **copy's screen** from the copies list or the game page
    (`getCopies` → `api/seen-copies.ts`).
    Each is on screen in the frame it opens, with no request when the list was
    loaded inside the page's `staleTime`.
@@ -3041,7 +3086,10 @@ screen's heading under its bar again.
      with the scroll." Do not fold it again. (For a week from 2026-10-15
      Home had no bar — its masthead scrolled with the page; SimpMusic's header
      replaced that on 2026-10-22. See § Home.)
-- **A screen's name is its bar's `title`.** Twenty-odd screens printed an `h1`
+- **A screen's name is its bar's `title`** — and, since 2026-11-02, also a
+  large title at the top of its content, drawn by the page scroller from that
+  same `title` (§ reacticx and glass tabs); never a heading written by hand.
+  Twenty-odd screens printed an `h1`
   at the top of their content because no bar existed to carry it — several
   said so in a comment. Those headings are the bars' titles now and are gone
   from the content; what was the line *under* the heading stayed, and where it
@@ -3650,14 +3698,14 @@ Function runs it; `useCopyArt` asks it.
   system ids are the scraping tools' (`SCREENSCRAPER_SYSTEMS`) and are to be
   checked on the first run.
 - **When**: as a copy is saved (`prefetchCopyArt` in `add-copy`), and on any
-  copy page or binder sleeve that has not asked yet. Answers are cached in
+  copy page that has not asked yet. Answers are cached in
   0042's `copy_art` by platform, region and name — three months for a find, a
   week for a miss — and a day on the phone.
 - **What is drawn**: the back face of the copy screen's case shows the scan
   (`<CopyCaseBack scan>`), and the edition record it printed is said under
   the stage while the back faces the reader (`copyRecordLine`) — still shown,
   still once. A disc shows its real label (`<CdDisc labelUrl>`) on the stage,
-  in the open case's tray and in the binder. **A cartridge's label is never
+  in the open case's tray. **A cartridge's label is never
   drawn** — the stage draws no cartridge. The front stays the app's.
 - **To switch it on**: run `0042_copy_art.sql`, then `supabase functions
   deploy copy-art`. GameTDB needs nothing else; for ScreenScraper,
@@ -3855,6 +3903,16 @@ and the event page's foot bar are all for a device.
   never persisted (the extractor keeps its own store), never invalidated.
   `['onboarding-examples', 'colours' | 'animated']` is the look questions'
   games.
+  Pings (0046): `['pings', 'for_you' | 'latest' | 'mine', userId, genre,
+  platform, withRefs]` (the tab's three infinite lists), `['pings', 'unseen',
+  userId]` (My Pings' dot), `['ping', id]` (a request — its page, the edit
+  sheet and the suggest sheet share it), `['ping-suggestions', id]`,
+  `['direct-pings', userId]` (the inbox), `['inbox', 'unread', userId]` (the
+  bell's number: pings plus notifications), `['pingable-people', userId]`,
+  `['ping-audience', userId]`. Anything that writes a request or a suggestion
+  invalidates the `['pings']` prefix; a status write in the log form, the
+  progress sheet or Surprise Me invalidates `['pings', 'for_you']`, because
+  what you have played is For You's ranking.
 - **Colours**: always `useTheme()`. Never hardcode a hex in a component; add the
   token to `Colors.dark` in `constants/theme.ts` — that object is the entire
   palette. There is no `Colors.light`: `APP_SCHEME` is `'dark'` and `useTheme()`
@@ -3933,34 +3991,23 @@ and the event page's foot bar are all for a device.
   replaced collapsed into `statusPlayed` under simulated protanopia. A
   *selected control* carries two non-hue signals too — its wash is lighter than
   the resting fill and its edge far brighter than the resting edge.
-- **In-page tabs are SimpMusic's top-bar chips, and there is one
-  implementation.** At the owner's direction (2026-10-15: "make the tabs in the
-  app like simpmusic"), read from `ChipGroup.kt` and the chip rows under
-  `HomeScreen.kt` / `LibraryScreen.kt` / `SearchScreen.kt`: `<TabBar>` is a
-  scrollable row of full pills, 32 high, 16 at each side, 4 apart, 15 in.
-  **Unselected: no fill, a 1dp `outlineVariant` edge, the label in
-  `onSurfaceVariant`. Selected: solid `primary` with `onPrimary`, no
-  check — poured in, as every outline that turns solid is (next bullet).**
-  Labels are `Type.tab` — Material's `labelLarge`, 14 medium, sentence case.
-  **On the game page the row is `align="spread"`**: three equal-width tabs,
-  40 high with a 15 label, 4 apart from the left margin to the right, never
-  scrolling — the owner's direction, over two passes: centred chips read as
-  "a little weird", then spread chips at their own widths as "too small and
-  far apart… big enough so they barely touch and it doesnt scroll". The roles are `accent.m3`'s, so a game's page draws them in the game's
-  palette. It replaced a wash with an accent label beside bare uppercase muted
-  type; on a game's page the selected tab is now a second `primary` beside the
-  review button, which SimpMusic's rule implies and nobody has judged yet. News uses it
-  too: it had a segmented icon dock of its own (`ui/dock.tsx`, now unused) until
-  the owner asked for it to match the rest. No underline and no
-  container hairline: a rule needs an edge to sit on, which read as a divider
-  wherever the bar sat over artwork, and two pixels of it disappeared into a
-  busy screenshot. Counts are **inline and neutral** (`ALL GAMES 135`); the red
-  badge is opt-in via `alert`, for things genuinely unseen. The profile used to
-  carry its own copy of this row and the two drifted the moment one was
-  restyled — if a screen needs tabs, it uses `<TabBar>`. `inset` moves the row
-  onto a margin that is not the app's 15; the profile is its one caller, and
-  its row is the one `iconOnly` strip — four glyphs spread across the column
-  under the widgets.
+- **In-page tabs are reacticx's segmented control, and there is one
+  implementation** (`<TabBar>`) — the owner's (2026-11-02: "Make the tabs in
+  the app look like this"), read from `organisms/segmented-control` (MIT): a
+  pill track (`segmentTrack`, translucent) with a solid thumb
+  (`segmentThumb`, the reference's small shadow as a `boxShadow` — elevation
+  would lift it over the labels on Android) that springs, heavily
+  overdamped, to the chosen segment; a tap swells the thumb to 1.3 and
+  wobbles it back; a sideways drag along a row that fits scrubs through the
+  tabs; hairlines between segments fade beside the thumb. Chosen label
+  `text`, the rest `textSecondary`; on a game's page (`accent.tonal`) the
+  scheme's `secondaryContainer` and its inks. **Two departures**: segments
+  are as wide as their words, sharing the slack (Search's six scopes do not
+  fit equal sixths), and a row wider than the phone scrolls, track and all,
+  keeping the chosen tab in view; and **no blur flash on a tap** (Android).
+  `align="spread"` is the game page's taller track, `iconOnly` the
+  profile's glyphs. It replaced SimpMusic's outlined chips with a poured
+  `primary` fill (2026-10-15), so a tab no longer pours.
 - **A tap always answers, and icons move — Convx's** (2026-10-31, the
   owner: "on tap there is always responsiveness and even the icons have
   animations"; `constants/press-motion`, read from Convx's `ModifierExt.kt`,
@@ -3999,9 +4046,9 @@ and the event page's foot bar are all for a device.
   on a 160 ms ease (`inkTransition`, `<PaintGlyph>` — an Ionicons glyph drawn as
   text so its colour can transition). Both are **CSS transitions on React
   props**, so a pill always rests on what was last rendered and never mounts
-  mid-pour. Five controls do it: the progress pills and their Story / Main
-  follow-up, the log form's Platinum and Spoilers toggles, `<TabBar>`, and
-  onboarding's chips. A new control that goes from an outline to a solid fill
+  mid-pour. Four controls do it: the progress pills and their Story / Main
+  follow-up, the log form's Platinum and Spoilers toggles, and onboarding's
+  chips (`<TabBar>` did until it became a segmented control). A new control that goes from an outline to a solid fill
   uses it; one that only washes when chosen (`useSelectable`, below) does not.
 - **Choices are outlined; actions are filled. Selection comes from
   `useSelectable()`.** Any control with an on/off state rests with no fill and a
@@ -4031,19 +4078,18 @@ and the event page's foot bar are all for a device.
   where the colour *is* the datum — a rarity band, a status — and tints the label
   only, never the fill. A run of filled colour capsules reads as a row of buttons
   demanding to be pressed, and chips are not buttons.
-- **Surprise Me's art is a plain pager, SimpMusic's** — the owner's direction
-  (2026-10-21): "Remove the way the artwork moves as a card out of the screen,
-  just make it a simple slide like SimpMusic when sliding to the next song".
-  The card used to be a depicted object — a face-down deck behind it, a ±7°
-  lean, a sheen, a flight off the screen; all of it is gone, and
-  `surprise-deck` / `surprise-sheen` are deleted. The deck is one strip
-  (`pageX`, every batch's cards counted by `base`) with the cards either side
-  laid out a display's width away; the strip follows the finger and springs
-  on Compose's pager default (400, critically damped). The strip is as wide as
-  every card on it, because Android hands a touch only to a child inside its
-  parent's bounds. **The next card's art shows during a drag**, as the next
-  song's does in the reference — it was face down "to keep the surprise"; the
-  surprise now lasts until the drag begins. DESIGN.md § 4.2.
+- **Surprise Me's art is a filling stack, reacticx's** — the owner's
+  direction (2026-11-02), reacticx's `FlingStack` (`molecules/filling-stack`,
+  MIT): the card in front and three behind it, each 18 higher and 5% smaller
+  and sunk under the page's colour (reacticx blurs them with expo-blur, which
+  on Android needs the page as its target — so a veil instead); a dealt card
+  falls a card and a quarter down as it fades. **A fling down deals, a fling
+  up goes back**, and the sideways swipe still drives the deck one for one.
+  Nothing about the deck changed: every card's depth is its place less
+  `pageX / width` (`<StackCard>` in `surprise-reveal`), so batches, prefetch,
+  the settle timer and the gestures are as they were. It replaced
+  SimpMusic's plain pager (2026-10-21), which had replaced a face-down deck
+  that flew off; neither comes back unasked.
 - **The ambient effect belongs on a game's own page and the review, nowhere
   else.** Not on rails, grids, feeds or any screen showing several games side by
   side: one glow per screen is atmosphere, eight is a lava lamp. `<Poster>`
@@ -5111,6 +5157,24 @@ for its Playlists / Artists / Albums / Songs. `library/[id]` without `?tab=` is
 - **Recently added**: the six newest logs, two across, square, the developer in
   the accent under the name.
 
+**Physical is Cover Flow** (the owner's, 2026-11-02, after rit3zh's
+`expo-coverflow-carousel`, MIT; `<PhysicalShelf>` in `components/copy-coverflow`,
+numbers in `constants/copy-coverflow` under `npm test`). It replaced the zip
+binder of discs (`cd-binder`, deleted). Portrait boxes at 58% of the display,
+one neighbour each side turned 64° and the next faded out; drag or flick
+along it, tap a side box to bring it in front. **Tapping the box in front picks
+it up**: the rest fade, the page fades into the copy's colours (its mesh, as
+`copy/[id]` draws it, or its plain page), and the box flies to where that
+screen's case stands — `landingRect`, from `copyStage`, `useStageRoom`
+(`hooks/use-copy-stage-room`, shared with the copy screen for exactly this)
+and the front face's perspective. Then `copy/[id]` is pushed with
+`handover=1`: the root layout fades it in instead of sliding, `<CopyShowcase
+handedOver>` skips its landing, `<MeshBackdrop instant>` skips its fade.
+Back, the box flies home. Reduce Motion is a plain push. The reflections are a
+flipped `<Poster>` under a gradient to the page — no Skia. Not seen on a
+phone: where the box lands against the case, and the fade between the two
+meshes (each starts its own clock), are the things to judge.
+
 The "All games" grid and its stats header (`library-stats`, deleted) are gone;
 `?tab=all` from an old link opens the head. `['library-pins', userId]` is the
 pins' key, written by the picker and the unpin.
@@ -5530,6 +5594,194 @@ A copy-pasted web component will not run. What has to change:
 web component and the header comment maps every construct to what replaced it.
 Port snippets that way rather than installing DOM libraries — `motion` and
 `tailwind-merge` would bundle and then do nothing.
+
+## reacticx and glass tabs (2026-11-02)
+
+Eight components the owner pointed at in one message, all ported from their
+source (MIT: `rit3zh/reacticx`, `davidmokos/expo-glass-tabs`), restated in
+this app's tokens, and not seen on a phone. Each reverses something older;
+the older rule is noted where it stood.
+
+- **The bottom bar is expo-glass-tabs** (`app-tab-bar`): a pill 12 from the
+  sides, 58 tall, a highlight sliding between tabs on an interruptible spring,
+  the glyph under it crossfading to its filled form, white when chosen (it was
+  the house blue). **Scrolling down minimizes it** — 44 tall, 34 further in,
+  the words folded away — and up, a tap or a tab change brings it back:
+  `<Screen>` feeds its `scrollY` to `useMinimizeOnScroll`, so every tab page
+  with a page scroller drives it. **Drag along it to scrub**; the tab opens on
+  release. A fade (and on iOS a stacked blur) rises behind it. Its glass is the
+  package's solid fallback: `UIGlassEffect` is iOS 26's and `expo-glass-effect`
+  is not linked. `useTabBarFootprint()` is how far the mini player rises over
+  it, since the bar's height over the system inset is `max(inset − 16, 12)`.
+- **Every alert is `showAlert`** (`ui/dialog`) — reacticx's dialog: a card
+  that swings in 20° about its top edge from 0.8 on a 150 / 25 spring, over a
+  scrim (blurred on iOS). Same arguments as `Alert.alert`, which no file calls
+  any more; it draws every button (Android's alert drops a fourth). One
+  `<DialogHost>` in the root layout, a queue.
+- **Sheets are reacticx's tray**: a card 10 from the sides and above the
+  system inset, 38 round, rising and growing from 0.9 on a 280 / 30 spring,
+  dragged away by its handle with the release projected 0.35s ahead.
+  `<SlideUpSheet>` (screen-sized) and `<Tray>` (as tall as its content —
+  the multi-pick sheet, the filter bar's sheets, the select field, add to
+  collection) share the numbers.
+- **Settings is a bouncy accordion** (`ui/accordion`): game colours, animated
+  artwork, physical copies, pings, review languages and hidden games, one open
+  at a time; the open row parts from its neighbours with a bounce.
+  `ReadingLanguages` and `SurpriseHiddenList` are accordion items themselves
+  (they take the `AccordionSlot` props). Ratings, moderation, privacy and sign
+  out are as they were.
+- **The top bar is reacticx's animated header** (`HEADER_FADE`): its ground
+  is the page's colour at 85% → 80% → nothing, reaching 50dp past its foot,
+  faded in over the first 80dp of scroll — not the solid band of 2026-10-14.
+  **Pages have a large title again**: a page with `insetHeader`, a bar with a
+  `title`, not a modal and not `centerTitle`, gets its name in `largeTitle`
+  (32) at the top of its content, drawn by the page scroller (`ui/page-scroll`)
+  and gone by 60dp, while the bar's small name fades and rises in over 40–80.
+  This reverses "do not print a screen's heading under its bar"; a page whose
+  list sits under a tab row passes `largeTitle={false}` (News, Moderation, the
+  inbox, People, Pings). Home's bar is the fade with its keys and no name.
+  **The glass bar is on the fade too** (the owner, the same day: "it isn't
+  applied across the app"): a game, a studio and a collection keep its discs,
+  centred name and handoff, and their blur and `GlassFrost` are gone. A header
+  the page does not scroll under — Search's field and tabs, the Profile tab's
+  row — has `<HeaderFade>` at the top of its content instead.
+- **Search's field folds only once the finger is up.** The fold changes the
+  height above the list, which moves the list under a held finger; the list
+  reads that as the finger moving, scrolls back, and the fold flips — from a
+  thumb's pulse alone (the owner's report). So the page scrollers publish
+  `ScreenChrome.dragging`, `<CollapsingField>` decides nothing while it is 1,
+  needs 56dp of travel (was 24), and folds over 450ms eased in and out (was
+  240 out). Anything else that resizes a header with the scroll must wait for
+  `dragging` the same way.
+- **Search's field is reacticx's scrollable search**: focusing it folds the
+  title away on an 18 / 120 spring and the panel (Search by, the history)
+  fades in over the scope, which stays mounted under it; pulling the page past
+  its top swells the field and focuses it — iOS only, since Android's scroller
+  stops at zero and its pull is the refresh.
+- **A physical copy stands on reacticx's mesh gradient** (`<MeshBackdrop>`,
+  `lib/mesh-gradient-shader`, compiled in CanvasKit by `npm test`): the game's
+  three M3 containers and its page, at a fifth of the reference's speed,
+  stopped when the screen is covered. The disc at the top right switches it
+  to the plain page, kept per account on the device (`['copy-mesh', userId]`,
+  `NEVER_PERSIST`). Skia only; without it there is no disc.
+- **The loader is the mascot** (`<Loader>`, `lib/morph`): a blob with two
+  rounded-rectangle eyes — Material's `ghostish` — who rests, blinks, then
+  turns into a circle, square, triangle, diamond, pentagon and pill, a full
+  turn a loop, eyes upright. reacticx's morph loader, its frames sampled by
+  arc length in plain TypeScript instead of through Skia, so they are under
+  `npm test` (`lib/morph/mascot.test`, which also holds both eyes inside every
+  shape). It replaced every `ActivityIndicator`; a build without Skia gets the
+  platform spinner.
+- **Tabs, Search's carousel and Surprise Me's stack** are the same day's
+  first message — § Search and § Conventions.
+
+## Pinged: pings to people, and pings to everybody (0046)
+
+The owner's rebrand and brief (2026-10-31): the app is **Pinged** — "You ping
+someone, discover something, get notified, connect." A ping is two things, and
+both are called that on screen:
+
+1. **A ping to a person** (`direct_pings`). A game, a review, a collection, an
+   event, a soundtrack or a request is sent to people, with a line. Every Ping
+   button (`usePingTo()`, the paper plane — `PING_GLYPH`) opens `send-ping`:
+   the game page's bar, a review's like row, a collection's two circles, an
+   event's bar, a soundtrack's bar (only once a soundtrack has loaded — none
+   does until SoundCloud is connected), a request's bar. It lands in the
+   **inbox** behind Home's bell, whose first tab is Pings and second
+   Notifications — the owner's.
+2. **A ping to the community** (`pings`, `ping_reference_games`,
+   `ping_suggestions`): the brief's long specification, a request for a game
+   built on up to three games, answered with suggestions and reasons. It is
+   the **Pings tab**, which took News's place in the bottom bar.
+
+**The Pings tab has two faces** (the owner's pick of 2026-11-01, a hybrid
+of two of the five concepts rendered in `.impeccable/mocks/pings/` by
+`scripts/pings-concepts.mjs` — keep the images):
+
+- **For You is "The One You're For"** (`<PingSpotlight>`): one request at a
+  time — its games fanned (an unplayed one grey), why it is in front of you
+  in `h2` (`spotlightClaim`: "You've played both of these"), who asks, the
+  words, and **Suggest a game** as the one white pill. A sideways swipe or
+  **Next** brings the next request — `ping_feed`'s order, so the best match
+  for the filters, never your own; back goes to the one before; the next page
+  is asked for as the queue runs short, and at the true end Next starts over
+  (`nextStageIndex`). "Up next" under it lists three; a tap brings one up.
+- **Latest and Mine are "The Board"** (`<PingPlate>`): plates on the page,
+  not cards — the games as one band of slices with a registration mark in
+  each corner, the asker's face pressed half off its bottom-left corner **with
+  their name and the time beside it** (the owner's addition), the words in
+  `h4`, and under a rule two printed words (`plateFoot`: "2 of 3 played",
+  "4 suggestions"; a request no longer open is struck through). "Pin yours"
+  (`<PinYours>`, a dashed plate) heads both and replaced the old prompt; the
+  tab is "Mine", not "My Pings". The old `<PingCard>` and `<PingPrompt>` are
+  deleted; `<StatusTag>` lives in `status-tag.tsx`.
+- **Grey for unplayed is `filter: grayscale`**, which Android draws from 12
+  and iOS not at all; the dim over it is what carries it everywhere. It is on
+  a `<View>` round the image — expo-image's style type has no `filter`.
+
+Rules that are easy to break:
+
+- **Who may ping you is the database's rule** (`can_ping`, the recipient's
+  `ping_preferences.audience`): anyone who follows you (the default, and what
+  no row means), people you follow back, or friends only — the owner's three.
+  `pingable_people()` only ever answers about people the caller follows or is
+  friends with, so the setting cannot be probed for strangers; the insert
+  trigger says the rule in words ("They only take pings from friends"). The
+  setting is `ping_preferences`, readable by its owner alone — never a column
+  on the public `profiles`.
+- **A ping carries how it looked** (`title`, `subtitle`, `image_url`): the
+  inbox draws fifty mixed kinds in one query, and events and soundtracks have
+  no local row to join. A soundtrack's title is the *game's* — nothing of
+  SoundCloud's is stored (§ Soundtracks).
+- **"Played" is playing, played, paused or dropped** — the set "Played by"
+  uses. Not backlog, not a wishlist or collection (list rows), not a physical
+  copy. `pings.test.ts` reads every status list in 0046 and holds it to that.
+- **For You is tiers, not scores**: `least(matched, 2)` desc, then newest,
+  over open requests by others. Latest is newest first and has tier 0
+  everywhere. The cursor is the last row's `(tier, created_at, id)`, compared
+  as a row; `pings-sql.mjs` walks both feeds a row at a time and checks
+  nothing repeats or is skipped. `reviewed_count` is said on the card
+  ("· reviewed one") and does not rank — the brief's Phase 3.
+- **The library leaves the database only as counts about the reader**:
+  `matched_count`, `reviewed_count`, and a `played` flag per reference game.
+  `ping_feed` is SECURITY INVOKER, so the block policies apply to it.
+- **The count is counted** (`ping_suggestion_count` recounts on every insert
+  and delete) and is not the client's: `pings` grants UPDATE on the words and
+  preferences only, and `pings_guard` resets the database's own fields on
+  insert and moves `updated_at` only on a real edit — a new suggestion, or the
+  owner opening the request (`mark_ping_seen`), is not one.
+- **A suggestion is refused** on a request that is not open, on your own, on
+  one of its reference games, across a block, or past five from one person;
+  `(ping_id, user_id, game_id)` is unique, so one person suggests a game once
+  and several people may suggest the same one — the page groups them
+  (`groupSuggestions`: the answer, then the owner's starred ones, then the
+  most suggested). "Worth a look" is the owner's alone, through
+  `set_ping_suggestion_interesting`.
+- **Every game a request names is in `games` first** (`cacheGame`): the same
+  id the game page, logs and lists use, so a suggested game's Wishlist,
+  Favourite, Log and Collect are the app's own controls and rows — there is
+  no Pings wishlist.
+- **Safety**: restrictive block policies on all three tables and on
+  `direct_pings`; `block_user` also deletes the pings between two people;
+  requests and suggestions are 0045's `user_content_reports` kinds `ping`
+  and `ping_suggestion`, removed (deleted) from the moderation queue's
+  "Comments & people" tab. A deleted request takes its notifications and
+  reports with it by trigger, so `delete_my_account()` is unchanged. The
+  privacy policy says what pings collect (`constants/legal.ts`, 31 October).
+- **News left the tab bar** and is `/news`: News and Events only, from Home's
+  "Latest news" and "Latest events" (`?tab=events`). Trailers went with the
+  owner's "removing the trailer section and such"; Releases and Popular were
+  read as the "and such" — Home's Releases band and Search's charts already
+  are those. `TrailerCard` and `getRecentTrailers` are deleted.
+- The Home tab's label is "Home" now; it read "GameLog", and "Pinged" beside
+  "Pings" would read as one tab twice.
+
+**Not seen on a phone, and 0046 is not applied to the live project.** Types,
+lint, `npm test` (`lib/pings` against 0046's text) and `pings-sql.mjs` on
+PGlite pass. To judge on a device: the stage's swipe against the page's
+scroll and its arrival, the fan's turned cards, the stamp's place on the
+band and the name beside it, the filters' row, the send sheet's footer over
+the keyboard, and the inbox rows.
 
 ## Store-release compliance (audited 2026-10-29)
 

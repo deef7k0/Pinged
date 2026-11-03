@@ -57,7 +57,7 @@ export function EngagementBar({
 
   async function handleShare() {
     try {
-      await Share.share({ message: shareMessage ?? 'Check this out on GameLog' });
+      await Share.share({ message: shareMessage ?? 'Check this out on Pinged' });
     } catch {
       // User dismissed the sheet; nothing to report.
     }

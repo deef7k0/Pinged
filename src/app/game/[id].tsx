@@ -33,6 +33,7 @@ import { Button } from '@/components/ui/button';
 import { CARD_INSET, cardMaterialFor, cardShape } from '@/components/ui/card-material';
 import { CoverHalo } from '@/components/ui/cover-halo';
 import { TrailerBackdrop } from '@/components/trailer-backdrop';
+import { PING_GLYPH, usePingTo } from '@/components/pings/use-ping-to';
 import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
 import { heroHeightFor } from '@/components/ui/hero-art';
 import { HandoffTitle } from '@/components/ui/handoff-title';
@@ -463,6 +464,7 @@ export default function GameDetailScreen() {
      a day and nothing from IGDB. One switch for both pages. */
   const trailer = useGameTrailer(id ?? null);
   const trailers = useTrailerSetting();
+  const pingTo = usePingTo();
   const playingTrailer = trailers.ready && trailers.on ? (trailer?.url ?? null) : null;
 
   const collectionId = extras.data?.collection?.id ?? null;
@@ -1429,6 +1431,23 @@ export default function GameDetailScreen() {
                   {/* Share, at the top right as on every other page that has
                         it — the action row gave its slot to Collect, and the
                         page had none until the owner put it here (2026-10-21). */}
+                  {/* Ping it to somebody — the app's own way of sharing,
+                      before the system's. */}
+                  {pingTo && (
+                    <TopBarDisc
+                      icon={PING_GLYPH}
+                      label={`Ping ${data.title} to someone`}
+                      onPress={() =>
+                        pingTo({
+                          kind: 'game',
+                          targetId: data.id,
+                          title: data.title,
+                          subtitle: [data.developer, data.releaseYear].filter(Boolean).join(' · '),
+                          imageUrl: data.coverUrl,
+                        })
+                      }
+                    />
+                  )}
                   <TopBarDisc
                     icon="share-outline"
                     label={`Share ${data.title}`}
@@ -1610,7 +1629,7 @@ function GameSheets({ store, game, log }: { store: SheetStore; game: Game; log: 
 function shareGame(game: Game) {
   const year = game.releaseDate ? ` (${new Date(game.releaseDate).getUTCFullYear()})` : '';
   const url = Linking.createURL(`/game/${game.id}`);
-  Share.share({ message: `${game.title}${year} on GameLog\n${url}` }).catch(() => undefined);
+  Share.share({ message: `${game.title}${year} on Pinged\n${url}` }).catch(() => undefined);
 }
 
 const styles = StyleSheet.create({

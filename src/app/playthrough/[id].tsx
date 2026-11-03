@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
@@ -27,6 +27,7 @@ import type { CompletionLevel, PlaythroughRow } from '@/lib/database.types';
 import { getGameById, type Game } from '@/lib/games';
 import { platformOptionsFor } from '@/lib/platform-options';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/components/ui/dialog';
 
 const MAX_NOTES = 500;
 
@@ -180,7 +181,7 @@ function PlaythroughForm({
   });
 
   function confirmRemove() {
-    Alert.alert(
+    showAlert(
       `Delete playthrough #${number}?`,
       'Your log of the game stays as it is — this removes only this run.',
       [

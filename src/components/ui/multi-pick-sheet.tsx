@@ -1,14 +1,14 @@
 import { useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FlatList, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Checkbox } from '@/components/ui/selection-marks';
 import { Text } from '@/components/ui/text';
+import { Tray } from '@/components/ui/tray';
 import { TextField } from '@/components/ui/text-field';
-import { Elevation, Radius, Spacing, TapTarget } from '@/constants/theme';
+import { Spacing, TapTarget } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Lists longer than this get a field to find a name in. */
@@ -32,7 +32,7 @@ function fold(text: string): string {
  * easier to arrange and pick" (2026-10-16). Changes apply as they are made;
  * Done only closes.
  *
- * A React Native `<Modal>`, as the filter bar's sheets are: the form it opens
+ * A tray (`<Tray>`, reacticx's), as the filter bar's sheets are: the form it opens
  * from is inside a scroller, and a sheet drawn in place there would scroll with
  * it.
  */
@@ -55,7 +55,6 @@ export function MultiPickSheet<K extends string | number>({
   onClose: () => void;
 }) {
   const theme = useTheme();
-  const insets = useSafeAreaInsets();
   const [typed, setTyped] = useState('');
 
   /* What was chosen when the sheet opened leads, in the list's own order, so
@@ -75,29 +74,14 @@ export function MultiPickSheet<K extends string | number>({
   }
 
   return (
-    <Modal
+    <Tray
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
       onShow={() => {
         setTyped('');
         setPinned(selected);
       }}>
-      {/* The scrim closes it. */}
-      <Pressable
-        style={[styles.scrim, { backgroundColor: theme.scrim }]}
-        onPress={onClose}
-        accessibilityRole="button"
-        accessibilityLabel="Close"
-      />
-
-      <View
-        style={[
-          styles.panel,
-          { backgroundColor: theme.surface, borderColor: theme.border },
-          Elevation.overlay,
-        ]}>
+      <View style={styles.panel}>
         <View style={[styles.head, { borderBottomColor: theme.border }]}>
           <View style={styles.headText}>
             <Text variant="h3" accessibilityRole="header">
@@ -159,11 +143,7 @@ export function MultiPickSheet<K extends string | number>({
           }}
         />
 
-        <View
-          style={[
-            styles.foot,
-            { borderTopColor: theme.border, paddingBottom: Spacing.x12 + insets.bottom },
-          ]}>
+        <View style={[styles.foot, { borderTopColor: theme.border, paddingBottom: Spacing.x12 }]}>
           <View style={styles.footButton}>
             <Button
               title="Clear"
@@ -183,26 +163,14 @@ export function MultiPickSheet<K extends string | number>({
           </View>
         </View>
       </View>
-    </Modal>
+    </Tray>
   );
 }
 
 const styles = StyleSheet.create({
-  scrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  /* Anchored to the bottom and capped: a sheet that filled the display would
-     be a screen, and this is a disclosure. */
-  panel: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    maxHeight: '80%',
-    borderTopLeftRadius: Radius.sheet,
-    borderTopRightRadius: Radius.sheet,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: 0,
-    overflow: 'hidden',
-  },
+  /* In a tray (`<Tray>`), which caps it at 80% of the display: a sheet that
+     filled it would be a screen, and this is a disclosure. */
+  panel: { flexShrink: 1 },
   head: {
     flexDirection: 'row',
     alignItems: 'center',

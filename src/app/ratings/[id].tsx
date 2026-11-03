@@ -106,7 +106,7 @@ export default function GameRatersScreen() {
         </Text>
       )}
       <Text variant="body" color="textSecondary">
-        Everyone who scored it on GameLog — with a review, or with a log alone.
+        Everyone who scored it on Pinged — with a review, or with a log alone.
       </Text>
 
       <DropdownButton label="Sort by" value={sort} options={SORT_OPTIONS} onChange={changeSort} />

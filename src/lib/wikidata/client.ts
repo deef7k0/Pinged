@@ -36,7 +36,7 @@ export const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
  * verified. Anything that loads a Wikimedia image passes this as a header.
  */
 export const USER_AGENT =
-  'GameLog/1.0 (com.nomicoprod.gamelog; studio logos from Wikimedia Commons)';
+  'Pinged/1.0 (com.nomicoprod.gamelog; studio logos from Wikimedia Commons)';
 
 /** Long enough for a slow mobile connection; short enough that a dead one ends in the error state. */
 const REQUEST_TIMEOUT_MS = 15_000;

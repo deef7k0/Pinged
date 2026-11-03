@@ -30,7 +30,13 @@ export type ReportTarget =
 export function isUserContentTarget(
   target: ReportTarget
 ): target is Extract<ReportTarget, { kind: UserContentKind }> {
-  return target.kind === 'comment' || target.kind === 'wall_post' || target.kind === 'profile';
+  return (
+    target.kind === 'comment' ||
+    target.kind === 'wall_post' ||
+    target.kind === 'profile' ||
+    target.kind === 'ping' ||
+    target.kind === 'ping_suggestion'
+  );
 }
 
 /** PostgREST's "no such table / function": the database predates 0045. */
@@ -291,6 +297,35 @@ export async function getReportedContent(
     if (!data) return null;
     const row = data as unknown as { body: string; author: Author };
     return { authorName: nameOf(row.author), quote: row.body };
+  }
+
+  if (target.kind === 'ping') {
+    const { data, error } = await supabase
+      .from('pings')
+      .select('description, profile:profiles(username, display_name)')
+      .eq('id', target.targetId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return null;
+    const row = data as unknown as { description: string; profile: Author };
+    return { authorName: nameOf(row.profile), quote: row.description };
+  }
+
+  if (target.kind === 'ping_suggestion') {
+    const { data, error } = await supabase
+      .from('ping_suggestions')
+      .select('message, profile:profiles(username, display_name), game:games(title)')
+      .eq('id', target.targetId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return null;
+    const row = data as unknown as {
+      message: string | null;
+      profile: Author;
+      game: { title: string } | null;
+    };
+    const quote = [row.game?.title, row.message?.trim()].filter(Boolean).join(' — ');
+    return { authorName: nameOf(row.profile), quote: quote || null };
   }
 
   const { data, error } = await supabase

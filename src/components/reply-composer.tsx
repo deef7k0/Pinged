@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, TextInput, View, type TextStyle } from 'react-native';
+import { StyleSheet, TextInput, View, type TextStyle } from 'react-native';
 
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
@@ -10,6 +10,7 @@ import { FontFamily } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { addComment, type TargetType } from '@/lib/api';
 import { useAuth } from '@/store/auth';
+import { Loader } from '@/components/ui/loader';
 
 /** `**` for bold, `*` for italic — what `<RichText>` reads back. */
 type Marker = '**' | '*';
@@ -127,7 +128,7 @@ export function ReplyComposer({
             { backgroundColor: canSend ? theme.white : theme.controlFill },
           ])}>
           {send.isPending ? (
-            <ActivityIndicator size="small" color={theme.textMuted} />
+            <Loader size="small" color={theme.textMuted} />
           ) : (
             <Ionicons
               name="arrow-up"

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
@@ -9,8 +9,9 @@ import { PressableScale } from '@/components/ui/pressable-scale';
 import { useSelectable } from '@/components/ui/selectable';
 import { SelectionCard } from '@/components/ui/selection-card';
 import { Text } from '@/components/ui/text';
+import { Tray } from '@/components/ui/tray';
 import { TextField } from '@/components/ui/text-field';
-import { ControlHeight, Elevation, Radius, SmallControlSlop, Spacing } from '@/constants/theme';
+import { ControlHeight, Radius, SmallControlSlop, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { EARLIEST_IGDB_YEAR, getGenres, getPlatforms, type GameFilters } from '@/lib/games';
 
@@ -396,7 +397,7 @@ function YearColumn({
 /**
  * The shared sheet chrome: a scrim, a titled panel, a close control.
  *
- * `<Modal>` from React Native rather than a routed screen — these are
+ * A tray (`<Tray>`, reacticx's) rather than a routed screen — these are
  * disclosures belonging to one control on one screen, not destinations, and
  * routing them would put four entries in the history stack between opening the
  * picker and choosing a game.
@@ -415,17 +416,8 @@ function Sheet({
   const theme = useTheme();
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      {/* The scrim dismisses. `Pressable` rather than a touchable wrapper so the
-          panel below can stop the press from reaching it. */}
-      <Pressable style={[styles.scrim, { backgroundColor: theme.scrim }]} onPress={onClose} />
-
-      <View
-        style={[
-          styles.panel,
-          { backgroundColor: theme.surface, borderColor: theme.border },
-          Elevation.overlay,
-        ]}>
+    <Tray visible={visible} onClose={onClose} maxHeightRatio={0.75}>
+      <View style={styles.panel}>
         <View style={[styles.panelHead, { borderBottomColor: theme.border }]}>
           <Text variant="h3">{title}</Text>
           <IconButton icon="close" accessibilityLabel="Close" size="small" onPress={onClose} />
@@ -433,7 +425,7 @@ function Sheet({
 
         {children}
       </View>
-    </Modal>
+    </Tray>
   );
 }
 
@@ -485,21 +477,9 @@ const styles = StyleSheet.create({
   },
   clearAll: { justifyContent: 'center', paddingHorizontal: Spacing.x8 },
 
-  scrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  /* Anchored to the bottom and capped at three quarters of the screen: a sheet
+  /* In a tray (`<Tray>`), capped at three quarters of the screen: a sheet
      that filled the display would be a screen, and this is a disclosure. */
-  panel: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    maxHeight: '75%',
-    borderTopLeftRadius: Radius.sheet,
-    borderTopRightRadius: Radius.sheet,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: 0,
-    overflow: 'hidden',
-  },
+  panel: { flexShrink: 1 },
   panelHead: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -340,7 +340,7 @@ export function GameReviewsSheet({
         {/* The app's own, headed as a section so it reads as the second of
             two — and so a sheet with no critics still says whose these are. */}
         <Text variant="h4" accessibilityRole="header" style={styles.members}>
-          GameLog reviews
+          Pinged reviews
         </Text>
 
         {/* The same summary the Ratings card on the Overview draws

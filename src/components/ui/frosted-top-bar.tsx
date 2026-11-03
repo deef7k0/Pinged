@@ -1,12 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { createContext, memo, useContext, useState, type ReactNode } from 'react';
 import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
+  Extrapolation,
+  interpolate,
   runOnJS,
-  useAnimatedProps,
   useAnimatedReaction,
   useAnimatedStyle,
   useDerivedValue,
@@ -27,6 +29,7 @@ import {
   BAR_SLIDE,
   BAR_SPRING,
   FROST,
+  HEADER_FADE,
   TOP_BAR_DISC,
   TOP_BAR_DISC_ROOM,
   TOP_BAR_EDGE,
@@ -39,7 +42,6 @@ import {
   TOP_BAR_TITLE_INSET,
   barTitleOpacity,
   discShift,
-  frostStrength,
   glassIn,
   handoffWeight,
   isScrolled,
@@ -84,25 +86,6 @@ const PANE_SCRIM = 0.27;
 
 /** Compose's `FastOutSlowInEasing`, the default of the reference's `tween(300)`. */
 const FROST_EASING = Easing.bezier(...FROST.easing);
-
-/*
- * The glass bar's blur (`glass`), where there is one to be had: iOS, and
- * Android from 12, where the blur view's own hardware method runs. Below that
- * the bar is its wash, opaque — SimpMusic's rule, and for its reason: the old
- * path blurs a strip the width of the display in software on every frame.
- */
-const GLASS_BLURS = Platform.OS !== 'android' || Number(Platform.Version) >= 31;
-
-/**
- * The blur at full strength, as each platform is asked for it, and what
- * Android divides that by to get a radius — `FROST.androidIntensity` has the
- * arithmetic (Android paints its own grey over the blur in proportion to the
- * strength, so it is asked for a strength its grey cannot be seen at).
- */
-const GLASS_MAX = Platform.OS === 'android' ? FROST.androidIntensity : FROST.intensity;
-const ANDROID_REDUCTION = FROST.androidIntensity / FROST.androidRadius;
-
-const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
 /**
  * A page that opens on artwork and does not say how tall its header is: this
@@ -251,6 +234,13 @@ export type FrostedTopBarProps = {
    * before `header`'s reveal.
    */
   handoff?: { from: number; to: number };
+  /**
+   * `false` keeps the page's name in the bar from the start instead of large
+   * at the top of the content (reacticx's animated header). `<Screen>` reads
+   * it. For a page whose list sits under a row of tabs, where a large title
+   * would land under the tabs.
+   */
+  largeTitle?: boolean;
 };
 
 export const FrostedTopBar = memo(function FrostedTopBar({
@@ -339,25 +329,53 @@ function PlainBar({
   const inset = useTopBarInset();
   const scrollY = usePageOffset();
   const pulse = usePulse();
-  const frost = useSharedValue(0);
+  const still = useSharedValue(0);
+  const drawn = chrome?.largeTitleDrawn ?? still;
+  const large = !!chrome?.largeTitle;
 
-  /* A fade, so it runs unchanged under Reduce Motion: nothing here moves. */
-  useAnimatedReaction(
-    () => isScrolled(scrollY.get()),
-    (scrolled, was) => {
-      if (scrolled === was) return;
-      frost.set(withTiming(scrolled ? 1 : 0, { duration: FROST.ms, easing: FROST_EASING }));
-    }
+  /* reacticx's header: the fade comes in over the first 80dp of scroll —
+     with the finger, not on a timer. */
+  const frost = useDerivedValue(() =>
+    interpolate(scrollY.get(), [0, HEADER_FADE.reach], [0, 1], Extrapolation.CLAMP)
   );
+
+  /* While the page draws its name large, the bar's own fades and rises in
+     as that one leaves (reacticx's `smallHeaderStyle`, timed 600ms). */
+  const titleStyle = useAnimatedStyle(() => {
+    pulse.get();
+    if (!large || drawn.get() === 0) return { opacity: 1, transform: [{ translateY: 0 }] };
+    const t = interpolate(
+      scrollY.get(),
+      [HEADER_FADE.smallFrom, HEADER_FADE.smallTo],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
+    return {
+      opacity: withTiming(t, { duration: HEADER_FADE.smallMs }),
+      transform: [
+        {
+          translateY: withTiming((1 - t) * HEADER_FADE.smallRise, {
+            duration: HEADER_FADE.smallMs,
+          }),
+        },
+      ],
+    };
+  });
 
   return (
     /* Not `box-none`: once the page is under the bar, a tap on the bar must
-       not reach a row the frost is hiding. At the top of the page there is
+       not reach a row the fade is hiding. At the top of the page there is
        nothing under it to reach — the page kept this room clear. */
     <View style={[styles.layer, { height: inset + TOP_BAR_ROW }]}>
       <Frost progress={frost} pulse={pulse} tint={chrome?.background ?? theme.background} />
       <BarRow inset={inset} leading={leading} right={right}>
-        <BarTitle title={title} leading={!!leading} centre={centerTitle} />
+        {centerTitle ? (
+          <BarTitle title={title} leading={!!leading} centre />
+        ) : (
+          <Animated.View style={[styles.titleSlot, titleStyle]}>
+            <BarTitle title={title} leading={!!leading} centre={false} />
+          </Animated.View>
+        )}
       </BarRow>
     </View>
   );
@@ -580,7 +598,10 @@ function GlassBar({
         pointerEvents={pinned ? 'auto' : 'none'}
         accessibilityElementsHidden={!pinned}
         importantForAccessibility={pinned ? 'auto' : 'no-hide-descendants'}>
-        <GlassFrost progress={shown} pulse={pulse} tint={chrome?.background ?? theme.background} />
+        {/* reacticx's header fade, as every bar's ground (2026-11-02, "across
+            the app"); it was Apple's blurred glass here from 2026-10-23. The
+            discs, the centred name and the handoff are unchanged. */}
+        <Frost progress={shown} pulse={pulse} tint={chrome?.background ?? theme.background} />
         <Animated.View
           style={[
             styles.glassTitle,
@@ -615,89 +636,6 @@ function GlassBar({
 }
 
 /**
- * The glass: the page behind the bar, blurred, and the page's own colour over
- * it at `FROST.glassTint` — the bar's frost as it was before the owner had it
- * removed from every other bar, kept for the one that asks for it.
- *
- * It fades by its **strength**, never by anybody's opacity: a blur inside a
- * view that is itself fading is not a blur on iOS until the fade ends. So
- * `progress` drives the blur's intensity and the wash together.
- *
- * Two things Android's blur view does, both of which bit this bar before:
- *
- *  - **It cannot be set up at a strength of nothing** ("nativePtr is null").
- *    So the strength never reaches zero (`frostStrength`), and what hides the
- *    glass while it is away is the `veil` — an opacity that is 0 or 1 and
- *    nothing between, so it is never a fade over a blur.
- *  - **It paints its own grey over the blur, in proportion to the strength.**
- *    So it is asked for a small strength and the radius is made up through
- *    `blurReductionFactor`; the wash is then the only tint.
- *
- * Every style reads `pulse` and carries a transform, and the strength moves by
- * a hundredth on alternate renders — see `usePulse`.
- */
-function GlassFrost({
-  progress,
-  pulse,
-  tint,
-}: {
-  progress: SharedValue<number>;
-  pulse: SharedValue<number>;
-  tint: string;
-}) {
-  const chrome = useScreenChrome();
-
-  const blur = useAnimatedProps(() => {
-    const nudge = (pulse.get() % 2) * 0.01;
-    return { intensity: frostStrength(progress.get(), GLASS_MAX, FROST.floor) + nudge };
-  });
-  const veil = useAnimatedStyle(() => {
-    pulse.get();
-    return { opacity: progress.get() > 0 ? 1 : 0, transform: [{ translateY: 0 }] };
-  });
-  const wash = useAnimatedStyle(() => {
-    pulse.get();
-    return { opacity: progress.get(), transform: [{ translateY: 0 }] };
-  });
-
-  return (
-    <View style={styles.fill} pointerEvents="none">
-      {/* Not mounted where there is no blur: the old software path would
-          redraw the page into a bitmap every frame for a frost the opaque
-          wash below covers anyway. */}
-      {GLASS_BLURS && (
-        <Animated.View style={[styles.fill, veil]}>
-          <AnimatedBlurView
-            animatedProps={blur}
-            /* iOS's navigation-bar material — the very one Apple's bars are
-               drawn in, saturation and all. On Android the tint is only the
-               near-invisible grey `FROST.androidIntensity` keeps it to. */
-            tint={
-              Platform.OS === 'ios' ? 'systemChromeMaterialDark' : 'systemUltraThinMaterialDark'
-            }
-            style={styles.fill}
-            {...(Platform.OS === 'android'
-              ? {
-                  blurMethod: 'dimezisBlurViewSdk31Plus' as const,
-                  blurTarget: chrome?.blurTarget,
-                  blurReductionFactor: ANDROID_REDUCTION,
-                }
-              : null)}
-          />
-        </Animated.View>
-      )}
-      <Animated.View
-        style={[
-          styles.fill,
-          { backgroundColor: withAlpha(tint, GLASS_BLURS ? FROST.glassTint : 1) },
-          wash,
-        ]}
-      />
-    </View>
-  );
-}
-
-/**
  * A top bar for a root tab, which has nothing to go back to — Home's: its row
  * at the top of the page, clear at the top and the page's colour under way
  * like any other.
@@ -725,15 +663,10 @@ export function FoldingTopBar({
   const inset = useTopBarInset();
   const scrollY = usePageOffset();
   const pulse = usePulse();
-  const frost = useSharedValue(0);
-
-  /* A fade, so it runs unchanged under Reduce Motion: nothing here moves. */
-  useAnimatedReaction(
-    () => isScrolled(scrollY.get()),
-    (scrolled, was) => {
-      if (scrolled === was) return;
-      frost.set(withTiming(scrolled ? 1 : 0, { duration: FROST.ms, easing: FROST_EASING }));
-    }
+  /* reacticx's header fade, with Home's keys over it (the owner's,
+     2026-11-02): no name is added — Home has its chips. */
+  const frost = useDerivedValue(() =>
+    interpolate(scrollY.get(), [0, HEADER_FADE.reach], [0, 1], Extrapolation.CLAMP)
   );
 
   return (
@@ -747,9 +680,11 @@ export function FoldingTopBar({
 }
 
 /**
- * What the bar is over the page: the page's own colour, solid, faded in by
- * `progress` — clear at the top of a page, and a band of the page under it
- * once there is something under it.
+ * What the bar is over the page: reacticx's header fade (`HEADER_FADE`) —
+ * the page's own colour at 85% under the row, thinning to nothing fifty dp
+ * below it — faded in by `progress`: clear at the top of a page, the fade
+ * once there is something under it. It was the page's colour, solid, from
+ * 2026-10-14 to 2026-11-02.
  *
  * **No blur.** The bar was frost — the page behind it blurred, with its colour
  * washed over the blur (the reference's `barBlurStyle`) — and the owner had
@@ -773,10 +708,54 @@ function Frost({
     return { opacity: progress.get(), transform: [{ translateY: 0 }] };
   });
 
+  /* The page's colour at 85%, 80% halfway, nothing at the foot — ending on
+     the colour at alpha 0, never a keyword (Android fades through black). */
+  const colours = [
+    withAlpha(tint, HEADER_FADE.alphas[0]),
+    withAlpha(tint, HEADER_FADE.alphas[1]),
+    withAlpha(tint, HEADER_FADE.alphas[2]),
+  ] as const;
+
   return (
     <View style={styles.fill} pointerEvents="none">
-      <Animated.View style={[styles.fill, { backgroundColor: tint }, wash]} />
+      <Animated.View style={[styles.fade, wash]}>
+        <LinearGradient colors={colours} style={styles.fill} />
+      </Animated.View>
     </View>
+  );
+}
+
+/**
+ * reacticx's header fade for a header the page does not scroll under —
+ * Search's field and tabs, the Profile tab's row: placed at the top of the
+ * content under that header, it carries the header's colour down over the
+ * list and thins to nothing `HEADER_FADE.tail` below, appearing over the
+ * first 80dp of scroll. The list dissolves into the header, as it does under
+ * every other bar (2026-11-02, "across the app").
+ */
+export function HeaderFade() {
+  const theme = useTheme();
+  const chrome = useScreenChrome();
+  const scrollY = usePageOffset();
+  const pulse = usePulse();
+  const tint = chrome?.background ?? theme.background;
+  const style = useAnimatedStyle(() => {
+    pulse.get();
+    return {
+      opacity: interpolate(scrollY.get(), [0, HEADER_FADE.reach], [0, 1], Extrapolation.CLAMP),
+      transform: [{ translateY: 0 }],
+    };
+  });
+  /* From the header's own colour, whole, to nothing — continuing it. */
+  const colours = [
+    withAlpha(tint, 1),
+    withAlpha(tint, HEADER_FADE.alphas[1]),
+    withAlpha(tint, 0),
+  ] as const;
+  return (
+    <Animated.View style={[styles.headerFade, style]} pointerEvents="none">
+      <LinearGradient colors={colours} locations={[0, 0.35, 1]} style={styles.fill} />
+    </Animated.View>
   );
 }
 
@@ -1068,4 +1047,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   fill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  /* reacticx's header ground runs `tail` past the bar's foot, fading out. */
+  fade: { position: 'absolute', top: 0, left: 0, right: 0, bottom: -HEADER_FADE.tail },
+  titleSlot: { flex: 1, minWidth: 0, flexDirection: 'row' },
+  headerFade: { position: 'absolute', top: 0, left: 0, right: 0, height: HEADER_FADE.tail },
 });

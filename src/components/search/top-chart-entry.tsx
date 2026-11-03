@@ -59,7 +59,7 @@ export function TopChartEntry() {
 
   const games: ChartEntry[] =
     (useCritics || ranking.isError ? critics.data : gamelog.data)?.slice(0, SHOWN) ?? [];
-  const whose = useCritics || ranking.isError ? 'by the critics' : 'on GameLog';
+  const whose = useCritics || ranking.isError ? 'by the critics' : 'on Pinged';
   const cards: FanCard[] = Array.from({ length: SHOWN }, (_, index) => ({
     kind: 'cover',
     uri: games[index]?.coverUrl ?? games[index]?.heroUrl ?? null,
@@ -97,7 +97,7 @@ export function TopChartEntry() {
             Top 1000
           </Text>
           <Text variant="bodySmall" color="textSecondary">
-            The best-reviewed games, ranked on GameLog or by the critics
+            The best-reviewed games, ranked on Pinged or by the critics
           </Text>
           {leader && (
             <Text variant="bodySmall" color="textMuted" numberOfLines={1} style={styles.leader}>

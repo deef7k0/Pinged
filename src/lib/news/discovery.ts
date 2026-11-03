@@ -1,7 +1,7 @@
 import { igdbQuery } from '../games/igdb';
 import { editionKindFor } from '../../constants/game-editions';
 import { makeGameId, type GameSearchResult } from '../games';
-import type { ChartEntry, GameEvent, PopularChart, Trailer } from './types';
+import type { ChartEntry, GameEvent, PopularChart } from './types';
 
 /**
  * Everything on the News tab that is *about games* rather than about articles:
@@ -127,53 +127,6 @@ export const LITE_FIELDS = `
          involved_companies.developer, involved_companies.company.name,
          cover.image_id, artworks.image_id, screenshots.image_id;
 `;
-
-// ---------------------------------------------------------------------------
-// Trailers
-// ---------------------------------------------------------------------------
-
-/**
- * Recent trailers, taken from games released in the last few months that have
- * video attached.
- *
- * Uses the `games` endpoint with a nested `videos` expansion rather than
- * `game_videos` directly, so it needs no change to the Edge Function allowlist.
- */
-export async function getRecentTrailers(signal?: AbortSignal): Promise<Trailer[]> {
-  const since = unixDaysFromNow(-120);
-  const until = unixDaysFromNow(30);
-
-  const raw = await igdbQuery<IgdbGameLite[]>(
-    'games',
-    `${LITE_FIELDS.replace(';', ', videos.video_id, videos.name;')}
-     where first_release_date > ${since}
-       & first_release_date < ${until}
-       & videos != null
-       & cover != null
-       & version_parent = null;
-     sort first_release_date desc;
-     limit 30;`,
-    signal
-  );
-
-  return (raw ?? []).flatMap((game) => {
-    const video = game.videos?.find((entry) => entry.video_id);
-    if (!video?.video_id) return [];
-
-    return [
-      {
-        id: `${game.id}:${video.video_id}`,
-        gameId: makeGameId('igdb', game.id),
-        gameTitle: game.name ?? 'Untitled',
-        videoId: video.video_id,
-        name: video.name ?? 'Trailer',
-        // YouTube's thumbnail endpoint is public and needs no API key.
-        thumbnailUrl: `https://img.youtube.com/vi/${video.video_id}/hqdefault.jpg`,
-        coverUrl: igdbImage(game.cover?.image_id, 'cover_big'),
-      },
-    ];
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Releases and discovery

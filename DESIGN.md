@@ -24,6 +24,10 @@ colors:
   controlPressed: "rgba(255,255,255,0.15)"
   # The soft label on an action button (#D6D4D9 measured). 12.4:1 on its fill.
   controlInk: "#D6D6D6"
+  # The segmented control (every in-page tab row): a translucent track and a
+  # solid thumb that slides along it — reacticx's SegmentedControl.
+  segmentTrack: "rgba(255,255,255,0.08)"
+  segmentThumb: "#3A3F4B"
   # The resting edge of a choice — a selection card, a filter pill. Choices are
   # outlined; actions are filled.
   outline: "rgba(255,255,255,0.16)"
@@ -151,6 +155,12 @@ typography:
   # 10: they are badges. The scale had been zoomed out ~8%; it came back up with
   # the spacing ladder. Weights are this app's.
   # `caseTitle` / `caseEdition` are pinned and did not move: see § 2.3.
+  largeTitle:
+    fontFamily: "Inter_700Bold"
+    fontSize: "32px"
+    fontWeight: 700
+    lineHeight: "38px"
+    letterSpacing: "-0.7px"
   display:
     fontFamily: "Inter_700Bold"
     fontSize: "25px"

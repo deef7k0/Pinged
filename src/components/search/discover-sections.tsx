@@ -1,12 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link, type Href } from 'expo-router';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import { Spacing, TapTarget, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { Loader } from '@/components/ui/loader';
 
 /**
  * The pieces of an untyped Search tab drawn as sections — Reviews' "Popular
@@ -59,7 +60,7 @@ export function SeeAll({ href, label }: { href: Href; label: string }) {
 
 export function SectionLoading() {
   const theme = useTheme();
-  return <ActivityIndicator color={theme.textMuted} style={styles.loading} />;
+  return <Loader color={theme.textMuted} style={styles.loading} />;
 }
 
 /** A section that failed says so in place. */

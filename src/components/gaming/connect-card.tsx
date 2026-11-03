@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -8,6 +8,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useAccountLink } from '@/hooks/use-gaming';
 import type { GamingProvider } from '@/lib/database.types';
 import { requireProvider } from '@/lib/gaming';
+import { showAlert } from '@/components/ui/dialog';
 
 /**
  * Connect / disconnect control for a gaming account.
@@ -69,7 +70,7 @@ export function ConnectAccountCard({
              a rate-limited API to rebuild, and the button fired on the first
              tap with nothing said about what was being thrown away. */
           onPress={() =>
-            Alert.alert(
+            showAlert(
               `Disconnect ${instance.label}?`,
               'Your imported library, achievements and badges will be removed. You can reconnect at any time.',
               [
@@ -98,7 +99,7 @@ export function ConnectAccountCard({
 
       {!linked && (
         <Text variant="caption" color="textMuted">
-          GameLog never sees your Steam password — Steam handles the sign-in and only tells us your
+          Pinged never sees your Steam password — Steam handles the sign-in and only tells us your
           account id.
         </Text>
       )}

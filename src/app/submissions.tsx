@@ -82,7 +82,7 @@ export default function SubmissionsScreen() {
           ) : (
             <EmptyState
               title="No submissions yet"
-              message="When you scan a barcode Gamelog does not know, you can describe the release — it shows up here."
+              message="When you scan a barcode Pinged does not know, you can describe the release — it shows up here."
             />
           )
         }

@@ -21,8 +21,8 @@ import { Text } from '@/components/ui/text';
 import { footHeight } from '@/constants/cover-rail';
 import type { EditionKind } from '@/constants/game-editions';
 import { clampScore, scoreColor } from '@/constants/score';
-import { slideHeight } from '@/constants/search-spotlight';
-import { FontFamily, Spacing } from '@/constants/theme';
+import { discoverGeometry } from '@/constants/discover-carousel';
+import { FontFamily, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { getBelovedGames, getUserLogs, type BelovedPeriod } from '@/lib/api';
 import { getSimilarTo } from '@/lib/games';
@@ -224,7 +224,9 @@ export function DiscoverFeed() {
   const linedRailHeight = rail.cover.height + lineFoot;
 
   function onScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    const away = event.nativeEvent.contentOffset.y > slideHeight(width) * SLIDER_GONE;
+    const away =
+      event.nativeEvent.contentOffset.y >
+      discoverGeometry(Math.min(width, MaxContentWidth)).height * SLIDER_GONE;
     if (away !== sliderAway) setSliderAway(away);
   }
 
@@ -258,12 +260,18 @@ export function DiscoverFeed() {
           tintColor={theme.primary}
         />
       }>
-      <SpotlightSlider
-        spotlight={spotlight.data ?? null}
-        loading={spotlight.isPending}
-        now={now}
-        away={sliderAway}
-      />
+      {/* The month's biggest releases, the most awaited game and the
+          calendar, as Home's carousel moving by itself (2026-11-02). The
+          heading is the reference's "You might like it", stating what the
+          row is. */}
+      <HomeSection title="Out now and coming soon">
+        <SpotlightSlider
+          spotlight={spotlight.data ?? null}
+          loading={spotlight.isPending}
+          now={now}
+          away={sliderAway}
+        />
+      </HomeSection>
 
       <HomeSection title="Popular this month" seeAll="/top-games">
         {topTen.isLoading ? (
@@ -324,7 +332,7 @@ export function DiscoverFeed() {
                   </Text>
                 )}
                 labelOf={(game) =>
-                  `${game.title}, rated ${game.average} on GameLog from ${game.ratings} ${
+                  `${game.title}, rated ${game.average} on Pinged from ${game.ratings} ${
                     game.ratings === 1 ? 'score' : 'scores'
                   }`
                 }
@@ -362,9 +370,9 @@ export function DiscoverFeed() {
 }
 
 const styles = StyleSheet.create({
-  /* `x32` between bands, matching Home, and from the slider to the first of
-     them. No padding above the slider: it starts where the tab row ends. */
-  content: { gap: Spacing.x32, paddingBottom: Spacing.x48 },
+  /* `x32` between bands, matching Home. The first heading stands a little
+     under the tab row. */
+  content: { gap: Spacing.x32, paddingTop: Spacing.x12, paddingBottom: Spacing.x48 },
   /* The bold family: Android synthesises no weight for a custom font. */
   score: { fontFamily: FontFamily.bold, fontVariant: ['tabular-nums'] },
   /* The last period's covers, while the chosen one is on its way. */

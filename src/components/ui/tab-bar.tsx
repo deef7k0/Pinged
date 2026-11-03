@@ -1,20 +1,24 @@
 import type Ionicons from '@expo/vector-icons/Ionicons';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { useReducedMotion } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import { useEffect, useRef, useState } from 'react';
+import { Platform, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 
-import { PaintFill, PaintGlyph, inkTransition } from '@/components/ui/paint-fill';
+import { PaintGlyph, inkTransition } from '@/components/ui/paint-fill';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
-import {
-  ControlHeight,
-  Radius,
-  SmallControlSlop,
-  Spacing,
-  TapTarget,
-  Type,
-  withAlpha,
-} from '@/constants/theme';
+import { Radius, Spacing, TapTarget, Type, withAlpha } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
+import { usePulse } from '@/hooks/use-pulse';
 import { useTheme } from '@/hooks/use-theme';
 import { readableInk } from '@/lib/color';
 
@@ -31,13 +35,7 @@ export type TabItem<T extends string> = {
    * you have not seen", which is a different claim — pass `alert` for that.
    */
   count?: number | null;
-  /**
-   * Render the count as an unread badge instead of an inline number.
-   *
-   * For genuinely new things — pending friend requests, unread replies. Rare
-   * enough to be opt-in, because a library that says 135 in red is shouting at
-   * someone about their own shelf.
-   */
+  /** Render the count as an unread badge instead of an inline number. */
   alert?: boolean;
 };
 
@@ -47,94 +45,75 @@ export type TabBarProps<T extends string> = {
   onChange: (value: T) => void;
   /**
    * What this set of tabs is choosing between — "What to search", "Library view".
-   *
-   * Read out before the tabs themselves, so a screen-reader user is told what
-   * the row decides rather than just hearing four words in a line.
+   * Read out before the tabs themselves.
    */
   label?: string;
   /**
-   * Draw the glyph and drop the printed word.
-   *
-   * Every tab must still carry an `icon` and a `label`: the label becomes the
-   * accessible name, so a screen reader hears "Collections, tab 2 of 4" exactly
-   * as it did before. Only sighted readers lose the word.
-   *
-   * **That loss is real** — an icon strip is recognition rather than reading,
-   * and it is only affordable where the glyphs are conventions the reader has
-   * already met. Use it where the set is small, stable and iconic; a row of five
-   * invented marks is a puzzle, not a control.
-   *
-   * The row also stops scrolling in this mode and divides the width evenly.
-   * Glyphs are all the same size, so there is nothing to scroll for, and an
-   * icon strip that ran off the edge would hide a destination behind a gesture
-   * with nothing to suggest it.
+   * Draw the glyph and drop the printed word. Every tab must still carry an
+   * `icon` and a `label`: the label becomes the accessible name. Use it where
+   * the set is small, stable and iconic (the profile's four).
    */
   iconOnly?: boolean;
   /**
-   * Where a short row sits when it does not fill the width.
-   *
-   * `start` (the default) is right for a bar that is one of several things on a
-   * line, and for any row long enough to scroll — a centred row that overflows
-   * would start mid-label.
-   *
-   * `center` is for a bar that is *the* control on its own line and has too few
-   * tabs to reach the edges. Centring costs nothing when the content overflows —
-   * `flexGrow` only has slack to distribute when there is slack. (The game page
-   * used it, after left-aligned it read as a row that had lost something; it
-   * uses `spread` now.)
-   *
-   * `spread` shares the row out: every tab the same width, the first on the
-   * left margin, the last on the right, 4 apart — taller than a chip, with a
-   * larger label. The game page's three, at the owner's direction (2026-10-15):
-   * first "overview touches the left margin and similar touches the right
-   * margin", then, seeing chips at their own widths with wide gaps between,
-   * "too small and far apart… big enough so they barely touch and it doesnt
-   * scroll and its alligned perfectly". It does not scroll, so it is for a few
-   * short labels that always fit.
+   * `spread` is the game page's: a taller track (its tabs are the page's main
+   * control, 15 type). `start` and `center` are kept for their callers and
+   * draw the same thing — a segmented control always spans its row.
    */
   align?: 'start' | 'center' | 'spread';
   /**
-   * How far in from the screen's edge the row starts and ends, when the screen
-   * it is on does not keep the app's 15.
-   *
-   * The first pill lines up with the page's content, and on every screen but
-   * one that is the app's margin — the default. The profile keeps a margin of
-   * its own (`PROFILE_MARGIN`), so its tab row has to as well.
+   * How far in from the screen's edge the track starts and ends, when the
+   * screen does not keep the app's 15 (the profile's `PROFILE_MARGIN`).
    */
   inset?: number;
 };
 
+type Segment = { x: number; width: number };
+
 /**
- * Horizontal tabs, shared by every screen that switches between views — drawn
- * as SimpMusic draws its top bar's tabs, at the owner's direction (2026-10-15:
- * "make the tabs in the app like simpmusic… the style of the tabs that
- * simpmusic uses on the top bar").
+ * reacticx's spring for the thumb: heavily overdamped, so it glides and lands
+ * without a bounce (`organisms/segmented-control`, MIT).
+ */
+const THUMB_SPRING = { stiffness: 80, damping: 90, mass: 1 } as const;
+
+/** A tap: the thumb swells to 1.3 over 350ms and wobbles back (reacticx's `triggerTapScale`). */
+const POP_SCALE = 1.3;
+const POP_MS = 350;
+const POP_RETURN = { stiffness: 10, damping: 5, mass: 0.8 } as const;
+/** Held for a scrub: 1.2, and back on release. */
+const SCRUB_SCALE = 1.2;
+
+/** Between the track's edge and the thumb (reacticx's 2dp margin). */
+const TRACK_PAD = 2;
+
+/**
+ * The app's tabs — reacticx's segmented control (the owner's, 2026-11-02:
+ * "Make the tabs in the app look like this", `organisms/segmented-control`,
+ * read from its source). One implementation: every in-page tab row is this.
  *
- * Read from its source, not its screenshots: `ui/component/ChipGroup.kt`
- * (`Chip`, an `ElevatedFilterChip`) and the rows under the top bars of
- * `HomeScreen.kt`, `LibraryScreen.kt` and `SearchScreen.kt`. So:
+ * - **A pill track with a thumb that slides along it.** The track is
+ *   translucent (`segmentTrack`), the thumb solid (`segmentThumb`) with the
+ *   reference's small shadow; on a game's page both come from its M3 scheme.
+ *   The chosen label is the bright ink, the others the quiet one, so the
+ *   choice survives without colour.
+ * - **The thumb springs** on reacticx's overdamped spring to the chosen
+ *   segment, and **a tap swells it** to 1.3 and lets it wobble back.
+ * - **Drag along it to scrub** — the thumb grows, and the tab under the
+ *   finger is chosen as it passes. Only when the row fits: a row that
+ *   scrolls gives a sideways drag to the scroll.
+ * - **Hairlines between segments**, faded out beside the thumb.
  *
- * - **A full pill, 32 high, 16 at each side** — Material's filter chip.
- * - **Unselected: no fill at all, a 1dp `outlineVariant` edge, the label in
- *   `onSurfaceVariant`.** No fill because the row mostly sits over a page or
- *   artwork, where a solid pill reads as a slab punched over it; the edge is
- *   what carries the shape.
- * - **Selected: a solid `primary` fill and its `onPrimary` label, no check.**
- *   The solid against the see-through is the selection, filled versus empty,
- *   so it survives without colour vision; a check would widen the chosen chip
- *   and shove the row sideways under the finger. **The fill pours** in from
- *   the chip's middle (`<PaintFill>`) — the owner's rule for every control that
- *   goes from an outline to solid (2026-10-15) — and drains from the one left.
- * - **The label is Material's `labelLarge`**: 14, medium, sentence case.
- * - **4 apart, 15 in from the edge**, scrolling when it overflows.
+ * Two departures, each forced by this app rather than chosen:
  *
- * The roles are the accent's own M3 set (`accent.m3`): the house blue's off a
- * game's screens, the game's palette on them — as SimpMusic's are its seed's.
+ * - **Segments are as wide as their words, sharing the slack.** reacticx's
+ *   are equal, which needs every label to fit a sixth of a phone; Search has
+ *   six scopes and "Collections" does not. When the row is wider than the
+ *   screen it scrolls, the track with it, and the chosen tab is kept in view.
+ * - **No blur flash on a tap.** reacticx sweeps an `expo-blur` view over the
+ *   control; on Android a blur needs the page as its target, which a control
+ *   inside the page cannot have (CLAUDE.md, gotchas), and would be a grey slab.
  *
- * **This replaced a wash and caps.** The selected tab was a 14% wash of the
- * accent with its label in the accent, every other tab bare muted type, and
- * every label uppercase and tracked out. The underline before that is gone for
- * the reason it always was: a rule needs an edge to sit on.
+ * It replaced SimpMusic's outlined chips with a poured `primary` fill
+ * (2026-10-15 to 2026-11-02), so `<TabBar>` no longer pours (`<PaintFill>`).
  */
 export function TabBar<T extends string>({
   tabs,
@@ -147,210 +126,291 @@ export function TabBar<T extends string>({
 }: TabBarProps<T>) {
   const theme = useTheme();
   const accent = useAccent();
-
-  const { m3 } = accent;
   const reduceMotion = useReducedMotion();
-  const fill = align === 'spread' && !iconOnly;
+  const pulse = usePulse();
+  const scroller = useRef<ScrollView>(null);
+
+  const { m3, tonal } = accent;
+  const track = tonal ? withAlpha(m3.onSurface, 0.08) : theme.segmentTrack;
+  const thumb = tonal ? m3.secondaryContainer : theme.segmentThumb;
+  const onInk = tonal ? m3.onSecondaryContainer : theme.text;
+  const offInk = tonal ? m3.onSurfaceVariant : theme.textSecondary;
+
+  const spread = align === 'spread' && !iconOnly;
+  const margin = inset ?? Spacing.x16;
+  const selected = Math.max(
+    0,
+    tabs.findIndex((tab) => tab.key === value)
+  );
+
+  /* Where each segment is, measured — the thumb goes to the chosen one. */
+  const [segments, setSegments] = useState<Record<number, Segment>>({});
+  const [viewport, setViewport] = useState(0);
+  const [content, setContent] = useState(0);
+  const overflows = content > viewport + 1;
+
+  const segmentsUi = useSharedValue<Segment[]>([]);
+  const thumbX = useSharedValue(0);
+  const thumbW = useSharedValue(0);
+  const thumbScale = useSharedValue(1);
+  const placed = useSharedValue(false);
+  const scrubbing = useSharedValue(false);
+
+  const target = segments[selected];
+
+  useEffect(() => {
+    if (!target) return;
+    if (!placed.get() || reduceMotion) {
+      thumbX.set(target.x);
+      thumbW.set(target.width);
+      placed.set(true);
+    } else {
+      thumbX.set(withSpring(target.x, THUMB_SPRING));
+      thumbW.set(withSpring(target.width, THUMB_SPRING));
+    }
+    /* Keep the chosen tab in view on a row that scrolls. */
+    if (overflows) {
+      scroller.current?.scrollTo({ x: Math.max(0, target.x - margin), animated: !reduceMotion });
+    }
+  }, [target, reduceMotion, overflows, margin, placed, thumbX, thumbW]);
+
+  const thumbStyle = useAnimatedStyle(() => {
+    /* Read so a render re-applies the settled pose (`usePulse`). */
+    pulse.get();
+    return {
+      opacity: placed.get() ? 1 : 0,
+      width: thumbW.get(),
+      transform: [{ translateX: thumbX.get() }, { scale: thumbScale.get() }],
+    };
+  });
+
+  /*
+   * The measurements are kept in a ref as they arrive and copied into state
+   * and the UI thread from the layout event itself. Never inside a `setState`
+   * updater: React runs updaters while it renders, and writing a shared value
+   * there is Reanimated's "Writing to `value` during component render" — what
+   * the first build logged on every tab press.
+   */
+  const measured = useRef<Record<number, Segment>>({});
+
+  function measure(index: number, event: LayoutChangeEvent) {
+    const { x, width } = event.nativeEvent.layout;
+    const was = measured.current[index];
+    if (was && was.x === x && was.width === width) return;
+    const next = { ...measured.current, [index]: { x, width } };
+    measured.current = next;
+    segmentsUi.set(tabs.map((_, i) => next[i] ?? { x: 0, width: 0 }));
+    setSegments(next);
+  }
+
+  function tick(style: Haptics.ImpactFeedbackStyle) {
+    /* iOS only: Android's generic buzz reads as an error (the app's rule). */
+    if (Platform.OS === 'ios') Haptics.impactAsync(style).catch(() => {});
+  }
+
+  function press(index: number) {
+    const tab = tabs[index];
+    if (!tab) return;
+    if (tab.key !== value) onChange(tab.key);
+    if (!reduceMotion) {
+      thumbScale.set(
+        withSequence(withTiming(POP_SCALE, { duration: POP_MS }), withSpring(1, POP_RETURN))
+      );
+    }
+    tick(Haptics.ImpactFeedbackStyle.Medium);
+  }
+
+  function scrubTo(index: number) {
+    const tab = tabs[index];
+    if (!tab || tab.key === value) return;
+    onChange(tab.key);
+    tick(Haptics.ImpactFeedbackStyle.Rigid);
+  }
+
+  /*
+   * reacticx's scrub. Horizontal only (`activeOffsetX` and `failOffsetY`, not
+   * its `minDistance`): the row usually sits in a page that scrolls
+   * vertically, and a drag down the page must stay the page's.
+   */
+  const scrub = Gesture.Pan()
+    .enabled(!overflows && tabs.length > 1)
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-10, 10])
+    .onStart(() => {
+      'worklet';
+      scrubbing.set(true);
+      if (!reduceMotion) thumbScale.set(withSpring(SCRUB_SCALE, { stiffness: 300, damping: 15 }));
+    })
+    .onUpdate((event) => {
+      'worklet';
+      const list = segmentsUi.get();
+      /* Segments are measured in the track's own box, as the finger is. */
+      const x = event.x;
+      let index = list.length - 1;
+      for (let i = 0; i < list.length; i++) {
+        if (x < list[i].x + list[i].width) {
+          index = i;
+          break;
+        }
+      }
+      if (index !== selected) runOnJS(scrubTo)(Math.max(0, index));
+    })
+    .onFinalize(() => {
+      'worklet';
+      scrubbing.set(false);
+      thumbScale.set(withSpring(1, { stiffness: 200, damping: 20 }));
+    });
+
   const items = tabs.map((tab, index) => {
-    const active = tab.key === value;
+    const active = index === selected;
     const showCount = tab.count != null && tab.count > 0;
-    const ink = active ? m3.onPrimary : m3.onSurfaceVariant;
+    const ink = active ? onInk : offInk;
+    /* A hairline after this segment, gone beside the thumb (reacticx's `AnimatedDivider`). */
+    const divider = index < tabs.length - 1;
+    const dividerOn = index !== selected && index !== selected - 1;
 
     return (
-      <PressableScale
-        key={tab.key}
-        accessibilityRole="tab"
-        accessibilityState={{ selected: active }}
-        accessibilityLabel={showCount ? `${tab.label}, ${tab.count}` : tab.label}
-        /* Position has to be spoken explicitly: a horizontal `ScrollView`
-           is not a list, so nothing derives "2 of 4" on its own. */
-        accessibilityHint={`${index + 1} of ${tabs.length}`}
-        onPress={() => onChange(tab.key)}
-        /* Drawn at the reference's chip height, touched at the floor. */
-        hitSlop={iconOnly ? undefined : fill ? FILL_SLOP : SmallControlSlop}
-        scaleTo={0.95}
-        pressedColor={active ? accent.pressed : theme.pressed}
-        focusRing={accent.ring}
-        style={StyleSheet.flatten([
-          styles.tab,
-          iconOnly && styles.tabIcon,
-          fill && styles.tabFill,
-          /* The fill is poured, not set (`<PaintFill>`): the chip itself stays
-             clear, and its edge takes the fill's colour once chosen so the two
-             meet without a seam. The explicit `transparent` is what the press
-             fill eases in from. */
-          {
-            backgroundColor: 'transparent',
-            borderColor: active ? m3.primary : m3.outlineVariant,
-          },
-        ])}>
-        <PaintFill on={active} color={m3.primary} />
-        {tab.icon && <PaintGlyph name={tab.icon} size={iconOnly ? 22 : 15} color={ink} />}
+      <View key={tab.key} style={styles.cell} onLayout={(event) => measure(index, event)}>
+        <PressableScale
+          accessibilityRole="tab"
+          accessibilityState={{ selected: active }}
+          accessibilityLabel={showCount ? `${tab.label}, ${tab.count}` : tab.label}
+          accessibilityHint={`${index + 1} of ${tabs.length}`}
+          onPress={() => press(index)}
+          scaleTo={0.96}
+          focusRing={accent.ring}
+          style={StyleSheet.flatten([
+            styles.segment,
+            spread && styles.segmentSpread,
+            iconOnly && styles.segmentIcon,
+          ])}>
+          {tab.icon && <PaintGlyph name={tab.icon} size={iconOnly ? 22 : 15} color={ink} />}
 
-        {!iconOnly && (
-          <Animated.Text
-            style={[
-              Type.tab,
-              fill && styles.labelFill,
-              { color: ink },
-              inkTransition(reduceMotion),
-            ]}
-            numberOfLines={1}>
-            {tab.label}
-          </Animated.Text>
-        )}
+          {!iconOnly && (
+            <Animated.Text
+              style={[
+                Type.tab,
+                spread && styles.labelSpread,
+                { color: ink },
+                inkTransition(reduceMotion),
+              ]}
+              numberOfLines={1}>
+              {tab.label}
+            </Animated.Text>
+          )}
 
-        {!iconOnly &&
-          showCount &&
-          (tab.alert ? (
-            <View style={[styles.badge, { backgroundColor: theme.danger }]}>
-              {/* Ink measured against the red: dark, at 5.74:1. White on this
-                  red is 3.36:1, under AA at the 10px a count is set in. */}
-              <Text variant="caption" style={{ color: readableInk(theme.danger) }}>
-                {tab.count! > 99 ? '99+' : tab.count}
+          {!iconOnly &&
+            showCount &&
+            (tab.alert ? (
+              <View style={[styles.badge, { backgroundColor: theme.danger }]}>
+                {/* Dark on the red, 5.74:1; white is 3.36:1. */}
+                <Text variant="caption" style={{ color: readableInk(theme.danger) }}>
+                  {tab.count! > 99 ? '99+' : tab.count}
+                </Text>
+              </View>
+            ) : (
+              <Text variant="caption" style={[styles.count, { color: withAlpha(ink, 0.72) }]}>
+                {tab.count}
               </Text>
-            </View>
-          ) : (
-            /* One step quieter than its own label in both states, so the
-               number never competes with the word it belongs to. */
-            <Text variant="caption" style={[styles.count, { color: withAlpha(ink, 0.72) }]}>
-              {tab.count}
-            </Text>
-          ))}
-      </PressableScale>
+            ))}
+        </PressableScale>
+        {divider && (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.divider,
+              {
+                backgroundColor: withAlpha(offInk, 0.28),
+                opacity: dividerOn ? 1 : 0,
+                transitionProperty: 'opacity',
+                transitionDuration: reduceMotion ? 0 : 200,
+              },
+            ]}
+          />
+        )}
+      </View>
     );
   });
 
-  const edge = inset === undefined ? undefined : { paddingHorizontal: inset };
-
-  /* A plain row, not a scroller: a fixed set spread edge to edge. */
-  if (align === 'spread' && !iconOnly) {
-    return (
-      <View
-        style={[styles.content, styles.contentBetween, edge]}
-        accessibilityRole="tablist"
-        accessibilityLabel={label}>
-        {items}
-      </View>
-    );
-  }
-
-  /* A plain row, not a scroller. See the note on `iconOnly`. */
-  if (iconOnly) {
-    return (
-      <View
-        style={[styles.content, styles.contentSpread, edge]}
-        accessibilityRole="tablist"
-        accessibilityLabel={label}>
-        {items}
-      </View>
-    );
-  }
-
   return (
-    /*
-     * `tablist` on the container, and it is not decoration.
-     *
-     * Every pill already carried `role="tab"` and its selected state, but with
-     * no set around them VoiceOver and TalkBack cannot say "tab 2 of 4" — the
-     * reader got four buttons, one of which claimed to be selected, with nothing
-     * saying what it was selected *out of*. This is the app's only in-page tab
-     * implementation, so the role belongs here rather than at each call site.
-     */
     <ScrollView
+      ref={scroller}
       horizontal
       showsHorizontalScrollIndicator={false}
-      /* **Never let this grow.** A `ScrollView` is `flexGrow: 1` out of the box
-         — a horizontal one too — so in a column it takes a share of whatever
-         height is spare. Above a list long enough to fill the screen there is
-         none and the row is its 48; above anything shorter, or anything that
-         is `flex: 1` itself, the row took half the screen and pushed the
-         content into what was left. That was Search with nothing typed, and
-         every tab whose list had not filled yet. See CLAUDE.md § Gotchas. */
+      scrollEnabled={overflows}
+      /* **Never let this grow** — a horizontal `ScrollView` is `flexGrow: 1`
+         and in a column took half the screen (CLAUDE.md § Gotchas). */
       style={styles.scroller}
-      /* A tab is tapped with a keyboard up on Search, where the row sits under
-         a focused field. Without this the first tap only puts the keyboard
-         away and the tab needs a second. */
+      /* A tab is tapped with a keyboard up on Search. */
       keyboardShouldPersistTaps="handled"
       accessibilityRole="tablist"
       accessibilityLabel={label}
-      contentContainerStyle={[styles.content, align === 'center' && styles.contentCenter, edge]}>
-      {items}
+      onLayout={(event) => setViewport(event.nativeEvent.layout.width)}
+      onContentSizeChange={(width) => setContent(width)}
+      contentContainerStyle={[styles.content, { paddingHorizontal: margin }]}>
+      <GestureDetector gesture={scrub}>
+        <View
+          style={[
+            styles.track,
+            { backgroundColor: track, borderRadius: Radius.pill, padding: TRACK_PAD },
+          ]}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.thumb,
+              {
+                top: TRACK_PAD,
+                bottom: TRACK_PAD,
+                /* A segment's x is measured from the track's edge, padding included. */
+                left: 0,
+                backgroundColor: thumb,
+                borderRadius: Radius.pill,
+              },
+              thumbStyle,
+            ]}
+          />
+          {items}
+        </View>
+      </GestureDetector>
     </ScrollView>
   );
 }
 
-/** `align="spread"`'s tab height: a step over the 32 chip. */
-const FILL_HEIGHT = 40;
-
-/** Up to Android's 48 from 40, above and below. */
-const FILL_SLOP = { top: 4, bottom: 4, left: 0, right: 0 };
-
 const styles = StyleSheet.create({
-  /* As tall as its pills, and no taller — see the note on the scroller. */
   scroller: { flexGrow: 0 },
-  /* No wrapper and no hairline. The bar sits directly on whatever is behind it
-     — page, artwork, a blurred header — and the pill is what carries selection,
-     so the divider the underline needed is gone with it.
-
-     SimpMusic's chip row (`LibraryScreen.kt`, `HomeScreen.kt`): 15 in from the
-     edge, so the first pill lines up with the page's content, 8 above and
-     below, 4 between. */
-  content: {
+  /* At least the viewport, so a row that fits spans it and one that does not scrolls. */
+  content: { flexGrow: 1, paddingVertical: Spacing.x8 },
+  track: { flexGrow: 1, flexDirection: 'row', alignItems: 'stretch' },
+  /* reacticx's `SHADOW` (0 2 2.62, black 23%) as a box shadow: elevation would
+     lift the thumb over the labels on Android. */
+  thumb: {
+    position: 'absolute',
+    boxShadow: '0px 2px 2.62px rgba(0, 0, 0, 0.23)',
+  },
+  /* Every cell grows by the same share of the slack, from its own word's width. */
+  cell: { flexGrow: 1, justifyContent: 'center' },
+  segment: {
+    flexGrow: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.x4,
-    paddingHorizontal: Spacing.x16,
-    paddingVertical: Spacing.x8,
-  },
-  /* Evenly divided rather than scrolled, for `iconOnly`. */
-  contentSpread: { alignSelf: 'stretch' },
-  /* `flexGrow`, not `width: '100%'`. The content container of a horizontal
-     ScrollView is sized by its children; growing it to the viewport gives
-     `justifyContent` something to centre *within*, and when the pills are wider
-     than the screen there is no slack and the row scrolls from its start exactly
-     as it did before. */
-  contentCenter: { flexGrow: 1, justifyContent: 'center' },
-  /* `align="spread"`: no slack anywhere — the tabs take the row between them. */
-  contentBetween: { alignSelf: 'stretch' },
-  /* One equal share of the row each, 40 high: a tab that is the page's main
-     control, not a chip in a scrolling strip. */
-  tabFill: {
-    flex: 1,
     justifyContent: 'center',
-    minHeight: FILL_HEIGHT,
-    paddingHorizontal: Spacing.x8,
-  },
-  /* A step over the chip's 14, with its own line so Android does not clip it. */
-  labelFill: { fontSize: 15, lineHeight: 20 },
-  /* The reference's chip: 32 drawn and 16 at the sides (Material's filter
-     chip, which SimpMusic draws every row of choices with). It reaches the tap
-     floor through `SmallControlSlop`, vertically — the row's own 8 above and
-     below is room for it. */
-  tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: Spacing.x8,
-    paddingVertical: Spacing.x4,
-    /* 16 at each side, less the edge, as Material measures it from outside. */
-    paddingHorizontal: Spacing.x16 - 1,
-    minHeight: ControlHeight.small,
-    borderWidth: 1,
-    /* The poured fill is clipped to the pill. */
-    overflow: 'hidden',
-    /* `pill`, not `control`. A tab is not a button — it is a position in a set,
-       and the fully-round end is what distinguishes "where you are" from "what
-       you can press". Same reasoning that keeps `<Chip>` a pill. */
-    borderRadius: Radius.pill,
+    /* reacticx's demo: 8.5 above and below, 5 at the sides — wider here,
+       because these segments are as wide as their words. */
+    paddingVertical: 8.5,
+    paddingHorizontal: Spacing.x12,
+    minHeight: 36,
   },
-  /* Each glyph takes an equal share of the row and centres in it, so four
-     destinations sit on a rhythm rather than at four label-driven widths. */
-  tabIcon: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.x8,
-    /* A glyph strip has no word to size it, so it stays at the floor. */
-    minHeight: TapTarget,
+  segmentSpread: { minHeight: 40, paddingVertical: Spacing.x8 },
+  segmentIcon: { minHeight: TapTarget - TRACK_PAD * 2, paddingHorizontal: Spacing.x8 },
+  labelSpread: { fontSize: 15, lineHeight: 20 },
+  /* On the cell's trailing edge, out of the layout, so a cell is its segment. */
+  divider: {
+    position: 'absolute',
+    right: 0,
+    top: '25%',
+    bottom: '25%',
+    width: StyleSheet.hairlineWidth * 2,
   },
   count: { letterSpacing: 0.3 },
   badge: {

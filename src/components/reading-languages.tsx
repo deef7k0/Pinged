@@ -1,11 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { useSelectable } from '@/components/ui/selectable';
 import { SelectionCard } from '@/components/ui/selection-card';
+import {
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+  type AccordionSlot,
+} from '@/components/ui/accordion';
 import { Text } from '@/components/ui/text';
 import {
   ControlHeight,
@@ -16,12 +21,13 @@ import {
 } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useReadingLanguages } from '@/hooks/use-reading-languages';
-import { useTheme } from '@/hooks/use-theme';
 import { LANGUAGES, languageList, languageSummary, type ReadingChoice } from '@/lib/language';
 import { saveReadingChoice } from '@/lib/reading-languages';
 
-export type ReadingLanguagesProps = {
+export type ReadingLanguagesProps = AccordionSlot & {
   userId: string;
+  /** Its key in the `<Accordion>` it is a row of. */
+  value: string;
 };
 
 /**
@@ -55,12 +61,10 @@ export type ReadingLanguagesProps = {
  * query cache as it is saved: every chart is keyed on these languages, so it
  * re-asks by itself.
  */
-export function ReadingLanguages({ userId }: ReadingLanguagesProps) {
-  const theme = useTheme();
+export function ReadingLanguages({ userId, value, ...slot }: ReadingLanguagesProps) {
   const accent = useAccent();
   const selectable = useSelectable();
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
 
   const { choice, reading, automatic, ready } = useReadingLanguages();
 
@@ -95,33 +99,14 @@ export function ReadingLanguages({ userId }: ReadingLanguagesProps) {
         : languageSummary(reading);
 
   return (
-    <View style={styles.root}>
-      <PressableScale
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        accessibilityLabel={`Review languages, ${
-          reading === null ? 'every language' : languageList(reading)
-        }`}
-        scaleTo={0.98}
-        /* Open is a disclosure, not a choice: a brighter step of the action
-           grey, as the row above it takes. */
-        pressedColor={theme.controlPressed}
-        onPress={() => setOpen((value) => !value)}
-        style={StyleSheet.flatten([
-          styles.row,
-          { backgroundColor: open ? theme.controlPressed : theme.controlFill },
-        ])}>
-        <Ionicons name="language-outline" size={20} color={theme.textSecondary} />
-        <View style={styles.rowText}>
-          <Text variant="body">Review languages</Text>
-          <Text variant="caption" color="textMuted" numberOfLines={1}>
-            {summary}
-          </Text>
-        </View>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textMuted} />
-      </PressableScale>
-
-      {open && (
+    <AccordionItem value={value} {...slot}>
+      <AccordionTrigger
+        icon="language-outline"
+        title="Review languages"
+        summary={summary}
+        accessibilityLabel={`Review languages, ${reading === null ? 'every language' : languageList(reading)}`}
+      />
+      <AccordionContent>
         <View style={styles.panel}>
           <Text variant="caption" color="textMuted" style={styles.hint}>
             Popular reviews, suggested people and the review a game’s page leads with are picked
@@ -184,23 +169,13 @@ export function ReadingLanguages({ userId }: ReadingLanguagesProps) {
             </View>
           )}
         </View>
-      )}
-    </View>
+      </AccordionContent>
+    </AccordionItem>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { gap: Spacing.x8 },
   /* The hidden-games row's own shape: the two are one group of rows. */
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.x12,
-    paddingVertical: Spacing.x12,
-    paddingHorizontal: Spacing.x16,
-    borderRadius: Radius.card,
-  },
-  rowText: { flex: 1, gap: 2 },
   panel: { paddingHorizontal: Spacing.x4, gap: Spacing.x16 },
   hint: { paddingTop: Spacing.x4 },
   /* The reference's 14 between options (`x16`, 15), as `<ChoiceChips>` keeps. */

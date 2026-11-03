@@ -317,7 +317,7 @@ function CardStep({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
-  const fileName = `GameLog_${gameTitle.slice(0, 32).replace(/[^A-Za-z0-9]+/g, '_')}`;
+  const fileName = `Pinged_${gameTitle.slice(0, 32).replace(/[^A-Za-z0-9]+/g, '_')}`;
 
   async function capture(): Promise<string> {
     const { captureRef } = await import('react-native-view-shot');
@@ -337,7 +337,7 @@ function CardStep({
       const uri = await capture();
       const saved = await saveToPhotos(uri);
       if (saved === 'denied') {
-        setStatus('GameLog needs permission to add it to your photos.');
+        setStatus('Pinged needs permission to add it to your photos.');
       } else if (saved === 'saved') {
         setStatus('Saved to your photos.');
       } else {

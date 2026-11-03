@@ -183,7 +183,7 @@ export function ReviewShareCard({
             />
           </View>
           <RNText style={[styles.small, { color: quiet, fontFamily: FontFamily.medium }]}>
-            GameLog
+            Pinged
           </RNText>
         </View>
 

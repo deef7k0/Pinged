@@ -12,7 +12,7 @@ import { Text } from '@/components/ui/text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
-import { getUnreadCount } from '@/lib/api';
+import { getUnreadCount, getUnreadPingCount } from '@/lib/api';
 import type { HomeView } from '@/lib/home-view';
 import { useAuth } from '@/store/auth';
 
@@ -147,7 +147,9 @@ function CreateKey() {
 /**
  * The bell, where Settings was (2026-10-28, the owner: "Place the notification
  * button where the settings icon is, and remove the settings icon from the
- * home section, it will only be in the profile tab"). The bare glyph,
+ * home section, it will only be in the profile tab"). It opens the inbox —
+ * your pings first, your notifications a tab away (2026-10-31) — and its count
+ * is both tabs' unread together. The bare glyph,
  * Material's `IconButton` — 48 to touch, nothing drawn round it — with the
  * unread count on its shoulder, ringed in the page's colour.
  */
@@ -156,9 +158,16 @@ function NotificationsKey() {
   const accent = useAccent();
   const router = useRouter();
   const userId = useAuth((state) => state.session?.user.id);
+  /* Both tabs of the inbox: pings and notifications, one number. */
   const unread = useQuery({
-    queryKey: ['notifications', 'unread', userId],
-    queryFn: () => getUnreadCount(userId!),
+    queryKey: ['inbox', 'unread', userId],
+    queryFn: async () => {
+      const [notifications, pings] = await Promise.all([
+        getUnreadCount(userId!),
+        getUnreadPingCount(userId!),
+      ]);
+      return notifications + pings;
+    },
     enabled: !!userId,
     refetchInterval: 60_000,
   });
@@ -167,7 +176,9 @@ function NotificationsKey() {
   return (
     <PressableScale
       accessibilityRole="button"
-      accessibilityLabel={count > 0 ? `Notifications, ${count} unread` : 'Notifications'}
+      accessibilityLabel={
+        count > 0 ? `Pings and notifications, ${count} unread` : 'Pings and notifications'
+      }
       onPress={() => router.push('/notifications')}
       scaleTo={0.92}
       pressedColor={theme.controlPressed}

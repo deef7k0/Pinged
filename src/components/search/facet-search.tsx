@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { useTabBarClearance } from '@/components/app-tab-bar';
 import { ChoiceChips } from '@/components/choice-chips';
@@ -36,6 +36,7 @@ import {
 import { searchFacetValues } from '@/lib/games/igdb';
 import { rawgTagsAvailable } from '@/lib/games/rawg-tags';
 import { useRawgTags } from '@/hooks/use-rawg-tags';
+import { Loader } from '@/components/ui/loader';
 
 /** What a remote lookup needs before it asks: two letters, as a title search does. */
 const MIN_LOOKUP = 2;
@@ -188,7 +189,7 @@ export function FacetPicker({
               <Text variant="bodySmall" color="textMuted" style={styles.note}>
                 {note}
               </Text>
-              {busy && <ActivityIndicator size="small" color={theme.textMuted} />}
+              {busy && <Loader size="small" color={theme.textMuted} />}
             </View>
           )}
         </View>

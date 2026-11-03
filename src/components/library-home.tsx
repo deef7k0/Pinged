@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { Link, useRouter, type Href } from 'expo-router';
 import { memo } from 'react';
-import { Alert, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { gridItemWidth } from '@/components/gaming/game-tile';
 import { HomeSection } from '@/components/home-section';
@@ -17,6 +17,7 @@ import { useSquareCover } from '@/hooks/use-square-cover';
 import { useTheme } from '@/hooks/use-theme';
 import { MAX_PINS, getLibraryPins, unpinGame } from '@/lib/api';
 import type { CachedGame, LogWithRelations } from '@/lib/database.types';
+import { showAlert } from '@/components/ui/dialog';
 
 /** The library's lists, as the rows under the pinned games. */
 export type LibraryRow = {
@@ -67,7 +68,7 @@ export function LibraryHome({
     mutationFn: (gameId: string) => unpinGame(userId, gameId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['library-pins', userId] }),
     onError: (error) =>
-      Alert.alert('Could not unpin', error instanceof Error ? error.message : undefined),
+      showAlert('Could not unpin', error instanceof Error ? error.message : undefined),
   });
 
   const pinned = pins.data ?? [];
@@ -76,7 +77,7 @@ export function LibraryHome({
   const recentSize = gridItemWidth(width, 2, Spacing.x16, Spacing.x12);
 
   const confirmUnpin = (game: CachedGame) =>
-    Alert.alert(`Unpin ${game.title}?`, 'It stays in your library.', [
+    showAlert(`Unpin ${game.title}?`, 'It stays in your library.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Unpin', style: 'destructive', onPress: () => unpin.mutate(game.id) },
     ]);

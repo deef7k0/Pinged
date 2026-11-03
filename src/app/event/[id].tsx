@@ -11,6 +11,7 @@ import { PORTRAIT_COLUMNS, gridItemWidth } from '@/components/gaming/game-tile';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ExpandableText } from '@/components/ui/expandable-text';
+import { PING_GLYPH, usePingTo } from '@/components/pings/use-ping-to';
 import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
 import { IconButton } from '@/components/ui/icon-button';
 import { InfoCard } from '@/components/ui/info-card';
@@ -96,6 +97,7 @@ export default function EventScreen() {
   /* Read once, when the screen mounts: "now" must not move between renders, and
      a lazy initialiser is the one place a clock may be read during one. */
   const [now] = useState(() => Date.now());
+  const pingTo = usePingTo();
 
   const { width: windowWidth } = useWindowDimensions();
   const width = Math.min(windowWidth, MaxContentWidth);
@@ -236,7 +238,32 @@ export default function EventScreen() {
           back
           title={data.name}
           header={Math.round(width * BANNER_RATIO) + NAME_BLOCK}
-          right={<TopBarDisc icon="share-outline" label={`Share ${data.name}`} onPress={share} />}
+          right={
+            <>
+              {pingTo && (
+                <TopBarDisc
+                  icon={PING_GLYPH}
+                  label={`Ping ${data.name} to someone`}
+                  onPress={() =>
+                    pingTo({
+                      kind: 'event',
+                      targetId: String(data.id),
+                      title: data.name,
+                      subtitle: data.startTime
+                        ? new Date(data.startTime * 1000).toLocaleDateString(undefined, {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                          })
+                        : null,
+                      imageUrl: data.thumbnailUrl ?? data.bannerUrl,
+                    })
+                  }
+                />
+              )}
+              <TopBarDisc icon="share-outline" label={`Share ${data.name}`} onPress={share} />
+            </>
+          }
         />
       }>
       <PageFlatList

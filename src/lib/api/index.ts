@@ -18,6 +18,7 @@ export * from './labels';
 export * from './lists';
 export * from './notifications';
 export * from './physical';
+export * from './pings';
 export * from './pins';
 export * from './progress';
 export * from './ratings';

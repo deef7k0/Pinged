@@ -1,87 +1,70 @@
 /**
- * The head of Search's Discover: the slider of landscape art.
+ * The head of Search's Discover: this month's biggest releases, the most
+ * awaited game and the calendar, as Home's carousel with reacticx's parallax.
  *
  * Pure — no React Native — so `npm test` covers it.
  *
- * ## The slider, measured
+ * ## Home's cards, reacticx's motion
  *
- * The owner's reference (2026-10-09) is the hero at the top of Letterboxd's
- * home on a 393pt phone: art edge to edge at 1.48:1, a name in two bold lines
- * at its lower left with one small name under it, a badge in its upper right,
- * and along its foot four equal segments, the current one lit. Read off the
- * screenshot: the name 24pt in from the side, the badge 23 in and 17 down, the
- * segments 2pt tall and 12 apart, 9 up from the foot. The sides here are the
- * app's own margin, so the name starts where the search field does.
+ * The owner's direction (2026-11-02): the slider's games "will go like the
+ * home carousel. They will scroll automatically with this kind of animation"
+ * — reacticx's `ParallaxCarousel` (`molecules/parallax-carousel`, MIT). So a
+ * card is Home's "Games for you" card (`constants/discover-carousel`:
+ * seventy per cent of the row, 0.92 wide to tall, 18 round, snapping), and
+ * inside it the art moves at a different speed from the row: reacticx's
+ * `translateX = interpolate(scrollX, [offset − step, offset, offset + step],
+ * [−w·k, 0, w·k])`, clamped.
  *
- * ## There is no light under it
+ * **The art is wider than its card, by `k` at each side.** reacticx's cards
+ * are a page wide, so its neighbours are off screen by the time their art has
+ * moved; Home's peek in at 70%, and an image the card's own width shifted by
+ * a third would show the card's empty fill beside it. Drawn `1 + 2k` wide and
+ * centred, it covers the card at every offset (`parallaxShift` never exceeds
+ * `k`), and landscape key art fits that wide box better than the card itself.
  *
- * There was, for three builds in one day: the owner asked for "a glow like the
- * one in the home page… like a neon light above a door" under the slider, saw
- * it on a phone twice — hung from the slider's top, then lying along its foot
- * — and then had it taken off: "Remove the glow from the search screen." Home
- * keeps its own (`home/home-glow`, SimpMusic's). Do not add one here.
+ * It replaced, on 2026-11-02, a full-bleed 3:2 slider after Letterboxd's hero
+ * (four segments along its foot as the timer). There is still no glow on
+ * Search (the owner's of 2026-10-09).
  */
 
-/** Past this the composition stops growing — `MaxContentWidth`, restated. */
-const MAX_DISPLAY = 800;
-
-export const SLIDE = {
-  /** Width over height. The reference's 1.48, as the plain ratio it is. */
-  aspect: 3 / 2,
-  /** The side margin of everything set on the art: `Spacing.x16`. */
-  inset: 15,
-  /** The badge, from the art's top edge. */
-  badgeTop: 15,
-  /** The segments: their height, the space between two, and how far up from the foot. */
-  segment: { height: 3, gap: 8, bottom: 12 },
-  /** From the segments up to the last line of text. */
-  textBottom: 14,
+export const SPOTLIGHT = {
   /**
-   * The darkening behind the text: how much of the art's height it covers from
-   * the foot, how dark it gets, and how far down itself it reaches that.
-   *
-   * 88% black, reached seven tenths of the way down and held to the foot. Not
-   * the scrim a collection's header uses, which ends on the page's own colour
-   * at full strength: this art does not melt into anything, it stops at an
-   * edge, and a slide whose lower third was solid black would be two thirds of
-   * a picture. See `slideScrimAt` for what it has to guarantee.
+   * reacticx's `parallaxIntensity`, as a share of the card's width the art
+   * moves over one card of scroll. Its default is 0.7 over full-page cards;
+   * 0.35 over cards that peek is the same travel on screen.
    */
-  scrim: 0.72,
-  scrimPeak: 0.88,
-  scrimFull: 0.7,
-  /** Stops in the ramp: each band narrow enough not to show on dark art. */
-  scrimStops: 9,
-  /** How long a slide stands before the next, when the slider is moving by itself. */
+  parallax: 0.35,
+  /** How long a card stands before the row moves on by itself. */
   interval: 6000,
+  /** The row's glide to the next card when it moves by itself. */
+  glideMs: 900,
+  /** The badge, in from the card's top and right edge. */
+  badgeInset: 12,
 } as const;
 
-/** The slider's height on a display this wide. */
-export function slideHeight(displayWidth: number): number {
-  return Math.round(Math.min(displayWidth, MAX_DISPLAY) / SLIDE.aspect);
+/** The art's width for a card `cardWidth` wide: wider by the parallax at each side. */
+export function parallaxArtWidth(cardWidth: number): number {
+  return Math.round(cardWidth * (1 + 2 * SPOTLIGHT.parallax));
 }
 
 /**
- * The scrim's alpha at `t` of the way down it, 0 at its top and 1 at the foot.
- *
- * A smoothstep up to `scrimFull`, then flat: no slope where it starts — a
- * darkening that began on a ramp would draw a line across the art — and full
- * strength under every line of text.
- *
- * What it guarantees, on white art — the worst there is — and on the
- * narrowest phone: 3:1 at the top of a two-line name, which is 20px bold and
- * so large text, and 4.5:1 under the small line below it. `npm test` holds
- * both. The name carries a soft shadow as well, for art that is brighter in
- * one place than this assumes.
+ * How far the art inside card `index` is shifted when the row has scrolled
+ * `scrollX`, cards `step` apart: reacticx's interpolation, clamped to one card
+ * either side. Positive is toward the right — the art lags behind the card.
  */
-export function slideScrimAt(t: number): number {
-  const u = Math.max(0, Math.min(1, t / SLIDE.scrimFull));
-  return SLIDE.scrimPeak * u * u * (3 - 2 * u);
+export function parallaxShift(
+  scrollX: number,
+  index: number,
+  step: number,
+  cardWidth: number
+): number {
+  'worklet';
+  const distance = (scrollX - index * step) / Math.max(1, step);
+  const clamped = Math.max(-1, Math.min(1, distance));
+  return clamped * cardWidth * SPOTLIGHT.parallax;
 }
 
-/** The scrim as stops: where each is, 0–1 down it, and the alpha there. */
-export function slideScrimStops(): { at: number; alpha: number }[] {
-  return Array.from({ length: SLIDE.scrimStops }, (_, index) => {
-    const at = index / (SLIDE.scrimStops - 1);
-    return { at, alpha: slideScrimAt(at) };
-  });
+/** Where the row moves next by itself: the next card, and the first after the last. */
+export function nextCard(current: number, count: number): number {
+  return count <= 1 ? 0 : (current + 1) % count;
 }

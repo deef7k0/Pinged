@@ -1,14 +1,17 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Poster } from '@/components/ui/poster';
-import { PressableScale } from '@/components/ui/pressable-scale';
+import {
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+  type AccordionSlot,
+} from '@/components/ui/accordion';
 import { Text } from '@/components/ui/text';
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   clearHiddenGames,
@@ -16,6 +19,7 @@ import {
   unhideGame,
   type HiddenGame,
 } from '@/lib/surprise-hidden';
+import { showAlert } from '@/components/ui/dialog';
 
 /**
  * Small enough to be a row's leading mark, large enough to recognise.
@@ -25,8 +29,10 @@ import {
  */
 const THUMB = 34;
 
-export type SurpriseHiddenListProps = {
+export type SurpriseHiddenListProps = AccordionSlot & {
   userId: string;
+  /** Its key in the `<Accordion>` it is a row of. */
+  value: string;
 };
 
 /**
@@ -49,10 +55,9 @@ export type SurpriseHiddenListProps = {
  * `<GameActions>` draws between clearing a bare status and deleting a log with a
  * review in it.
  */
-export function SurpriseHiddenList({ userId }: SurpriseHiddenListProps) {
+export function SurpriseHiddenList({ userId, value, ...slot }: SurpriseHiddenListProps) {
   const theme = useTheme();
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
 
   /* The same key Surprise Me reads, so unhiding here is reflected on the next
      roll without either screen knowing the other exists. `staleTime: Infinity`
@@ -80,12 +85,11 @@ export function SurpriseHiddenList({ userId }: SurpriseHiddenListProps) {
     mutationFn: () => clearHiddenGames(userId),
     onSuccess: (next: HiddenGame[]) => {
       queryClient.setQueryData(['surprise-hidden', userId], next);
-      setOpen(false);
     },
   });
 
   function confirmClear() {
-    Alert.alert(
+    showAlert(
       'Show all hidden games again?',
       `All ${games.length} of them go back into the Surprise Me pool. This cannot be undone.`,
       [
@@ -96,43 +100,24 @@ export function SurpriseHiddenList({ userId }: SurpriseHiddenListProps) {
   }
 
   return (
-    <View style={styles.root}>
-      <PressableScale
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
+    <AccordionItem value={value} {...slot}>
+      <AccordionTrigger
+        icon="eye-off-outline"
+        title="Hidden from Surprise Me"
+        summary={
+          hidden.isPending
+            ? 'Checking…'
+            : games.length === 0
+              ? 'Nothing hidden yet'
+              : `${games.length} ${games.length === 1 ? 'game' : 'games'} will never come up`
+        }
         accessibilityLabel={
           games.length > 0
             ? `Hidden from Surprise Me, ${games.length} games`
             : 'Hidden from Surprise Me, none'
         }
-        scaleTo={0.98}
-        /* Open is a disclosure, not a choice, so it takes a brighter step of
-           the action grey rather than the accent's selected state. */
-        pressedColor={theme.controlPressed}
-        onPress={() => setOpen((value) => !value)}
-        style={StyleSheet.flatten([
-          styles.row,
-          {
-            backgroundColor: open ? theme.controlPressed : theme.controlFill,
-          },
-        ])}>
-        <Ionicons name="eye-off-outline" size={20} color={theme.textSecondary} />
-        <View style={styles.rowText}>
-          <Text variant="body">Hidden from Surprise Me</Text>
-          <Text variant="caption" color="textMuted">
-            {/* The count is the sentence. A row that said "manage hidden games"
-                would make somebody open it to learn there are none. */}
-            {hidden.isPending
-              ? 'Checking…'
-              : games.length === 0
-                ? 'Nothing hidden yet'
-                : `${games.length} ${games.length === 1 ? 'game' : 'games'} will never come up`}
-          </Text>
-        </View>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textMuted} />
-      </PressableScale>
-
-      {open && (
+      />
+      <AccordionContent>
         <View style={styles.panel}>
           {games.length === 0 ? (
             /* Says how the list gets filled. This is the only place in the app
@@ -181,22 +166,12 @@ export function SurpriseHiddenList({ userId }: SurpriseHiddenListProps) {
             </>
           )}
         </View>
-      )}
-    </View>
+      </AccordionContent>
+    </AccordionItem>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { gap: Spacing.x8 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.x12,
-    paddingVertical: Spacing.x12,
-    paddingHorizontal: Spacing.x16,
-    borderRadius: Radius.card,
-  },
-  rowText: { flex: 1, gap: 2 },
   panel: { paddingHorizontal: Spacing.x4 },
   hint: { paddingVertical: Spacing.x8 },
   /* A hairline between rows rather than a card each: a hundred cards is a

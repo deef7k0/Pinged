@@ -2,7 +2,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { StatusBar } from 'expo-status-bar';
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -20,6 +19,7 @@ import { POSTER_THEMES, type PosterKey } from '@/constants/poster';
 import { FontFamily, Radius, TapTarget, Type, readableInk, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { INK_ON_LIGHT } from '@/lib/color';
+import { Loader } from '@/components/ui/loader';
 
 /**
  * Onboarding's kit — the owner's reference (2026-10-15), drawn once.
@@ -296,7 +296,7 @@ export function PosterButton({
       scaleTo={0.98}
       style={StyleSheet.flatten([styles.button, { backgroundColor: fill }])}>
       {busy ? (
-        <ActivityIndicator color={ink} />
+        <Loader color={ink} />
       ) : (
         <Text variant="posterButton" style={{ color: ink }} numberOfLines={1}>
           {title}

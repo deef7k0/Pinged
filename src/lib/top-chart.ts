@@ -60,7 +60,7 @@ export const CRITIC_FLOOR = 7;
 export const CHART_BASES: readonly { key: ChartBasis; label: string; note: string }[] = [
   {
     key: 'gamelog',
-    label: 'GameLog',
+    label: 'Pinged',
     note: 'Ranked by the scores people gave them here.',
   },
   {

@@ -1,12 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import { ACTIONS } from '@/constants/profile-layout';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { Loader } from '@/components/ui/loader';
 
 /**
  * The profile's actions, centred under its counts: one big button, then up to
@@ -72,7 +73,7 @@ export function ProfileButton({
         disabled && !loading && styles.disabled,
       ])}>
       {loading ? (
-        <ActivityIndicator color={ink} />
+        <Loader color={ink} />
       ) : (
         <>
           {icon && <Ionicons name={icon} size={17} color={ink} />}
@@ -120,7 +121,7 @@ export function ProfileKey({
       scaleTo={0.88}
       style={StyleSheet.flatten([styles.key, disabled && !loading && styles.disabled])}>
       {loading ? (
-        <ActivityIndicator size="small" color={theme.textSecondary} />
+        <Loader size="small" color={theme.textSecondary} />
       ) : (
         <Ionicons
           name={icon}

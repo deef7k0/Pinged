@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, BackHandler, Pressable, StyleSheet, View } from 'react-native';
+import { BackHandler, Pressable, StyleSheet, View } from 'react-native';
 
 import {
   BracketNote,
@@ -21,6 +21,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { INTRO_LINES, MIN_PASSWORD_LENGTH, typingDuration } from '@/lib/onboarding';
 import { signInWithProvider, type OAuthProvider } from '@/lib/oauth';
 import { useAuth } from '@/store/auth';
+import { Loader } from '@/components/ui/loader';
 
 /** Longest a page waits for its headline before showing what is under it. */
 const REVEAL_CAP_MS = 900;
@@ -324,7 +325,7 @@ function AgreementNote({ action }: { action: string }) {
 
   return (
     <Text variant="caption" color="textMuted" style={styles.agreement}>
-      {`By ${action} you agree to GameLog’s `}
+      {`By ${action} you agree to Pinged’s `}
       <Text
         variant="caption"
         color="textSecondary"
@@ -382,7 +383,7 @@ function ProviderMark({
         disabled && !busy && styles.dimmed,
       ])}>
       {busy ? (
-        <ActivityIndicator color={theme.text} />
+        <Loader color={theme.text} />
       ) : (
         <Ionicons name={icon} size={22} color={tint ?? theme.text} />
       )}

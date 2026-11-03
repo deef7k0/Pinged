@@ -169,6 +169,8 @@ const REPORT_TITLE: Record<ReportKind, string> = {
   comment: 'Report this comment',
   wall_post: 'Report this post',
   profile: 'Report this account',
+  ping: 'Report this ping',
+  ping_suggestion: 'Report this suggestion',
 };
 
 function targetFrom(params: Params): ReportTarget | null {
@@ -185,6 +187,8 @@ function targetFrom(params: Params): ReportTarget | null {
     case 'comment':
     case 'wall_post':
     case 'profile':
+    case 'ping':
+    case 'ping_suggestion':
       return params.author
         ? { kind: params.kind, targetId: params.id, authorId: params.author }
         : null;
@@ -312,6 +316,8 @@ const USER_CONTENT_NOUN: Record<UserContentKind, string> = {
   comment: 'comment',
   wall_post: 'wall post',
   profile: 'account',
+  ping: 'ping',
+  ping_suggestion: 'suggestion',
 };
 
 function UserContentReport({

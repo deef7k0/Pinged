@@ -36,6 +36,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { MiniPlayer } from '@/components/player/mini-player';
+import { DialogHost } from '@/components/ui/dialog';
 import { PlayerHost } from '@/components/player/player-host';
 import { GameColoursWarmup } from '@/hooks/use-game-colours';
 import { primeSteamArtwork } from '@/hooks/use-steam-artwork';
@@ -261,6 +262,13 @@ export default function RootLayout() {
                 <Stack.Screen name="review/[id]" />
                 <Stack.Screen name="soundtrack/[id]" />
                 <Stack.Screen name="notifications/index" />
+                {/* Pings (0046): a request's page, the news that left the
+                    tab bar for it, and three sheets — ask, answer, send. */}
+                <Stack.Screen name="ping/[id]" />
+                <Stack.Screen name="news" />
+                <Stack.Screen name="new-ping" options={SHEET} />
+                <Stack.Screen name="suggest-game/[id]" options={SHEET} />
+                <Stack.Screen name="send-ping" options={SHEET} />
                 <Stack.Screen name="settings" />
                 <Stack.Screen name="blocked" />
                 <Stack.Screen name="delete-account" />
@@ -274,7 +282,17 @@ export default function RootLayout() {
                 <Stack.Screen name="log/[id]" options={SHEET} />
                 <Stack.Screen name="playthrough/[id]" options={SHEET} />
                 <Stack.Screen name="add-copy" options={SHEET} />
-                <Stack.Screen name="copy/[id]" />
+                {/* From the physical shelf's Cover Flow the cover has already
+                    flown to where the case stands, on the copy's moving
+                    colours: the stage fades in over it rather than sliding. */}
+                <Stack.Screen
+                  name="copy/[id]"
+                  options={({ route }) =>
+                    (route.params as { handover?: string } | undefined)?.handover === '1'
+                      ? { animation: 'fade', animationDuration: 260 }
+                      : {}
+                  }
+                />
                 <Stack.Screen name="scan" options={FULL_SHEET} />
                 <Stack.Screen name="add-release" options={SHEET} />
                 <Stack.Screen name="suggest-similar/[id]" options={SHEET} />
@@ -333,6 +351,8 @@ export default function RootLayout() {
             */}
             <PlayerHost />
             <MiniPlayer />
+            {/* Every alert in the app (`showAlert`), over everything. */}
+            <DialogHost />
             <AfterOnboarding />
             {/* Settings → Game colours, read once there is an account, so the
                 first game's page never opens in colour and then turns grey. */}

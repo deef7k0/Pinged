@@ -568,6 +568,8 @@ export default function SurpriseScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-logs', userId] });
+      // A status changed what you have played: For You's tiers with it (0046).
+      queryClient.invalidateQueries({ queryKey: ['pings', 'for_you'] });
       queryClient.invalidateQueries({ queryKey: ['my-log', userId, game?.id] });
       AccessibilityInfo.announceForAccessibility(`${game?.title} added to your backlog`);
     },
@@ -765,6 +767,8 @@ export default function SurpriseScreen() {
       }
       queryClient.invalidateQueries({ queryKey: ['surprise-review'] });
       queryClient.invalidateQueries({ queryKey: ['user-logs', userId] });
+      // A status changed what you have played: For You's tiers with it (0046).
+      queryClient.invalidateQueries({ queryKey: ['pings', 'for_you'] });
     }, [queryClient, userId])
   );
 

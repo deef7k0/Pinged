@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { IconButton } from '@/components/ui/icon-button';
 import { PressableScale } from '@/components/ui/pressable-scale';
@@ -33,6 +33,7 @@ import type { GameLog } from '@/lib/database.types';
 import type { Game } from '@/lib/games';
 import { platformOptionsFor } from '@/lib/platform-options';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/components/ui/dialog';
 
 /** How far one tap on the stepper moves the percentage. */
 const PERCENT_STEP = 5;
@@ -96,6 +97,8 @@ export function ProgressSheet({ game, log, onClose, onOpenPlaythroughs }: Progre
     queryClient.invalidateQueries({ queryKey: ['my-log', userId, game.id] });
     queryClient.invalidateQueries({ queryKey: ['feed'] });
     queryClient.invalidateQueries({ queryKey: ['user-logs', userId] });
+    // A status changed what you have played: For You's tiers with it (0046).
+    queryClient.invalidateQueries({ queryKey: ['pings', 'for_you'] });
     queryClient.invalidateQueries({ queryKey: ['profile-stats', userId] });
     queryClient.invalidateQueries({ queryKey: ['achievement-stats', userId] });
     queryClient.invalidateQueries({ queryKey: ['completions', userId] });
@@ -169,7 +172,7 @@ export function ProgressSheet({ game, log, onClose, onOpenPlaythroughs }: Progre
       remove.mutate();
       return;
     }
-    Alert.alert(
+    showAlert(
       'Remove from your games?',
       `Your score, review and playthroughs for ${game.title} are deleted along with it. This cannot be undone.`,
       [

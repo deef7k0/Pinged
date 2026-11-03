@@ -16,6 +16,7 @@ import { CommentSection } from '@/components/comment-section';
 import { QuoteBlock } from '@/components/quote-block';
 import { ReplyComposer } from '@/components/reply-composer';
 import { ReportFlag, useCanReport } from '@/components/report-flag';
+import { PING_GLYPH, usePingTo } from '@/components/pings/use-ping-to';
 import { ReviewShareSheet } from '@/components/review-share-sheet';
 import { SpoilerNotice } from '@/components/spoiler-notice';
 import { AnimatedCoverImage } from '@/components/ui/animated-cover-image';
@@ -218,6 +219,7 @@ function ReviewPage({
   const [sharing, setSharing] = useState(false);
 
   const canReport = useCanReport(review.user_id);
+  const pingTo = usePingTo();
 
   const game = review.game;
   const author = review.profile;
@@ -471,6 +473,27 @@ function ReviewPage({
                       authorId={review.user_id}
                       label={`Report ${authorName}’s review`}
                     />
+                  )}
+                  {pingTo && (
+                    <PressableScale
+                      accessibilityRole="button"
+                      accessibilityLabel="Ping this review to someone"
+                      onPress={() =>
+                        pingTo({
+                          kind: 'review',
+                          targetId: review.id,
+                          title: game ? `${authorName} on ${game.title}` : `${authorName}’s review`,
+                          subtitle:
+                            quote ?? (rating !== null ? `${rating} out of 100` : 'A review'),
+                          imageUrl: game?.cover_url ?? null,
+                        })
+                      }
+                      scaleTo={0.9}
+                      style={styles.share}>
+                      <PressGlyph motion="skip">
+                        <Ionicons name={PING_GLYPH} size={LIKE_ROW.share} color={theme.textMuted} />
+                      </PressGlyph>
+                    </PressableScale>
                   )}
                   <PressableScale
                     accessibilityRole="button"

@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { PlayerArtwork } from '@/components/player/player-bar';
 import { SoundCloudMark } from '@/components/player/soundcloud-mark';
@@ -16,6 +16,7 @@ import { getStarredSong } from '@/lib/api';
 import { noticeText, progressOf } from '@/lib/player-queue';
 import { getSoundCloudTrack, isSoundCloudUrn } from '@/lib/soundcloud/api';
 import { player, usePlayer } from '@/store/player';
+import { Loader } from '@/components/ui/loader';
 
 /** Track art: 56, a step over the soundtrack screen's rows, with the widget. */
 const ARTWORK = 56;
@@ -182,7 +183,7 @@ export function StarredSongWidget({ profileId }: { profileId: string }) {
         {playable && (
           <View style={[styles.play, { backgroundColor: theme.controlFill }]}>
             {starting ? (
-              <ActivityIndicator size="small" color={theme.text} />
+              <Loader size="small" color={theme.text} />
             ) : (
               <Ionicons name={playing ? 'pause' : 'play'} size={18} color={theme.text} />
             )}

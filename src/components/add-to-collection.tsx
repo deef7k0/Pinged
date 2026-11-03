@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Modal, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
@@ -9,6 +9,7 @@ import { Poster } from '@/components/ui/poster';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { LoadingState } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
+import { Tray } from '@/components/ui/tray';
 import { Radius, Spacing, withAlpha } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
@@ -111,12 +112,8 @@ export function AddToCollection({ game, visible, onClose }: AddToCollectionProps
   });
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}>
-      <View style={[styles.sheet, { backgroundColor: theme.background }]}>
+    <Tray visible={visible} onClose={onClose} maxHeightRatio={0.9}>
+      <View style={styles.sheet}>
         <View style={styles.head}>
           <View style={styles.headText}>
             <Text variant="h2">Add to collection</Text>
@@ -232,12 +229,13 @@ export function AddToCollection({ game, visible, onClose }: AddToCollectionProps
           </View>
         )}
       </View>
-    </Modal>
+    </Tray>
   );
 }
 
 const styles = StyleSheet.create({
-  sheet: { flex: 1, paddingTop: Spacing.x24, gap: Spacing.x16 },
+  /* In a tray (`<Tray>`): as tall as its lists, up to 90% of the display. */
+  sheet: { flexShrink: 1, paddingBottom: Spacing.x16, gap: Spacing.x16 },
   head: {
     flexDirection: 'row',
     alignItems: 'flex-start',

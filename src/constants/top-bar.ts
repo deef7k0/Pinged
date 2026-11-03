@@ -356,3 +356,25 @@ export function settleOffset(
   if (moved < -intent) return from;
   return offset - from < to - offset ? from : to;
 }
+
+/**
+ * reacticx's animated header scroll view (`organisms/animated-header-scrollview`,
+ * MIT; the owner's, 2026-11-02: "Implement this header scroll view across the
+ * app"). The bar's ground is a fade, not a band: the page's colour at 85%,
+ * then 80% halfway, then nothing, reaching `tail` past the bar's foot, and it
+ * fades in over the first `reach` dp of scroll. Home's bar is that fade with
+ * its keys (the owner: "the black topbar is this fade and the buttons remain
+ * there"). A page's name is large at the top of its content (`largeTitle`,
+ * Type's 32) and gone by `titleOut`; the bar's own small name fades and rises
+ * in between `smallFrom` and `smallTo`, over `smallMs`.
+ */
+export const HEADER_FADE = {
+  reach: 80,
+  tail: 50,
+  alphas: [0.85, 0.8, 0] as const,
+  titleOut: 60,
+  smallFrom: 40,
+  smallTo: 80,
+  smallMs: 600,
+  smallRise: 20,
+} as const;

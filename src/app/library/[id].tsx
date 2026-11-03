@@ -1,19 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link, useLocalSearchParams, useRouter } from 'expo-router';
+import { Link, useLocalSearchParams } from 'expo-router';
 import { memo, useMemo, useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 
-import { CdBinder } from '@/components/cd-binder';
 import {
   SHELF_COLUMNS,
   SHELF_GAP,
   gridItemWidth,
   steamHeaderUrl,
 } from '@/components/gaming/game-tile';
+import { PhysicalShelf } from '@/components/copy-coverflow';
 import { LibraryHome, type LibraryRow } from '@/components/library-home';
-import { Button } from '@/components/ui/button';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
-import { PageFlatList, PageScrollView } from '@/components/ui/page-scroll';
+import { PageFlatList } from '@/components/ui/page-scroll';
 import { Poster } from '@/components/ui/poster';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, Screen } from '@/components/ui/screen';
@@ -35,7 +34,7 @@ import {
   getUserGameStats,
   getUserLogs,
 } from '@/lib/api';
-import type { CopyWithRelations, ListItem } from '@/lib/api';
+import type { ListItem } from '@/lib/api';
 import type { LogWithRelations } from '@/lib/database.types';
 import {
   availableSorts,
@@ -137,7 +136,6 @@ function isLibraryTab(value: string | undefined): value is LibraryTab {
  */
 export default function LibraryScreen() {
   const { width } = useWindowDimensions();
-  const router = useRouter();
   const params = useLocalSearchParams<{ id: string; tab?: string }>();
   const id = params.id;
   const viewerId = useAuth((state) => state.session?.user.id) ?? null;
@@ -311,98 +309,100 @@ export default function LibraryScreen() {
     );
   }
 
+  /* Physical is Cover Flow, a screen of its own: the copy's colours are its
+     backdrop as a box is picked up (`<PhysicalShelf>`). */
+  if (tab === 'physical') {
+    return (
+      <PhysicalShelf
+        copies={physical}
+        loading={copies.isLoading}
+        error={copies.error}
+        onRetry={() => void copies.refetch()}
+        isSelf={isSelf}
+        ownerId={id}
+      />
+    );
+  }
+
   return (
     <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title={TAB_LABELS[tab]} />}>
-      {tab === 'physical' ? (
-        <PhysicalTab
-          copies={physical}
-          loading={copies.isLoading}
-          error={copies.error}
-          onRetry={() => void copies.refetch()}
-          isSelf={isSelf}
-          ownerId={id}
-          width={width - Spacing.x16 * 2}
-          onOpenCopy={(copy) => router.push({ pathname: '/copy/[id]', params: { id: copy.id } })}
-        />
-      ) : (
-        <PageFlatList
-          data={entries}
-          key={`grid-${COLUMNS}`}
-          numColumns={COLUMNS}
-          keyExtractor={(entry) => entry.key}
-          {...ShelfGridWindow}
-          renderItem={({ item }) => (
-            /* Favourites say nothing under their covers, so that tab keeps no
+      <PageFlatList
+        data={entries}
+        key={`grid-${COLUMNS}`}
+        numColumns={COLUMNS}
+        keyExtractor={(entry) => entry.key}
+        {...ShelfGridWindow}
+        renderItem={({ item }) => (
+          /* Favourites say nothing under their covers, so that tab keeps no
                line for it; every other tab holds one, so its rows are level
                whether or not a game has something to say. */
-            <LibraryCard entry={item} width={tileWidth} captioned={tab !== 'favourites'} />
-          )}
-          columnWrapperStyle={styles.column}
-          contentContainerStyle={styles.grid}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            /* Search and sort are a linked account's, sorted in Postgres. The
+          <LibraryCard entry={item} width={tileWidth} captioned={tab !== 'favourites'} />
+        )}
+        columnWrapperStyle={styles.column}
+        contentContainerStyle={styles.grid}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          /* Search and sort are a linked account's, sorted in Postgres. The
                others are short enough to scan, and a sort row that silently
                applied to only part of what was on screen would be worse than
                no sort row. */
-            isOwnedTab(tab) ? (
-              <View style={styles.controls}>
-                {tab === 'steam' && <SteamFigures data={steamStats.data} />}
-                <TextField
-                  value={search}
-                  onChangeText={setSearch}
-                  icon="search"
-                  variant="search"
-                  placeholder="Search this library"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
+          isOwnedTab(tab) ? (
+            <View style={styles.controls}>
+              {tab === 'steam' && <SteamFigures data={steamStats.data} />}
+              <TextField
+                value={search}
+                onChangeText={setSearch}
+                icon="search"
+                variant="search"
+                placeholder="Search this library"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
 
-                {/* "Recently purchased" is absent for Steam on purpose: its Web
+              {/* "Recently purchased" is absent for Steam on purpose: its Web
                     API exposes no purchase date, and a sort that quietly fell
                     back to last-played would misrepresent what it shows. */}
-                <SortBar
-                  /* "Most played" only where the service reports playtime. */
-                  options={availableSorts(provider).filter(
-                    (option) => playtime || option.key !== 'most-played'
-                  )}
-                  value={sort}
-                  onChange={setSort}
-                  accessibilityLabel="Sort this library"
-                />
-              </View>
-            ) : null
-          }
-          ListEmptyComponent={
-            <LibraryEmpty
-              tab={tab}
-              isSelf={isSelf}
-              isPrivate={isPrivate}
-              noSteam={noSteam}
-              search={search}
-              loading={
-                isOwnedTab(tab)
-                  ? games.isLoading
-                  : tab === 'backlog'
-                    ? backlog.isLoading
-                    : tab === 'favourites'
-                      ? favourites.isLoading
-                      : logs.isLoading
-              }
-              error={
-                isOwnedTab(tab)
-                  ? games.error
-                  : tab === 'backlog'
-                    ? backlog.error
-                    : tab === 'favourites'
-                      ? favourites.error
-                      : logs.error
-              }
-              tileWidth={tileWidth}
-            />
-          }
-        />
-      )}
+              <SortBar
+                /* "Most played" only where the service reports playtime. */
+                options={availableSorts(provider).filter(
+                  (option) => playtime || option.key !== 'most-played'
+                )}
+                value={sort}
+                onChange={setSort}
+                accessibilityLabel="Sort this library"
+              />
+            </View>
+          ) : null
+        }
+        ListEmptyComponent={
+          <LibraryEmpty
+            tab={tab}
+            isSelf={isSelf}
+            isPrivate={isPrivate}
+            noSteam={noSteam}
+            search={search}
+            loading={
+              isOwnedTab(tab)
+                ? games.isLoading
+                : tab === 'backlog'
+                  ? backlog.isLoading
+                  : tab === 'favourites'
+                    ? favourites.isLoading
+                    : logs.isLoading
+            }
+            error={
+              isOwnedTab(tab)
+                ? games.error
+                : tab === 'backlog'
+                  ? backlog.error
+                  : tab === 'favourites'
+                    ? favourites.error
+                    : logs.error
+            }
+            tileWidth={tileWidth}
+          />
+        }
+      />
     </Screen>
   );
 }
@@ -685,86 +685,6 @@ function LibraryEmpty({
 }
 
 // ---------------------------------------------------------------------------
-// Physical — the binder
-// ---------------------------------------------------------------------------
-
-/**
- * The Physical tab: the binder, and the ways to fill it.
- *
- * The binder is the whole view, not a header over a grid — it *is* the list of
- * physical games, just kept the way discs are kept. The plain list survives one
- * tap away for anyone who wants to scan titles rather than turn pages.
- */
-function PhysicalTab({
-  copies,
-  loading,
-  error,
-  onRetry,
-  isSelf,
-  ownerId,
-  width,
-  onOpenCopy,
-}: {
-  copies: CopyWithRelations[];
-  loading: boolean;
-  error: unknown;
-  onRetry: () => void;
-  isSelf: boolean;
-  ownerId: string;
-  width: number;
-  onOpenCopy: (copy: CopyWithRelations) => void;
-}) {
-  const router = useRouter();
-
-  if (loading) {
-    return (
-      <View style={styles.physical}>
-        <Skeleton width={Math.floor(width / 2)} height={Math.floor(width * 1.05)} />
-      </View>
-    );
-  }
-  if (error) return <ErrorState error={error} onRetry={onRetry} />;
-
-  return (
-    <PageScrollView contentContainerStyle={styles.physical} showsVerticalScrollIndicator={false}>
-      <CdBinder copies={copies} width={width} onOpenCopy={onOpenCopy} />
-
-      {copies.length === 0 && (
-        <View style={styles.physicalEmpty}>
-          <Text variant="h3">No physical games yet</Text>
-          <Text variant="bodySmall" color="textMuted" style={styles.centred}>
-            {isSelf
-              ? 'Scan the barcode on a box, or add one by hand, and its disc goes in here.'
-              : 'Nothing on this shelf yet.'}
-          </Text>
-        </View>
-      )}
-
-      {isSelf && (
-        <View style={styles.physicalActions}>
-          <Button title="Scan a game" icon="scan-outline" onPress={() => router.push('/scan')} />
-          <Button
-            title="Add by hand"
-            variant="secondary"
-            onPress={() => router.push('/add-copy')}
-          />
-        </View>
-      )}
-
-      {copies.length > 0 && (
-        <Link href={{ pathname: '/copies/[user]', params: { user: ownerId } }} asChild>
-          <PressableScale accessibilityRole="link" scaleTo={0.96} hitSlop={12}>
-            <Text variant="caption" color="primaryText">
-              See them as a list
-            </Text>
-          </PressableScale>
-        </Link>
-      )}
-    </PageScrollView>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Steam
 // ---------------------------------------------------------------------------
 
@@ -843,15 +763,5 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   statCell: { width: '50%', gap: 1, paddingVertical: Spacing.x8 },
-  physical: {
-    alignItems: 'center',
-    gap: Spacing.x24,
-    padding: Spacing.x16,
-    paddingTop: Spacing.x24,
-    paddingBottom: Spacing.x48,
-  },
-  physicalEmpty: { alignItems: 'center', gap: Spacing.x4 },
-  centred: { textAlign: 'center' },
-  physicalActions: { flexDirection: 'row', gap: Spacing.x8 },
   skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
 });

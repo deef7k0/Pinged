@@ -21,7 +21,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   AppState,
   KeyboardAvoidingView,
   Platform,
@@ -32,7 +31,6 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   CopyShowcase,
@@ -45,11 +43,10 @@ import { copyRecordLine } from '@/components/copy-case-back';
 import { formatReleaseDate } from '@/lib/games/release';
 import { ReviewQuote } from '@/components/review-quote';
 import { Button } from '@/components/ui/button';
-import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
+import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
 import { PageScrollView } from '@/components/ui/page-scroll';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { RichText } from '@/components/ui/rich-text';
-import { ROUND_ACTION } from '@/components/ui/round-action';
 import { EmptyState, ErrorState, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
 import { TextField } from '@/components/ui/text-field';
@@ -59,8 +56,12 @@ import { CASE_TEMPLATE_SIZE } from '@/constants/platform-cases';
 import { platformKeyForStored } from '@/constants/platform-family';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { AccentProvider, useAccent, useGameAccent } from '@/hooks/use-accent';
+import { useCopyMesh } from '@/hooks/use-copy-mesh';
+import { SKIA_AVAILABLE } from '@/lib/skia-available';
+import { MeshBackdrop } from '@/components/ui/mesh-backdrop';
 import { useCopyArt } from '@/hooks/use-copy-art';
 import { useDiscRoom } from '@/hooks/use-header-height';
+import { CAPTION_ROOM, useStageRoom } from '@/hooks/use-copy-stage-room';
 import { useTheme } from '@/hooks/use-theme';
 import {
   COPY_NOTES_MAX,
@@ -74,18 +75,10 @@ import { recallCopy } from '@/lib/api/seen-copies';
 import { displayNameFor } from '@/lib/format';
 import { cardShows } from '@/lib/review-quote';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/components/ui/dialog';
 
 /** Lines of the review its card prints — the reviews sheet's own measure. */
 const REVIEW_LINES = 10;
-
-/**
- * What the first screen holds under the stage, in dp, so the stage can be given
- * the rest: the caption (a title line and the line under it), the keys (a round
- * key and its word), and enough of whatever comes next to say there is more.
- */
-const CAPTION_ROOM = Spacing.x16 + Type.h2.lineHeight + Spacing.x4 + Type.body.lineHeight;
-const KEYS_ROOM = Spacing.x20 + ROUND_ACTION + Spacing.x4 + 2 + Type.caption.lineHeight;
-const PEEK = Spacing.x48;
 
 /** How long the caption says a sealed copy would not open, before it goes back. */
 const REFUSAL_MS = 2600;
@@ -120,7 +113,11 @@ const REFUSAL_MS = 2600;
  * (DESIGN.md § 4.3).
  */
 export default function CopyScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, handover } = useLocalSearchParams<{ id: string; handover?: string }>();
+  /* Opened from the physical shelf's Cover Flow, which has already flown the
+     cover to where the case stands and faded the moving colours in: the case
+     is there at once, square on, and the colours do not fade in again. */
+  const handedOver = handover === '1';
 
   const copy = useQuery({
     queryKey: ['copy', id],
@@ -140,6 +137,10 @@ export default function CopyScreen() {
 
   const discRoom = useDiscRoom();
   const stageRoom = useStageRoom();
+  /* The game's colours moving slowly behind the copy, or the plain page —
+     the owner's (2026-11-02), switched by the disc at the top right. */
+  const backdrop = useCopyMesh();
+  const meshOn = backdrop.mesh && SKIA_AVAILABLE && !!copy.data;
 
   let body: React.ReactNode;
   if (copy.isLoading) body = <StageSkeleton />;
@@ -152,7 +153,7 @@ export default function CopyScreen() {
       <AccentProvider
         artwork={copy.data.game?.cover_url ?? copy.data.game?.hero_url}
         genres={copy.data.game?.genres}>
-        <CopyDetail copy={copy.data} pageColor={accent.page} />
+        <CopyDetail copy={copy.data} pageColor={accent.page} handedOver={handedOver} />
       </AccentProvider>
     );
 
@@ -164,6 +165,19 @@ export default function CopyScreen() {
     <Screen
       edges={['bottom']}
       background={copy.data ? accent.page : undefined}
+      backdrop={
+        meshOn ? (
+          <MeshBackdrop
+            instant={handedOver}
+            colours={[
+              accent.m3.primaryContainer,
+              accent.m3.tertiaryContainer,
+              accent.m3.secondaryContainer,
+              accent.page,
+            ]}
+          />
+        ) : undefined
+      }
       /* The disc of glass leaves with the stage. The bar that follows names
          the game, once the stage and the name under it have gone — which is
          the room the stage was given, the caption under it, and the disc's own
@@ -173,6 +187,19 @@ export default function CopyScreen() {
           back
           title={copy.data?.game?.title}
           header={discRoom + stageRoom + CAPTION_ROOM}
+          right={
+            SKIA_AVAILABLE && copy.data ? (
+              <TopBarDisc
+                icon={backdrop.mesh ? 'color-palette' : 'color-palette-outline'}
+                label={
+                  backdrop.mesh
+                    ? 'Moving colours behind the copy. Switch to the plain page'
+                    : 'Plain page behind the copy. Switch to moving colours'
+                }
+                onPress={() => backdrop.setMesh(!backdrop.mesh)}
+              />
+            ) : undefined
+          }
         />
       }>
       {body}
@@ -180,15 +207,15 @@ export default function CopyScreen() {
   );
 }
 
-/** The height the stage may take on this display: the first screen, less what sits under it. */
-function useStageRoom(): number {
-  const { height } = useWindowDimensions();
-  const header = useDiscRoom();
-  const insets = useSafeAreaInsets();
-  return height - header - insets.bottom - CAPTION_ROOM - KEYS_ROOM - PEEK;
-}
-
-function CopyDetail({ copy, pageColor }: { copy: CopyWithRelations; pageColor: string }) {
+function CopyDetail({
+  copy,
+  pageColor,
+  handedOver,
+}: {
+  copy: CopyWithRelations;
+  pageColor: string;
+  handedOver: boolean;
+}) {
   const theme = useTheme();
   const accent = useAccent();
   const { width, height } = useWindowDimensions();
@@ -309,7 +336,7 @@ function CopyDetail({ copy, pageColor }: { copy: CopyWithRelations; pageColor: s
   });
 
   function confirmRemove() {
-    Alert.alert(
+    showAlert(
       'Delete this copy?',
       `It comes off your shelf. ${copy.game?.title ?? 'The game'} itself, your log and any review stay as they are.`,
       [
@@ -344,6 +371,7 @@ function CopyDetail({ copy, pageColor }: { copy: CopyWithRelations; pageColor: s
           onSideChange={setSide}
           onRefuse={refuse}
           active={focused && foreground && !scrolledAway && !typing}
+          handedOver={handedOver}
         />
 
         <View style={styles.caption}>

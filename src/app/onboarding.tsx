@@ -1,6 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, BackHandler } from 'react-native';
+import { BackHandler } from 'react-native';
 
 import {
   AnimatedStep,
@@ -39,6 +39,7 @@ import {
   saveResume,
   useOnboarding,
 } from '@/store/onboarding';
+import { Loader } from '@/components/ui/loader';
 
 /**
  * Whether linking Steam would import anything yet.
@@ -105,7 +106,7 @@ function Holding() {
   const theme = useTheme();
   return (
     <HoldingStep>
-      <ActivityIndicator color={theme.textMuted} />
+      <Loader color={theme.textMuted} />
     </HoldingStep>
   );
 }

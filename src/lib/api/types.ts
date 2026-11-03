@@ -4,6 +4,7 @@ import type {
   ListKind,
   ListRow,
   NotificationKind,
+  NotificationTargetType,
   Profile,
   TargetType,
 } from '../database.types';
@@ -15,7 +16,7 @@ import type {
  * kinds added in 0005 — and did it again to `TargetType` when 0013 added
  * `list`, which is why that one is now imported above rather than written out.
  */
-export type { ListKind, NotificationKind, TargetType };
+export type { ListKind, NotificationKind, NotificationTargetType, TargetType };
 
 export type Tier = 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
 
@@ -132,7 +133,7 @@ export type AppNotification = {
   user_id: string;
   actor_id: string;
   kind: NotificationKind;
-  target_type: TargetType | null;
+  target_type: NotificationTargetType | null;
   target_id: string | null;
   read: boolean;
   created_at: string;

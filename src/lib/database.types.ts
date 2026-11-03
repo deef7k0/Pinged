@@ -220,7 +220,15 @@ export type ProfileAchievementStats = {
 
 export type ListKind = 'list' | 'favorites' | 'tier' | 'wishlist' | 'awards' | 'captioned';
 export type NotificationKind =
-  'like' | 'comment' | 'follow' | 'reply' | 'friend_request' | 'friend_accepted' | 'wall_post';
+  | 'like'
+  | 'comment'
+  | 'follow'
+  | 'reply'
+  | 'friend_request'
+  | 'friend_accepted'
+  | 'wall_post'
+  /** 0046: somebody answered one of your requests. Its target is the request. */
+  | 'ping_suggestion';
 
 // --- 0005_friends_and_wall.sql ----------------------------------------------
 
@@ -394,12 +402,15 @@ export type AwardRow = {
   created_at: string;
 };
 
+/** What a notification can point at: a log, a list, or (0046) a request. */
+export type NotificationTargetType = TargetType | 'ping';
+
 export type NotificationRow = {
   id: string;
   user_id: string;
   actor_id: string;
   kind: NotificationKind;
-  target_type: TargetType | null;
+  target_type: NotificationTargetType | null;
   target_id: string | null;
   read: boolean;
   created_at: string;
@@ -865,8 +876,8 @@ export type BlockRow = {
   created_at: string;
 };
 
-/** What can be reported in `user_content_reports`. */
-export type UserContentKind = 'comment' | 'wall_post' | 'profile';
+/** What can be reported in `user_content_reports` — 0045's three, and 0046's two. */
+export type UserContentKind = 'comment' | 'wall_post' | 'profile' | 'ping' | 'ping_suggestion';
 
 /** 0031's reasons, and one only a profile can be: pretending to be somebody. */
 export type UserContentReportReason = ContentReportReason | 'impersonation';
@@ -1111,6 +1122,122 @@ export type ContributionResult =
   | { status: 'duplicate'; contribution_id: string }
   | { status: 'pending'; contribution_id: string; release_id: null }
   | { status: 'approved'; contribution_id: string; release_id: string };
+
+// --- 0046_pings.sql ----------------------------------------------------------
+
+/** Who may ping somebody: anyone who follows them, mutual follows, or friends. */
+export type PingAudience = 'followers' | 'mutuals' | 'friends';
+
+/** One person's setting. No row means `followers`. Readable only by its owner. */
+export type PingPreferencesRow = {
+  user_id: string;
+  audience: PingAudience;
+  updated_at: string;
+};
+
+/** What can be pinged to a person. `request` is a community ping. */
+export type DirectPingKind = 'game' | 'review' | 'collection' | 'event' | 'soundtrack' | 'request';
+
+/**
+ * A ping to a person: what was sent (kind and id), how it looked to the
+ * sender (title, line, picture), and their words. Readable by both ends; the
+ * recipient may only flip `read`.
+ */
+export type DirectPingRow = {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  kind: DirectPingKind;
+  target_id: string;
+  title: string;
+  subtitle: string | null;
+  image_url: string | null;
+  message: string | null;
+  read: boolean;
+  created_at: string;
+};
+
+export type PingStatus = 'open' | 'found' | 'closed';
+export type PingLength = 'short' | 'medium' | 'long';
+export type PingPlayers = 'solo' | 'multi';
+export type PingEra = 'recent' | 'modern' | 'retro';
+
+/** A request to the community. `suggestion_count` and `owner_seen_at` are the database's. */
+export type PingRow = {
+  id: string;
+  user_id: string;
+  description: string;
+  status: PingStatus;
+  genres: string[];
+  platforms: string[];
+  play_length: PingLength | null;
+  player_mode: PingPlayers | null;
+  release_era: PingEra | null;
+  resolved_game_id: string | null;
+  suggestion_count: number;
+  owner_seen_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PingReferenceGameRow = {
+  id: string;
+  ping_id: string;
+  game_id: string;
+  sort_order: number;
+  created_at: string;
+};
+
+export type PingSuggestionRow = {
+  id: string;
+  ping_id: string;
+  user_id: string;
+  game_id: string;
+  message: string | null;
+  interesting: boolean;
+  created_at: string;
+};
+
+/** A reference game as `ping_feed` returns it, with whether the reader played it. */
+export type PingFeedRef = {
+  game_id: string;
+  title: string;
+  cover_url: string | null;
+  release_year: number | null;
+  played: boolean;
+};
+
+/** One row of `ping_feed()`: a request as its card draws it. */
+export type PingFeedRow = {
+  id: string;
+  user_id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  description: string;
+  status: PingStatus;
+  genres: string[];
+  platforms: string[];
+  play_length: PingLength | null;
+  player_mode: PingPlayers | null;
+  release_era: PingEra | null;
+  suggestion_count: number;
+  /** Suggestions the owner has not opened; 0 for anybody else. */
+  unseen_count: number;
+  /** How many the reader suggested here. */
+  my_suggestion_count: number;
+  created_at: string;
+  updated_at: string;
+  reference_count: number;
+  /** Reference games the reader has played (playing, played, paused, dropped). */
+  matched_count: number;
+  /** Of those, the ones the reader scored or wrote about. */
+  reviewed_count: number;
+  /** The For You tier: min(matched, 2). Always 0 elsewhere. Part of the cursor. */
+  tier: number;
+  refs: PingFeedRef[];
+  resolved_game: Omit<PingFeedRef, 'played'> | null;
+};
 
 type Insert<T, Optional extends keyof T> = Omit<T, Optional> & Partial<Pick<T, Optional>>;
 
@@ -1501,6 +1628,80 @@ export type Database = {
         Update: Partial<UserContentReportRow>;
         Relationships: [];
       };
+      // --- 0046 pings ----------------------------------------------------------
+      // Every table keyed on its own `id`, never on two keys into `profiles`.
+      ping_preferences: {
+        Row: PingPreferencesRow;
+        Insert: Insert<PingPreferencesRow, 'audience' | 'updated_at'>;
+        Update: Partial<PingPreferencesRow>;
+        Relationships: [];
+      };
+      direct_pings: {
+        Row: DirectPingRow;
+        Insert: Insert<
+          DirectPingRow,
+          'id' | 'created_at' | 'read' | 'subtitle' | 'image_url' | 'message'
+        >;
+        Update: Partial<Pick<DirectPingRow, 'read'>>;
+        Relationships: [
+          FK<'direct_pings_sender_id_fkey', 'sender_id', 'profiles', 'id'>,
+          FK<'direct_pings_recipient_id_fkey', 'recipient_id', 'profiles', 'id'>,
+        ];
+      };
+      pings: {
+        Row: PingRow;
+        Insert: Insert<
+          PingRow,
+          | 'id'
+          | 'status'
+          | 'genres'
+          | 'platforms'
+          | 'play_length'
+          | 'player_mode'
+          | 'release_era'
+          | 'resolved_game_id'
+          | 'suggestion_count'
+          | 'owner_seen_at'
+          | 'created_at'
+          | 'updated_at'
+        >;
+        Update: Partial<
+          Pick<
+            PingRow,
+            | 'description'
+            | 'status'
+            | 'genres'
+            | 'platforms'
+            | 'play_length'
+            | 'player_mode'
+            | 'release_era'
+            | 'resolved_game_id'
+          >
+        >;
+        Relationships: [
+          FK<'pings_user_id_fkey', 'user_id', 'profiles', 'id'>,
+          FK<'pings_resolved_game_id_fkey', 'resolved_game_id', 'games', 'id'>,
+        ];
+      };
+      ping_reference_games: {
+        Row: PingReferenceGameRow;
+        Insert: Insert<PingReferenceGameRow, 'id' | 'sort_order' | 'created_at'>;
+        Update: never;
+        Relationships: [
+          FK<'ping_reference_games_ping_id_fkey', 'ping_id', 'pings', 'id'>,
+          FK<'ping_reference_games_game_id_fkey', 'game_id', 'games', 'id'>,
+        ];
+      };
+      ping_suggestions: {
+        Row: PingSuggestionRow;
+        Insert: Insert<PingSuggestionRow, 'id' | 'message' | 'interesting' | 'created_at'>;
+        Update: never;
+        Relationships: [
+          FK<'ping_suggestions_ping_id_fkey', 'ping_id', 'pings', 'id'>,
+          FK<'ping_suggestions_user_id_fkey', 'user_id', 'profiles', 'id'>,
+          FK<'ping_suggestions_game_id_fkey', 'game_id', 'games', 'id'>,
+        ];
+      };
       moderators: {
         Row: ModeratorRow;
         Insert: Insert<ModeratorRow, 'created_at'>;
@@ -1797,6 +1998,31 @@ export type Database = {
         Returns: undefined;
       };
       delete_my_account: { Args: Record<string, never>; Returns: undefined };
+      // --- 0046 ---------------------------------------------------------------
+      pingable_people: {
+        Args: { p_search?: string | null; p_limit?: number };
+        Returns: Profile[];
+      };
+      ping_feed: {
+        Args: {
+          p_mode?: 'for_you' | 'latest' | 'mine';
+          p_genre?: string | null;
+          p_platform?: string | null;
+          p_with_refs?: boolean;
+          p_cursor_tier?: number | null;
+          p_cursor_at?: string | null;
+          p_cursor_id?: string | null;
+          p_limit?: number;
+          p_ping?: string | null;
+        };
+        Returns: PingFeedRow[];
+      };
+      my_unseen_ping_suggestions: { Args: Record<string, never>; Returns: number };
+      mark_ping_seen: { Args: { p_ping: string }; Returns: undefined };
+      set_ping_suggestion_interesting: {
+        Args: { p_suggestion: string; p_interesting: boolean };
+        Returns: undefined;
+      };
       // --- 0026 ---------------------------------------------------------------
       game_review_stats: {
         Args: { p_game: string };

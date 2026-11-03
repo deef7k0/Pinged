@@ -68,7 +68,7 @@ export function renderLegalHtml(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escape(doc.title)} — GameLog</title>
+<title>${escape(doc.title)} — Pinged</title>
 <style>
   :root { color-scheme: dark; }
   body { margin: 0; background: #14171C; color: #E1E4EB;
@@ -85,7 +85,7 @@ export function renderLegalHtml(
 <body>
 <main>
 <h1>${escape(doc.title)}</h1>
-<p class="updated">GameLog · Last updated ${escape(LEGAL_UPDATED)}</p>
+<p class="updated">Pinged · Last updated ${escape(LEGAL_UPDATED)}</p>
 <p>${inline(doc.intro, email)}</p>
 ${sections}
 <nav>${nav}</nav>

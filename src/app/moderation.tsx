@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { ChoiceChips } from '@/components/choice-chips';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,7 @@ import type {
 import { displayBarcode } from '@/lib/barcode';
 import { displayNameFor, timeAgo } from '@/lib/format';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/components/ui/dialog';
 
 /**
  * Reasons a claim is turned down. Preset rather than typed: the contributor sees
@@ -144,7 +145,10 @@ export default function ModerationScreen() {
 
   if (moderator.isLoading) {
     return (
-      <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="Moderation" />}>
+      <Screen
+        edges={['bottom']}
+        insetHeader
+        topBar={<FrostedTopBar back title="Moderation" largeTitle={false} />}>
         <LoadingState />
       </Screen>
     );
@@ -152,8 +156,11 @@ export default function ModerationScreen() {
 
   if (!moderator.data) {
     return (
-      <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="Moderation" />}>
-        <EmptyState title="Moderators only" message="This queue is for Gamelog’s moderators." />
+      <Screen
+        edges={['bottom']}
+        insetHeader
+        topBar={<FrostedTopBar back title="Moderation" largeTitle={false} />}>
+        <EmptyState title="Moderators only" message="This queue is for Pinged’s moderators." />
       </Screen>
     );
   }
@@ -348,7 +355,10 @@ export default function ModerationScreen() {
   }
 
   return (
-    <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="Moderation" />}>
+    <Screen
+      edges={['bottom']}
+      insetHeader
+      topBar={<FrostedTopBar back title="Moderation" largeTitle={false} />}>
       {list}
     </Screen>
   );
@@ -469,7 +479,7 @@ function SuggestionReportCard({ entry }: { entry: SuggestionReportQueueRow }) {
   });
 
   function askRemove() {
-    Alert.alert(
+    showAlert(
       'Remove this suggestion?',
       `${entry.author_name}’s reasons and text come down, with the upvotes they earned. They still count as agreeing with the pick. This cannot be undone.`,
       [
@@ -568,7 +578,7 @@ function ReviewReportCard({ entry }: { entry: ReviewReportQueueRow }) {
   });
 
   function askRemove() {
-    Alert.alert(
+    showAlert(
       'Remove this review?',
       `The headline and the writing come down. ${entry.author_name}’s log of ${entry.game_title} — the score and the hours — stays. This cannot be undone.`,
       [
@@ -661,6 +671,17 @@ const PEOPLE_KIND: Record<
     remove: 'Delete post',
     explain: (name) => `${name}’s wall post is deleted. This cannot be undone.`,
   },
+  ping: {
+    noun: 'PING',
+    remove: 'Delete ping',
+    explain: (name) =>
+      `${name}’s ping is deleted, with every suggestion on it. This cannot be undone.`,
+  },
+  ping_suggestion: {
+    noun: 'PING SUGGESTION',
+    remove: 'Delete suggestion',
+    explain: (name) => `${name}’s suggestion is deleted. This cannot be undone.`,
+  },
   profile: {
     noun: 'PROFILE',
     remove: 'Reset profile',
@@ -687,6 +708,10 @@ function UserContentReportCard({ entry }: { entry: UserContentReportQueueRow }) 
       if (action !== 'remove') return;
       if (entry.kind === 'profile') {
         queryClient.invalidateQueries({ queryKey: ['profile', entry.author_id] });
+      } else if (entry.kind === 'ping' || entry.kind === 'ping_suggestion') {
+        queryClient.invalidateQueries({ queryKey: ['pings'] });
+        queryClient.invalidateQueries({ queryKey: ['ping'] });
+        queryClient.invalidateQueries({ queryKey: ['ping-suggestions'] });
       } else {
         queryClient.invalidateQueries({ queryKey: ['comments'] });
         queryClient.invalidateQueries({ queryKey: ['wall'] });
@@ -695,7 +720,7 @@ function UserContentReportCard({ entry }: { entry: UserContentReportQueueRow }) 
   });
 
   function askRemove() {
-    Alert.alert(`${kind.remove}?`, kind.explain(entry.author_name), [
+    showAlert(`${kind.remove}?`, kind.explain(entry.author_name), [
       { text: 'Cancel', style: 'cancel' },
       { text: kind.remove, style: 'destructive', onPress: () => decide.mutate('remove') },
     ]);
@@ -709,6 +734,8 @@ function UserContentReportCard({ entry }: { entry: UserContentReportQueueRow }) 
       });
     } else if (entry.kind === 'wall_post' && entry.context_id) {
       router.push({ pathname: '/profile/[id]', params: { id: entry.context_id } });
+    } else if ((entry.kind === 'ping' || entry.kind === 'ping_suggestion') && entry.context_id) {
+      router.push({ pathname: '/ping/[id]', params: { id: entry.context_id } });
     } else {
       router.push({ pathname: '/profile/[id]', params: { id: entry.author_id } });
     }
@@ -743,7 +770,13 @@ function UserContentReportCard({ entry }: { entry: UserContentReportQueueRow }) 
       )}
       <View style={styles.readAll}>
         <Button
-          title={entry.kind === 'comment' ? 'Open the thread' : 'Open the profile'}
+          title={
+            entry.kind === 'comment'
+              ? 'Open the thread'
+              : entry.kind === 'ping' || entry.kind === 'ping_suggestion'
+                ? 'Open the ping'
+                : 'Open the profile'
+          }
           variant="ghost"
           size="small"
           onPress={open}

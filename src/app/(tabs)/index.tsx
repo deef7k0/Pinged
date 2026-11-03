@@ -396,7 +396,7 @@ export default function HomeScreen() {
   const activityLogs = activity.data?.logs ?? [];
   /* The heading is the row's claim about whose games these are. While the
      first answer is on its way it is the row's own name. */
-  const activityTitle = activity.data?.scope === 'everyone' ? 'New on GameLog' : 'New from friends';
+  const activityTitle = activity.data?.scope === 'everyone' ? 'New on Pinged' : 'New from friends';
   const personFoot = footHeight('person');
   const lineFoot = footHeight('line');
 
@@ -665,7 +665,8 @@ export default function HomeScreen() {
               )}
             </HomeSection>
 
-            {/* Band 4 — what happened. */}
+            {/* Band 4 — what happened. Its heading is the way into News, which
+                left the tab bar for Pings (2026-10-31). */}
             <HomeSection title="Latest news" seeAll="/news">
               <View style={styles.stack}>
                 {news.isLoading ? (
@@ -689,11 +690,15 @@ export default function HomeScreen() {
             {/* Band 5 — the showcases that just happened, as stories. Absent when
             IGDB has none to give; a failure says so, as every band does. */}
             {latestEvents.isLoadingError ? (
-              <HomeSection title="Latest events">
+              <HomeSection
+                title="Latest events"
+                seeAll={{ pathname: '/news', params: { tab: 'events' } }}>
                 <BandError label="Events could not load." onRetry={() => latestEvents.refetch()} />
               </HomeSection>
             ) : latestEvents.isPending || (latestEvents.data ?? []).length > 0 ? (
-              <HomeSection title="Latest events">
+              <HomeSection
+                title="Latest events"
+                seeAll={{ pathname: '/news', params: { tab: 'events' } }}>
                 <View style={styles.stack}>
                   {latestEvents.isPending
                     ? Array.from({ length: LATEST_EVENTS }).map((_, index) => (

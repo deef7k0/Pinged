@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useRouter, type Href } from 'expo-router';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import * as Linking from 'expo-linking';
-import { Alert, RefreshControl, Share, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { RefreshControl, Share, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { PlatformBadges } from '@/components/gaming/platform-badges';
 import { useTabBarClearance } from '@/components/app-tab-bar';
@@ -60,6 +60,7 @@ import { buildShelf } from '@/lib/games/shelf';
 import { hasWriting } from '@/lib/review-quote';
 import { useGamingSync, useLinkedAccount } from '@/hooks/use-gaming';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/components/ui/dialog';
 
 type ProfileTab = 'reviews' | 'lists' | 'wall' | 'steam';
 
@@ -459,7 +460,7 @@ export function ProfileView({ profileId, headerAction }: ProfileViewProps) {
 
   /** Unfollowing is quiet and reversible, so it confirms without alarm. */
   function confirmUnfollow() {
-    Alert.alert(`Unfollow ${ownerName}?`, 'Their activity will stop appearing in your feed.', [
+    showAlert(`Unfollow ${ownerName}?`, 'Their activity will stop appearing in your feed.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Unfollow', style: 'destructive', onPress: () => toggleFollow.mutate() },
     ]);
@@ -468,7 +469,7 @@ export function ProfileView({ profileId, headerAction }: ProfileViewProps) {
   /** Their profile's link, through the system's share sheet. */
   function shareProfile() {
     const url = Linking.createURL(`/profile/${profileId}`);
-    Share.share({ message: `${ownerName} on GameLog\n${url}` }).catch(() => undefined);
+    Share.share({ message: `${ownerName} on Pinged\n${url}` }).catch(() => undefined);
   }
 
   /*
@@ -864,7 +865,7 @@ function FriendKey({
              destroys that status. The alert is where the action is named.
              Same pattern as `game-actions.tsx`. */
           onPress={() =>
-            Alert.alert('Remove friend?', 'You will both lose access to each other’s wall.', [
+            showAlert('Remove friend?', 'You will both lose access to each other’s wall.', [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Remove', style: 'destructive', onPress: () => onPress('remove') },
             ])

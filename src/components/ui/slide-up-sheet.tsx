@@ -16,37 +16,40 @@ import Animated, {
 
 import { IconButton } from '@/components/ui/icon-button';
 import { Text } from '@/components/ui/text';
-import { Radius, Spacing, TapTarget, withAlpha } from '@/constants/theme';
+import { Spacing, TapTarget, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-/**
- * How the sheet arrives and leaves.
- *
- * Damped just under critical, so it settles with one shallow overshoot rather
- * than sliding to a dead stop. Heavier than `ARRIVAL_CONTROL`: this is a whole
- * surface moving, and it should read as having some mass behind it.
+/*
+ * reacticx's tray (`organisms/tray`, MIT), read from its source: a card that
+ * floats 10 in from the sides and above the system inset, 38 round, rising
+ * from below as it grows from 0.9 to full size on a spring of 280 / 30, its
+ * handle 38 × 5. A drag projects the release a third of a second ahead, as
+ * iOS does, so a flick and a long drag decide alike; past the top it
+ * rubber-bands. The backdrop is black at 55%, and thins as the card is
+ * dragged away.
  */
-const RISE = { damping: 26, stiffness: 190, mass: 1 } as const;
-
+const PRESENT_SPRING = { damping: 30, stiffness: 280, mass: 0.9 } as const;
+const RETURN_SPRING = { damping: 26, stiffness: 300, mass: 0.9 } as const;
 /** Dismissal is faster than arrival, as an exit always should be. */
 const FALL_MS = 220;
-
-/**
- * How far down it has to be dragged before releasing dismisses it.
- *
- * A release *anywhere* closing the sheet is the literal reading of "drag down
- * and let go", and it is a trap: a two-pixel twitch while reaching for the list
- * would throw the screen away. Sixty points is unmistakably a drag and still
- * well short of effortful — and a downward flick dismisses from anywhere, so the
- * threshold never stands between a deliberate gesture and its result.
- */
-const DISMISS_AT = 60;
-
-/** A flick counts even when it has not travelled far. dp per second. */
-const DISMISS_VELOCITY = 700;
-
-/** Resistance on an upward drag. There is nothing above full screen. */
-const RUBBER_BAND = 0.2;
+/** How far past its rest a release has to land, projected, to dismiss. */
+const DISMISS_AT = 96;
+/** A flick dismisses from anywhere. dp per second. */
+const DISMISS_VELOCITY = 900;
+/** How far ahead a release is projected, in seconds (`flickProjection`). */
+const PROJECTION = 0.35;
+/** The tray's corner, and its distance from the sides and the foot. */
+const TRAY_RADIUS = 38;
+const TRAY_SIDE = 10;
+const TRAY_FOOT = 12;
+/** The tray grows from this as it rises. */
+const START_SCALE = 0.9;
+/** reacticx's `rubberBand`, for a drag past the top. */
+function rubberBand(distance: number, dimension: number, factor = 0.55): number {
+  'worklet';
+  const d = Math.max(dimension, 1);
+  return (1 - 1 / ((distance * factor) / d + 1)) * d;
+}
 
 export type SlideUpSheetProps = {
   /** Mount and raise it. The caller keeps this in state. */
@@ -136,7 +139,7 @@ function OpenSheet({ onClose, title, maxHeightRatio, surface, children }: SlideU
       return;
     }
     offset.set(
-      withSpring(0, RISE, (finished) => {
+      withSpring(0, PRESENT_SPRING, (finished) => {
         if (finished) runOnJS(setSettled)(true);
       })
     );
@@ -162,24 +165,31 @@ function OpenSheet({ onClose, title, maxHeightRatio, surface, children }: SlideU
     .activeOffsetY([-8, 8])
     .onUpdate((event) => {
       'worklet';
-      /* Down follows the finger exactly; up resists, because there is nothing
-         above a full-screen sheet to reveal. */
-      offset.set(event.translationY > 0 ? event.translationY : event.translationY * RUBBER_BAND);
+      /* Down follows the finger exactly; up rubber-bands, because there is
+         nothing above the tray to reveal. */
+      offset.set(
+        event.translationY > 0 ? event.translationY : -rubberBand(-event.translationY, height)
+      );
     })
     .onEnd((event) => {
       'worklet';
-      const far = event.translationY > DISMISS_AT;
-      const flicked = event.velocityY > DISMISS_VELOCITY;
+      const projected = event.translationY + event.velocityY * PROJECTION;
+      const flicked = event.velocityY > DISMISS_VELOCITY && event.translationY > 0;
 
-      if (far || flicked) {
+      if (projected > DISMISS_AT || flicked) {
         runOnJS(dismiss)();
         return;
       }
-      offset.set(withSpring(0, RISE));
+      offset.set(withSpring(0, { ...RETURN_SPRING, velocity: event.velocityY }));
     });
 
   const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: offset.get() }],
+    transform: [
+      { translateY: offset.get() },
+      {
+        scale: reduceMotion ? 1 : interpolate(offset.get(), [0, height], [1, START_SCALE], 'clamp'),
+      },
+    ],
     /* Under Reduce Motion the sheet does not travel, so opacity is the only
        thing left to carry the transition. */
     opacity: reduceMotion ? interpolate(offset.get(), [0, height], [1, 0], 'clamp') : 1,
@@ -196,7 +206,7 @@ function OpenSheet({ onClose, title, maxHeightRatio, surface, children }: SlideU
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
-          { backgroundColor: withAlpha(theme.shadowInk, 0.5) },
+          { backgroundColor: withAlpha(theme.shadowInk, 0.55) },
           scrimStyle,
           settled && styles.scrimSettled,
         ]}
@@ -209,9 +219,10 @@ function OpenSheet({ onClose, title, maxHeightRatio, surface, children }: SlideU
           /* Capped: `top: 'auto'` releases the top offset so `height` governs,
              and the safe-area inset is dropped — a sheet that stops short of the
              status bar has no reason to pad for it. */
+          { bottom: Math.max(insets.bottom, TRAY_FOOT) },
           maxHeightRatio
             ? { height: height * maxHeightRatio, top: 'auto' as const }
-            : { paddingTop: insets.top },
+            : { top: insets.top + TRAY_SIDE },
           { backgroundColor: surface?.[1] ?? theme.background, borderColor: theme.border },
           sheetStyle,
           settled && styles.sheetSettled,
@@ -256,22 +267,16 @@ function OpenSheet({ onClose, title, maxHeightRatio, surface, children }: SlideU
 }
 
 const styles = StyleSheet.create({
+  /* The tray: a card floating over the page on every side — reacticx's
+     10 from the sides, 38 round, a hairline all round. `top` and `bottom`
+     are set inline (the status bar's inset, the system's). */
   sheet: {
-    /* The four offsets written out: `StyleSheet.absoluteFillObject` is gone from
-       the RN 0.86 types, and this style is spread into an array rather than used
-       alone, so `StyleSheet.absoluteFill` would not compose. */
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    /* `Radius.sheet`: the roundest interface shape, because it holds
-       everything else. A hairline on the three sides that meet the page draws
-       the rounded top against the dimmed screen behind it. */
-    borderTopLeftRadius: Radius.sheet,
-    borderTopRightRadius: Radius.sheet,
+    left: TRAY_SIDE,
+    right: TRAY_SIDE,
+    borderRadius: TRAY_RADIUS,
+    borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: 0,
     overflow: 'hidden',
   },
   grabRow: {
@@ -280,7 +285,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: Spacing.x16,
   },
-  grabber: { position: 'absolute', top: Spacing.x8, width: 36, height: 4, borderRadius: 2 },
+  /* reacticx's handle: 38 × 5, 10 from the top. */
+  grabber: { position: 'absolute', top: 10, width: 38, height: 5, borderRadius: 3 },
   grabTitle: { marginTop: Spacing.x8 },
   close: {
     position: 'absolute',

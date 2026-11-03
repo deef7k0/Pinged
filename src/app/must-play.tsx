@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Alert, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { GameGridTile } from '@/components/game-grid-tile';
 import { PORTRAIT_COLUMNS, gridItemWidth } from '@/components/gaming/game-tile';
@@ -18,6 +18,7 @@ import { refreshGameLabel, setGameLabelLocally } from '@/hooks/use-game-labels';
 import { useHeaderHeight } from '@/hooks/use-header-height';
 import { getLabelledGames, isModerator, removeGameLabel, type LabelledGame } from '@/lib/api';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/components/ui/dialog';
 
 const LABEL: GameLabel = 'must_play';
 
@@ -75,7 +76,7 @@ export default function MustPlayScreen() {
       queryClient.invalidateQueries({ queryKey: ['labelled-games', LABEL] });
     },
     onError: (error) =>
-      Alert.alert(
+      showAlert(
         'Could not remove the label',
         error instanceof Error ? error.message : 'Try again in a moment.'
       ),
@@ -83,7 +84,7 @@ export default function MustPlayScreen() {
 
   function confirmRemove(entry: LabelledGame) {
     /* Two buttons: Android draws at most three and drops the rest. */
-    Alert.alert(
+    showAlert(
       `Remove ${GAME_LABEL_TEXT[LABEL].title}?`,
       `${entry.game.title} loses the badge everywhere. You can label it again.`,
       [
@@ -200,7 +201,7 @@ export default function MustPlayScreen() {
             message={
               canEdit
                 ? 'Pick the first one: search for a game and tap it.'
-                : 'GameLog’s moderators have not picked any games yet.'
+                : 'Pinged’s moderators have not picked any games yet.'
             }
             action={
               canEdit ? (

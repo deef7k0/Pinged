@@ -5,7 +5,6 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -43,6 +42,7 @@ import {
 import { displayNameFor } from '@/lib/format';
 import { getGameById } from '@/lib/games';
 import { useAuth } from '@/store/auth';
+import { Loader } from '@/components/ui/loader';
 
 /** How long the "didn't read cleanly" hint stays up after a misread. */
 const MISREAD_MS = 1800;
@@ -326,8 +326,8 @@ function PermissionState({
       </Text>
       <Text variant="body" color="textSecondary" style={styles.centredText}>
         {canAsk
-          ? 'Gamelog reads the barcode on the back of the box to find that exact release. The camera is only used while this screen is open.'
-          : 'It was turned off for Gamelog. You can switch it back on in Settings, or type the digits under the bars instead.'}
+          ? 'Pinged reads the barcode on the back of the box to find that exact release. The camera is only used while this screen is open.'
+          : 'It was turned off for Pinged. You can switch it back on in Settings, or type the digits under the bars instead.'}
       </Text>
       <View style={styles.stack}>
         {canAsk ? (
@@ -459,7 +459,7 @@ function LookupResult({ code, onScanAgain }: { code: string; onScanAgain: () => 
     return (
       <View style={styles.result} accessibilityLiveRegion="polite">
         <View style={styles.loadingRow}>
-          <ActivityIndicator color={theme.textSecondary} />
+          <Loader color={theme.textSecondary} />
           <Text variant="body" color="textSecondary">
             Looking up {shown}…
           </Text>
@@ -752,8 +752,8 @@ function IdentifiedResult({
         sub="Identified by ScanDex"
       />
       <Text variant="bodySmall" color="textSecondary">
-        We know the game, not the region or edition of this box. Add those and it goes into
-        Gamelog’s database for the next person who scans it.
+        We know the game, not the region or edition of this box. Add those and it goes into Pinged’s
+        database for the next person who scans it.
       </Text>
       <View style={styles.stack}>
         <Button

@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
 import { ChoiceChips } from '@/components/choice-chips';
 import { GamePicker } from '@/components/game-picker';
@@ -44,6 +44,7 @@ import type { ContributionResult, ReleasePhotoKind, ReleaseRegion } from '@/lib/
 import { getGameById, type Game } from '@/lib/games';
 import { platformOptionsFor } from '@/lib/platform-options';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/components/ui/dialog';
 
 /** The database accepts eight per submission (0024); so does the form. */
 const MAX_PHOTOS = 8;
@@ -304,7 +305,7 @@ function ReleaseForm({
   }
 
   function confirmWithdraw() {
-    Alert.alert(
+    showAlert(
       'Withdraw this submission?',
       'It is removed from the review queue. You can submit the barcode again later.',
       [

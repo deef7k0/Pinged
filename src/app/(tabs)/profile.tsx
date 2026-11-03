@@ -8,6 +8,7 @@ import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanim
 
 import { ProfileActionRow, ProfileButton, ProfileKey } from '@/components/profile-actions';
 import { ProfileView } from '@/components/profile-view';
+import { HeaderFade } from '@/components/ui/frosted-top-bar';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
@@ -69,7 +70,7 @@ export default function MyProfileScreen() {
     if (!userId) return;
     const name = profile.data ? displayNameFor(profile.data) : 'me';
     const url = Linking.createURL(`/profile/${userId}`);
-    Share.share({ message: `${name} on GameLog\n${url}` }).catch(() => undefined);
+    Share.share({ message: `${name} on Pinged\n${url}` }).catch(() => undefined);
   }
 
   if (!userId) {
@@ -127,28 +128,33 @@ export default function MyProfileScreen() {
         </PressableScale>
       </View>
 
-      <ProfileView
-        profileId={userId}
-        headerAction={
-          /*
-           * The head's action row (`<ProfileActionRow>`): the big pill and a
-           * share glyph beside it, as someone else's profile has Follow. In
-           * the action grey, not white: white is the call to act on someone
-           * else's page, and editing your own is not that.
-           */
-          <ProfileActionRow
-            button={
-              <ProfileButton
-                title="Edit profile"
-                icon="create-outline"
-                filled={false}
-                onPress={() => router.push('/edit-profile')}
-              />
-            }
-            keys={<ProfileKey icon="share-outline" label="Share your profile" onPress={share} />}
-          />
-        }
-      />
+      {/* The profile under its row, dissolving into it as it scrolls —
+          reacticx's header fade (`<HeaderFade>`). */}
+      <View style={styles.body}>
+        <ProfileView
+          profileId={userId}
+          headerAction={
+            /*
+             * The head's action row (`<ProfileActionRow>`): the big pill and a
+             * share glyph beside it, as someone else's profile has Follow. In
+             * the action grey, not white: white is the call to act on someone
+             * else's page, and editing your own is not that.
+             */
+            <ProfileActionRow
+              button={
+                <ProfileButton
+                  title="Edit profile"
+                  icon="create-outline"
+                  filled={false}
+                  onPress={() => router.push('/edit-profile')}
+                />
+              }
+              keys={<ProfileKey icon="share-outline" label="Share your profile" onPress={share} />}
+            />
+          }
+        />
+        <HeaderFade />
+      </View>
 
       {/*
         The + menu: two choices dropped from the key, over the page.
@@ -226,6 +232,7 @@ function MenuRow({
 }
 
 const styles = StyleSheet.create({
+  body: { flex: 1 },
   /* Home's masthead row at this screen's own margin: a little air above, keys
      at the floor. */
   bar: {

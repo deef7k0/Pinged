@@ -82,7 +82,7 @@ export default function LabelGamesScreen() {
         topBar={<FrostedTopBar dismiss title={`Label games ${words.title}`} />}>
         <EmptyState
           title="Moderators only"
-          message={`${words.title} is set by GameLog’s moderators.`}
+          message={`${words.title} is set by Pinged’s moderators.`}
         />
       </Screen>
     );

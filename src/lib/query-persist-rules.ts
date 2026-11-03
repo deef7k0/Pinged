@@ -100,6 +100,7 @@ const NEVER_PERSIST: ReadonlySet<string> = new Set([
   'log-draft',
   'reading-languages',
   'review-colour',
+  'copy-mesh',
   'game-colours',
   'animated-artwork',
   'copy-stage-3d',

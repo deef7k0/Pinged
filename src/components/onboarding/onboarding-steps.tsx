@@ -738,7 +738,7 @@ function SampleNotification({ now }: { now: number }) {
           accessibilityIgnoresInvertColors
         />
         <View style={styles.notificationText}>
-          <Text variant="itemTitle">GameLog</Text>
+          <Text variant="itemTitle">Pinged</Text>
           <Text variant="bodySmall" color="textSecondary" numberOfLines={2}>
             {name
               ? `${name} starts in ${REMINDER_LEAD_MINUTES} minutes.`

@@ -98,6 +98,8 @@ export type CollectionHeaderProps = {
   /** Like count and whether the viewer is one of them. */
   engagement?: Engagement;
   onShare?: () => void;
+  /** Ping it to somebody (0046) — a circle beside share's. */
+  onPing?: () => void;
   /**
    * The glass bar's handoff (`handoffBand`): the name fades over its first
    * half as it goes under the bar, and the bar's name comes in over the
@@ -220,6 +222,7 @@ export function CollectionHeader({
   pageColor = null,
   engagement,
   onShare,
+  onPing,
   handoff,
   onTitleHeight,
 }: CollectionHeaderProps) {
@@ -351,6 +354,19 @@ export function CollectionHeader({
           )}
 
           <View style={styles.actions}>
+            {onPing && (
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel="Ping this collection to someone"
+                onPress={onPing}
+                pressedColor={theme.pressed}
+                scaleTo={0.92}
+                style={StyleSheet.flatten([styles.action, { backgroundColor: actionFill }])}>
+                <PressGlyph motion="skip">
+                  <Ionicons name="paper-plane-outline" size={ACTION_GLYPH} color={theme.text} />
+                </PressGlyph>
+              </PressableScale>
+            )}
             {onShare && (
               <PressableScale
                 accessibilityRole="button"

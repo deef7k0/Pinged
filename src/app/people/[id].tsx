@@ -87,7 +87,10 @@ export default function PeopleScreen() {
 
   if (!id) {
     return (
-      <Screen edges={[]} insetHeader topBar={<FrostedTopBar back title="People" />}>
+      <Screen
+        edges={[]}
+        insetHeader
+        topBar={<FrostedTopBar back title="People" largeTitle={false} />}>
         <EmptyState title="Profile not found" />
       </Screen>
     );
@@ -97,7 +100,10 @@ export default function PeopleScreen() {
     /* `insetHeader`: this screen leads with a tab strip rather than artwork, so
        content starts below the bar instead of running under it. The bar names
        whose people these are — the thing the tabs underneath are filtering. */
-    <Screen edges={[]} insetHeader topBar={<FrostedTopBar back title={owner ?? 'People'} />}>
+    <Screen
+      edges={[]}
+      insetHeader
+      topBar={<FrostedTopBar back title={owner ?? 'People'} largeTitle={false} />}>
       <TabBar tabs={TABS} value={tab} onChange={setTab} />
 
       <PageFlatList

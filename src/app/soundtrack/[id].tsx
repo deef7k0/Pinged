@@ -2,14 +2,15 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, type ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { GameDisc } from '@/components/game-disc';
 import { PlayerBar } from '@/components/player/player-bar';
 import { SoundCloudMark, openOnSoundCloud } from '@/components/player/soundcloud-mark';
 import { SoundtrackUnavailable } from '@/components/soundtrack-section';
 import { Button } from '@/components/ui/button';
-import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
+import { PING_GLYPH, usePingTo } from '@/components/pings/use-ping-to';
+import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
 import { PageFlatList } from '@/components/ui/page-scroll';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { ErrorState, Screen } from '@/components/ui/screen';
@@ -28,6 +29,7 @@ import type { GameSoundtrack, SoundCloudTrack } from '@/lib/soundcloud/types';
 import { formatDuration, formatRunningTime } from '@/lib/soundtrack-pick';
 import { useAuth } from '@/store/auth';
 import { player, usePlayer, type PlayerPhase, type PlayerQueue } from '@/store/player';
+import { Loader } from '@/components/ui/loader';
 
 /** The disc at the head of the list. */
 const DISC = 196;
@@ -142,6 +144,7 @@ function Soundtrack({
   });
 
   const owner = `soundtrack:${gameId}`;
+  const pingTo = usePingTo();
   useEffect(() => () => player.release(owner, { honourKeepPlaying: true }), [owner]);
 
   const answer = query.data;
@@ -230,7 +233,24 @@ function Soundtrack({
   }
 
   return (
-    <Shell docked={<PlayerBar queue={queue} />} scrolls title={title}>
+    <Shell
+      docked={<PlayerBar queue={queue} />}
+      scrolls
+      title={title}
+      onPing={
+        pingTo && title
+          ? () =>
+              pingTo({
+                kind: 'soundtrack',
+                targetId: gameId,
+                /* The game's name — never SoundCloud's words, which may not
+                   be stored (§ Soundtracks). */
+                title: `${title} — the soundtrack`,
+                subtitle: developer,
+                imageUrl: coverUrl,
+              })
+          : undefined
+      }>
       <TrackList
         soundtrack={soundtrack}
         title={title}
@@ -260,12 +280,15 @@ function Shell({
   docked,
   scrolls = false,
   title,
+  onPing,
 }: {
   children: ReactNode;
   docked?: ReactNode;
   scrolls?: boolean;
   /** The game's name, for the bar that follows the disc off the page. */
   title?: string | null;
+  /** Ping this soundtrack to somebody (0046). */
+  onPing?: () => void;
 }) {
   const accent = useAccent();
   const discRoom = useDiscRoom();
@@ -286,6 +309,15 @@ function Shell({
           variant="art"
           title={title ?? undefined}
           header={discRoom + Spacing.x8 + DISC + HEADING_BLOCK}
+          right={
+            onPing ? (
+              <TopBarDisc
+                icon={PING_GLYPH}
+                label="Ping this soundtrack to someone"
+                onPress={onPing}
+              />
+            ) : undefined
+          }
         />
       }>
       <View style={styles.flex}>{children}</View>
@@ -493,7 +525,7 @@ const TrackRow = memo(function TrackRow({
       style={StyleSheet.flatten([styles.row, current && { backgroundColor: accent.wash }])}>
       <View style={[styles.lead, blocked && styles.dimmed]}>
         {phase === 'loading' ? (
-          <ActivityIndicator size="small" color={accent.onSurface} />
+          <Loader size="small" color={accent.onSurface} />
         ) : current ? (
           <Ionicons name={playing ? 'pause' : 'play'} size={16} color={accent.onSurface} />
         ) : (

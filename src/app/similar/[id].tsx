@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ReportFlag, reportHref } from '@/components/report-flag';
 import { Avatar } from '@/components/ui/avatar';
@@ -33,6 +33,7 @@ import type { CommunitySimilarGame, SimilaritySuggestion } from '@/lib/database.
 import { displayNameFor, timeAgo } from '@/lib/format';
 import { getGameById } from '@/lib/games';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/components/ui/dialog';
 
 type SuggestionSort = 'upvoted' | 'newest' | 'oldest';
 
@@ -191,7 +192,7 @@ function PairDetail({ pair, gameId }: { pair: CommunitySimilarGame; gameId: stri
 
   function askRemove() {
     if (!mine) return;
-    Alert.alert(
+    showAlert(
       'Delete your suggestion?',
       `Your reasons${mine.upvotes > 0 ? ` and its ${mine.upvotes} ${mine.upvotes === 1 ? 'upvote' : 'upvotes'}` : ''} go, and you no longer count as agreeing. You can agree again any time.`,
       [

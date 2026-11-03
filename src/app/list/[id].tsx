@@ -2,17 +2,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Alert,
-  BackHandler,
-  Platform,
-  Share,
-  StyleSheet,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { BackHandler, Platform, Share, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { AwardShow } from '@/components/award-show';
+import { usePingTo } from '@/components/pings/use-ping-to';
 import {
   COLLECTION_COVER_FADE,
   COLLECTION_COVER_RATIO,
@@ -38,6 +31,7 @@ import { Poster } from '@/components/ui/poster';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
+import { displayNameFor } from '@/lib/format';
 import { ArtRowWindow, CoverGridWindow } from '@/constants/list-window';
 import { ControlHeight, Radius, Spacing, Type, type ThemePalette } from '@/constants/theme';
 import { AccentProvider, useGameAccent } from '@/hooks/use-accent';
@@ -59,6 +53,7 @@ import {
 } from '@/lib/api';
 import { sortGames, type GameSort } from '@/lib/games';
 import { useAuth } from '@/store/auth';
+import { showAlert } from '@/components/ui/dialog';
 
 /** A game's cover in a tier list's row, in dp. */
 const POSTER = 58;
@@ -113,6 +108,7 @@ function tierColor(tier: string, theme: ThemePalette): string {
 export default function ListDetailScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const pingTo = usePingTo();
   const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
   const userId = useAuth((state) => state.session?.user.id);
@@ -245,7 +241,7 @@ export default function ListDetailScreen() {
       }
     },
     onError: (error) =>
-      Alert.alert(
+      showAlert(
         'Could not remove those games',
         error instanceof Error ? error.message : 'Try again in a moment.'
       ),
@@ -478,9 +474,23 @@ export default function ListDetailScreen() {
         engagement={engagement.data}
         handoff={handoff}
         onTitleHeight={setTitleHeight}
+        onPing={
+          pingTo
+            ? () =>
+                pingTo({
+                  kind: 'collection',
+                  targetId: data.id,
+                  title: data.title,
+                  subtitle: `${items.length} ${items.length === 1 ? 'game' : 'games'}${
+                    owner.data ? ` · by ${displayNameFor(owner.data)}` : ''
+                  }`,
+                  imageUrl: boxArt,
+                })
+            : undefined
+        }
         onShare={() =>
           Share.share({
-            message: `${data.title} — ${items.length} games on GameLog`,
+            message: `${data.title} — ${items.length} games on Pinged`,
           }).catch(() => undefined)
         }
       />

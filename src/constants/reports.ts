@@ -14,7 +14,16 @@ import type {
  * **comment**, a **wall post** and a **profile** (0045) share it too, and a
  * profile adds impersonation.
  */
-export type ReportKind = 'pick' | 'suggestion' | 'review' | 'comment' | 'wall_post' | 'profile';
+export type ReportKind =
+  | 'pick'
+  | 'suggestion'
+  | 'review'
+  | 'comment'
+  | 'wall_post'
+  | 'profile'
+  /** 0046: a request to the community, and one answer to it. */
+  | 'ping'
+  | 'ping_suggestion';
 
 export const REPORT_KINDS: readonly ReportKind[] = [
   'pick',
@@ -23,6 +32,8 @@ export const REPORT_KINDS: readonly ReportKind[] = [
   'comment',
   'wall_post',
   'profile',
+  'ping',
+  'ping_suggestion',
 ];
 
 export function isReportKind(value: string | undefined): value is ReportKind {

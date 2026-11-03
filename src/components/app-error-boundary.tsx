@@ -46,7 +46,7 @@ export function AppErrorBoundary({ error, retry }: ErrorBoundaryProps) {
         Something went wrong
       </Text>
       <Text variant="body" color="textSecondary">
-        This screen could not be shown. What Gamelog had saved on this phone to open faster has been
+        This screen could not be shown. What Pinged had saved on this phone to open faster has been
         cleared, in case that was the cause — nothing in your account is affected.
       </Text>
       {__DEV__ && (

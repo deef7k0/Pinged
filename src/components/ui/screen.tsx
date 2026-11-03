@@ -1,17 +1,19 @@
 import { BlurTargetView } from 'expo-blur';
-import type { ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { isValidElement, type ReactNode } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
 
-import { useTabBarClearance } from '@/components/app-tab-bar';
+import { useMinimizeOnScroll, useTabBarClearance } from '@/components/app-tab-bar';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { MINI_PLAYER_BAND } from '@/constants/player';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useHeaderHeight } from '@/hooks/use-header-height';
-import { ScreenChromeProvider } from '@/hooks/use-screen-chrome';
+import { ScreenChromeProvider, useScreenChrome } from '@/hooks/use-screen-chrome';
+import { useSharedValue } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/use-theme';
 import { useMiniPlayerActive } from '@/store/player';
+import { Loader } from '@/components/ui/loader';
 
 export type ScreenProps = {
   children: ReactNode;
@@ -129,11 +131,39 @@ export function Screen({
       ? MINI_PLAYER_BAND + (edges.includes('bottom') ? 0 : insets.bottom)
       : 0;
 
+  /*
+   * The large title (reacticx's animated header scroll view, 2026-11-02): a
+   * page that opens on a list or a form and has a bar with a name gets that
+   * name large at the top of its content, which the bar takes over as it
+   * scrolls away. Not a modal form, not a centred name (a person's handle),
+   * and not where the screen says `largeTitle={false}` (a tab row above the
+   * list would put the title under the tabs).
+   */
+  const barProps = isValidElement<{
+    title?: unknown;
+    variant?: string;
+    centerTitle?: boolean;
+    largeTitle?: boolean;
+  }>(topBar)
+    ? topBar.props
+    : null;
+  const largeTitle =
+    insetHeader &&
+    !modal &&
+    barProps &&
+    typeof barProps.title === 'string' &&
+    barProps.variant !== 'art' &&
+    !barProps.centerTitle &&
+    barProps.largeTitle !== false
+      ? barProps.title
+      : null;
+
   return (
     <ScreenChromeProvider
       modal={modal}
       background={background ?? theme.background}
-      insetHeader={insetHeader}>
+      insetHeader={insetHeader}
+      largeTitle={largeTitle}>
       {({ blurTargetRef }) => (
         <View style={styles.flex}>
           {/*
@@ -174,17 +204,28 @@ export function Screen({
           </BlurTargetView>
 
           {topBar}
+          <TabBarMinimizer />
         </View>
       )}
     </ScreenChromeProvider>
   );
 }
 
+/**
+ * The page's scroll, handed to the glass tab bar's minimize-on-scroll
+ * (`useMinimizeOnScroll`). Inside the chrome so it can read `scrollY`; does
+ * nothing outside the tab navigator.
+ */
+function TabBarMinimizer() {
+  const still = useSharedValue(0);
+  useMinimizeOnScroll(useScreenChrome()?.scrollY ?? still);
+  return null;
+}
+
 export function LoadingState({ label }: { label?: string }) {
-  const theme = useTheme();
   return (
     <View style={styles.centered}>
-      <ActivityIndicator color={theme.primary} />
+      <Loader size="large" />
       {label && (
         <Text variant="bodySmall" color="textMuted" style={styles.centeredText}>
           {label}
@@ -236,7 +277,7 @@ function readableError(error: unknown): string {
   const raw = error instanceof Error ? error.message.toLowerCase() : '';
 
   if (raw.includes('network') || raw.includes('fetch') || raw.includes('timeout')) {
-    return 'No connection to GameLog. Check your network and try again.';
+    return 'No connection to Pinged. Check your network and try again.';
   }
   if (raw.includes('jwt') || raw.includes('unauthorized') || raw.includes('not signed in')) {
     return 'Your session expired. Sign in again to continue.';

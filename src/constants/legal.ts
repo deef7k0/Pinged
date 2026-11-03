@@ -23,7 +23,7 @@
 export const LEGAL_CONTACT_EMAIL: string | null = null;
 
 /** The date printed as "Last updated". Change it with the text. */
-export const LEGAL_UPDATED = '29 October 2026';
+export const LEGAL_UPDATED = '31 October 2026';
 
 export type LegalBlock = string | { list: readonly string[] };
 export type LegalSection = { heading: string; blocks: readonly LegalBlock[] };
@@ -43,7 +43,7 @@ export function isLegalSlug(value: string | undefined): value is LegalSlug {
 
 /** `{contact}` in the text, filled in. */
 export function contactPhrase(email: string | null = LEGAL_CONTACT_EMAIL): string {
-  return email ?? 'the contact email address on GameLog’s Google Play listing';
+  return email ?? 'the contact email address on Pinged’s Google Play listing';
 }
 
 export function fillContact(text: string, email: string | null = LEGAL_CONTACT_EMAIL): string {
@@ -54,14 +54,14 @@ const PRIVACY: LegalDoc = {
   slug: 'privacy',
   title: 'Privacy policy',
   intro:
-    'GameLog is an app for keeping a record of the video games you play: logging them, scoring and reviewing them, and following what other people play. This policy says what GameLog collects, why, who else sees it, and how to delete it. “We” means the developer of GameLog.',
+    'Pinged is an app for keeping a record of the video games you play — logging, scoring and reviewing them — and for pinging people about them: sending a friend a game, a review or a collection, and asking everybody what to play next. This policy says what Pinged collects, why, who else sees it, and how to delete it. “We” means the developer of Pinged.',
   sections: [
     {
       heading: 'What we collect',
       blocks: [
         'Your account. Your email address and password. The password is stored hashed by our hosting provider, Supabase; we never see it. If you sign in with Google or Facebook, we receive your email address and name from them.',
         'Your profile. Your username, and anything you add: a display name, a bio, a location, a favourite platform, a profile picture and a banner.',
-        'What you do in GameLog. The games you log and how you played them (status, score, hours, platform, dates, playthroughs, platinums); your reviews and the language we detect they are written in; your collections, lists and award shows; comments, wall posts and likes; who you follow and your friends; events you mark as going to; pinned games and a starred song; games you suggest as similar and your votes; your physical copies (platform, region, edition, condition, notes and barcode); release details and box photos you submit to the shared barcode catalogue; reports you send; and the people you block.',
+        'What you do in Pinged. The games you log and how you played them (status, score, hours, platform, dates, playthroughs, platinums); your reviews and the language we detect they are written in; your collections, lists and award shows; comments, wall posts and likes; who you follow and your friends; events you mark as going to; pinned games and a starred song; games you suggest as similar and your votes; your physical copies (platform, region, edition, condition, notes and barcode); release details and box photos you submit to the shared barcode catalogue; reports you send; the people you block; pings you send and receive (what was pinged, your line, and to whom); requests for a game you post and the games you suggest on other people’s; and who you let ping you.',
         'Linked gaming accounts, if you link them. Your Steam ID (through Steam’s own sign-in), or the PlayStation online ID, Xbox gamertag or GOG username you type in — and the games, playtime and achievements those services show publicly.',
         'Rating statistics. To weight the community score, we work out from your scores how much they vary. Only you can see your own figures; moderators see totals across everyone.',
         'Photos, only when you choose them. The camera is used only to read a barcode; nothing it sees is stored or uploaded. Pictures you pick for your profile or a release are uploaded. Images of your reviews that you save go to your phone’s photo library, not to us.',
@@ -79,8 +79,8 @@ const PRIVACY: LegalDoc = {
         {
           list: [
             'Your location, your contacts, or your phone’s advertising ID.',
-            'Anything for advertising: GameLog has no ads.',
-            'Analytics or crash reports: GameLog includes no analytics, tracking or crash-reporting service.',
+            'Anything for advertising: Pinged has no ads.',
+            'Analytics or crash reports: Pinged includes no analytics, tracking or crash-reporting service.',
           ],
         },
         'We do not sell your data, and we do not share it for advertising.',
@@ -89,23 +89,23 @@ const PRIVACY: LegalDoc = {
     {
       heading: 'How we use it',
       blocks: [
-        'To run GameLog: to show your library, profile and reviews; to build feeds, charts, recommendations and the community score; to send you notifications about activity on your writing; to look up the games in your linked libraries; and to keep the community safe — moderators read reports and can remove what breaks the terms of use.',
+        'To run Pinged: to show your library, profile and reviews; to build feeds, charts, recommendations and the community score; to send you notifications about activity on your writing; to deliver your pings and to put requests built on games you have played first in your For You list (worked out on our servers from your own logs — only a count of matching games is shown to you, and nothing about your library is shown to anyone else); to look up the games in your linked libraries; and to keep the community safe — moderators read reports and can remove what breaks the terms of use.',
       ],
     },
     {
       heading: 'What other people see',
       blocks: [
-        'GameLog is a social app. Your profile, your logs and scores, your reviews, collections, comments, wall posts, likes, follows and friends, and the gaming accounts you link are visible to other GameLog users. Your email address, your reports, the people you block and your rating statistics are not.',
+        'Pinged is a social app. Your profile, your logs and scores, your reviews, collections, comments, wall posts, likes, follows and friends, and the gaming accounts you link are visible to other Pinged users. Requests for a game you post and the games you suggest are visible to other users too. A ping is seen only by you and the person it was sent to. Your email address, your reports, the people you block, who you let ping you and your rating statistics are not.',
       ],
     },
     {
       heading: 'Who else receives data',
       blocks: [
-        'Supabase hosts GameLog’s database, sign-in and file storage, and processes everything above on our behalf.',
-        'To show game information, your phone loads pictures and pages directly from IGDB, Steam, SteamGridDB, RAWG, Wikimedia Commons and Wikidata, YouTube (video thumbnails), SoundCloud (music you play) and the news sites in the News tab (IGN, GameSpot, PC Gamer, Kotaku). Like any website, they see your IP address and what is being loaded — never your account.',
+        'Supabase hosts Pinged’s database, sign-in and file storage, and processes everything above on our behalf.',
+        'To show game information, your phone loads pictures and pages directly from IGDB, Steam, SteamGridDB, RAWG, Wikimedia Commons and Wikidata, YouTube (video thumbnails), SoundCloud (music you play) and the news sites on the News page (IGN, GameSpot, PC Gamer, Kotaku). Like any website, they see your IP address and what is being loaded — never your account.',
         'Some lookups go through our own servers instead, so the service sees our server and not you: IGDB (run by Twitch), IsThereAnyDeal (prices), OpenCritic (critic reviews, through RapidAPI), Steam store pages (awards and news), SoundCloud (finding soundtracks), GameTDB and ScreenScraper (box art for physical copies) and ScanDex (barcodes). These receive the game or barcode being looked up, not who asked.',
         'When you link an account, the name you type is sent to that service to read your public library: Sony (PlayStation Network), OpenXBL (xbl.io, a third-party Xbox service) or GOG. Linking Steam opens Steam’s own sign-in page.',
-        'If you sign in with Google or Facebook, they know you used it to sign in to GameLog.',
+        'If you sign in with Google or Facebook, they know you used it to sign in to Pinged.',
         'We may disclose data if the law requires it.',
       ],
     },
@@ -113,7 +113,7 @@ const PRIVACY: LegalDoc = {
       heading: 'How long we keep it, and deleting it',
       blocks: [
         'We keep your data for as long as you have an account. You can delete your account at any time in the app: Profile → Settings → Delete account. If you cannot use the app, write to {contact} from your account’s email address and we will delete it within 30 days.',
-        'Deleting your account deletes, immediately: your profile and pictures, your logs, scores, reviews, collections, comments, wall posts, likes, follows, friendships, copies, linked accounts, reports, blocks and rating statistics — and other people’s likes and comments on your writing.',
+        'Deleting your account deletes, immediately: your profile and pictures, your logs, scores, reviews, collections, comments, wall posts, likes, follows, friendships, copies, linked accounts, reports, blocks, pings, requests, suggestions and rating statistics — and other people’s likes and comments on your writing.',
         'What stays has nothing to identify you: releases you added to the shared barcode catalogue and the box photos you submitted for them, and community figures such as a game’s average score, which are recalculated without your ratings. Copies may remain in our hosting provider’s backups for a limited time before they are overwritten.',
       ],
     },
@@ -132,7 +132,7 @@ const PRIVACY: LegalDoc = {
     {
       heading: 'Children',
       blocks: [
-        'GameLog is not meant for children under 13, or under the minimum age for using such services where you live, and we do not knowingly collect their data. If you believe a child has an account, write to {contact} and we will delete it.',
+        'Pinged is not meant for children under 13, or under the minimum age for using such services where you live, and we do not knowingly collect their data. If you believe a child has an account, write to {contact} and we will delete it.',
       ],
     },
     {
@@ -152,7 +152,7 @@ const TERMS: LegalDoc = {
   slug: 'terms',
   title: 'Terms of use',
   intro:
-    'These terms are the rules for using GameLog. By making an account, or by using the app, you agree to them and to the privacy policy.',
+    'These terms are the rules for using Pinged. By making an account, or by using the app, you agree to them and to the privacy policy.',
   sections: [
     {
       heading: 'Your account',
@@ -163,14 +163,14 @@ const TERMS: LegalDoc = {
     {
       heading: 'What you post',
       blocks: [
-        'Your reviews, comments, collections, wall posts and pictures stay yours. By posting them you allow GameLog to store them and show them to other users in the app, for as long as they are up. You can delete them, or your whole account, at any time.',
+        'Your reviews, comments, collections, wall posts, requests, suggestions, pings and pictures stay yours. By posting them you allow Pinged to store them and show them to other users in the app, for as long as they are up. You can delete them, or your whole account, at any time.',
         'Only post what you have the right to post.',
       ],
     },
     {
       heading: 'The rules',
       blocks: [
-        'GameLog has no tolerance for objectionable content or abusive users. Do not post or do anything that:',
+        'Pinged has no tolerance for objectionable content or abusive users. Do not post or do anything that:',
         {
           list: [
             'harasses, bullies, threatens or targets a person;',
@@ -202,13 +202,13 @@ const TERMS: LegalDoc = {
     {
       heading: 'The app itself',
       blocks: [
-        'GameLog is provided as it is, and may change, have errors or be unavailable at times. As far as the law allows, we are not liable for indirect losses arising from using it. Nothing in these terms takes away rights you have by law as a consumer.',
+        'Pinged is provided as it is, and may change, have errors or be unavailable at times. As far as the law allows, we are not liable for indirect losses arising from using it. Nothing in these terms takes away rights you have by law as a consumer.',
       ],
     },
     {
       heading: 'Ending',
       blocks: [
-        'You can stop using GameLog and delete your account at any time. We may end or suspend an account that breaks these terms.',
+        'You can stop using Pinged and delete your account at any time. We may end or suspend an account that breaks these terms.',
       ],
     },
     {
@@ -222,15 +222,15 @@ const TERMS: LegalDoc = {
 
 const DELETE_ACCOUNT: LegalDoc = {
   slug: 'delete-account',
-  title: 'Delete your GameLog account',
-  intro: 'You can delete your GameLog account and its data whenever you like. It cannot be undone.',
+  title: 'Delete your Pinged account',
+  intro: 'You can delete your Pinged account and its data whenever you like. It cannot be undone.',
   sections: [
     {
       heading: 'In the app',
       blocks: [
         {
           list: [
-            'Open GameLog and go to your Profile.',
+            'Open Pinged and go to your Profile.',
             'Open Settings (the gear at the top).',
             'Choose Delete account, and confirm with your username.',
           ],

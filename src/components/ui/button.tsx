@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { ActivityIndicator, StyleSheet, Text, View, type PressableProps } from 'react-native';
+import { StyleSheet, Text, View, type PressableProps } from 'react-native';
 
 import { PressableScale } from '@/components/ui/pressable-scale';
 import {
@@ -14,6 +14,7 @@ import {
 import { useAccent } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
 import { filledRoles } from '@/lib/filled';
+import { Loader } from '@/components/ui/loader';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size = 'large' | 'medium' | 'small';
@@ -204,7 +205,7 @@ export function Button({
       {/* Keep the label mounted while loading so the button does not resize. */}
       {loading && (
         <View style={styles.spinner}>
-          <ActivityIndicator size="small" color={look.foreground} />
+          <Loader size="small" color={look.foreground} />
         </View>
       )}
 
