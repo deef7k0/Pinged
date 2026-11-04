@@ -49,6 +49,7 @@ import type {
 import { displayNameFor, timeAgoLong } from '@/lib/format';
 import { getGameById } from '@/lib/games';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 type Params = { kind: string; id: string; author?: string; game?: string };
 
@@ -386,7 +387,10 @@ function ReportForm<R extends string>({
 
   const submit = useMutation({
     mutationFn: () => send(reason!, note),
-    onSuccess: onSent,
+    onSuccess: () => {
+      toast.success('Report sent');
+      return onSent();
+    },
   });
 
   return (

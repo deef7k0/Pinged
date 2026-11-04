@@ -26,6 +26,7 @@ import { PageScrollView } from '@/components/ui/page-scroll';
 import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
+import { HERO_ANIMATES, HeroFoot } from '@/components/ui/pinned-hero';
 import { Text } from '@/components/ui/text';
 import { PLATFORMS } from '@/constants/platform-cases';
 import { familyForStored, platformKeyForStored } from '@/constants/platform-family';
@@ -592,32 +593,41 @@ function ReviewHero({
 
   return (
     <View style={[styles.hero, { height }]} pointerEvents="none">
-      {uri && (
-        <AnimatedCoverImage
-          staticUrl={uri}
-          staticCacheKey={`review-hero-${uri}`}
-          staticTransition={280}
-          animatedUrl={animated.animatedUrl}
-          format={animated.format}
-          status={animated.status}
-          onFailed={animated.reportFailure}
-          aspect="square"
-          style={{ width, height }}
-          backdrop={page}
-          animatedOpacity={ANIMATED_HERO_OPACITY}
+      <View style={[styles.heroArt, { height }]}>
+        {uri && (
+          <AnimatedCoverImage
+            staticUrl={uri}
+            staticCacheKey={`review-hero-${uri}`}
+            staticTransition={280}
+            animatedUrl={animated.animatedUrl}
+            format={animated.format}
+            status={animated.status}
+            onFailed={animated.reportFailure}
+            aspect="square"
+            style={{ width, height }}
+            backdrop={page}
+            animatedOpacity={ANIMATED_HERO_OPACITY}
+          />
+        )}
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: withAlpha(Palette.shadowInk, REVIEW_HERO.veil) },
+          ]}
         />
-      )}
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: withAlpha(Palette.shadowInk, REVIEW_HERO.veil) },
-        ]}
-      />
-      <LinearGradient
-        colors={HERO_COLOURS(page)}
-        locations={HERO_LOCATIONS}
-        style={StyleSheet.absoluteFill}
-      />
+        {/* Without Skia, the screenshot's own ramp. */}
+        {!HERO_ANIMATES && (
+          <LinearGradient
+            colors={HERO_COLOURS(page)}
+            locations={HERO_LOCATIONS}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
+      </View>
+      {/* Convx's long blur and its mirrored tail as the fade into the page
+          (the owner's, 2026-11-04), the tail lying behind the row under the
+          art. Out of the hero's clip, on purpose. */}
+      {uri && HERO_ANIMATES && <HeroFoot uri={uri} height={height} page={page} />}
     </View>
   );
 }
@@ -667,7 +677,10 @@ function lineStyle({ size, line, weight }: ReviewLine): TextStyle {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { alignItems: 'center', paddingBottom: CONTENT_BOTTOM },
-  hero: { alignSelf: 'stretch', overflow: 'hidden' },
+  /* The art is clipped to its box; its blurred tail is not — it runs on
+     behind the row under it. */
+  hero: { alignSelf: 'stretch' },
+  heroArt: { overflow: 'hidden' },
   /* The face and the text beside it, centred on each other. */
   row: { flexDirection: 'row', alignItems: 'center', marginTop: REVIEW_ROW.top },
   /* `minWidth: 0` so a long name or title wraps, not pushes. */

@@ -6,6 +6,7 @@
  * — stable, human-readable, and safe to use as a React key or route param.
  */
 import type { EditionKind } from '../../constants/game-editions';
+import type { GameLogo } from './logo-art';
 
 export type GameSource = 'igdb' | 'rawg' | 'steam' | 'itch';
 
@@ -83,6 +84,19 @@ export type Game = {
    * fallback, or half the catalogue would lose its covers.
    */
   steamAppId: string | null;
+  /**
+   * The game's transparent logo from IGDB (`chooseLogo`), or null when it has
+   * none. Optional: only IGDB fills it in, and a game kept on the device from
+   * before it has no such field.
+   */
+  logo?: GameLogo | null;
+  /**
+   * The cover's height over its width, as IGDB has it (`cover.width`,
+   * `cover.height`) — the game page draws the cover at exactly this shape,
+   * uncropped. Optional: only IGDB fills it in, and a game kept on the device
+   * from before it has none; the page then measures the file as it loads.
+   */
+  coverAspect?: number | null;
 };
 
 /**

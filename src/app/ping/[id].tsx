@@ -36,6 +36,7 @@ import { displayNameFor, timeAgoLong } from '@/lib/format';
 import { canSuggest, groupSuggestions, pingTags, suggestionCount } from '@/lib/pings';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 /** A reference game's box on the request's own page. */
 const REF_COVER = 92;
@@ -333,6 +334,7 @@ function Actions({
     mutationFn: ({ next, game }: { next: PingStatus; game?: string | null }) =>
       setPingStatus(ping.id, next, game ?? null),
     onSuccess: () => {
+      toast.success('Request updated');
       setFinding(false);
       refresh();
     },
@@ -341,6 +343,7 @@ function Actions({
   const remove = useMutation({
     mutationFn: () => deletePing(ping.id),
     onSuccess: () => {
+      toast.success('Request deleted');
       void queryClient.invalidateQueries({ queryKey: ['pings'] });
       queryClient.removeQueries({ queryKey: ['ping', ping.id] });
       router.back();

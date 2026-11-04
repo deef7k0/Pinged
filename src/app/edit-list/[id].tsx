@@ -13,6 +13,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { getList, updateListDetails } from '@/lib/api';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 /**
  * Rename a collection and rewrite its About.
@@ -118,6 +119,7 @@ function EditForm({
   const save = useMutation({
     mutationFn: () => updateListDetails(userId, listId, { title, description }),
     onSuccess: () => {
+      toast.success('Collection saved');
       queryClient.invalidateQueries({ queryKey: ['list', listId] });
       queryClient.invalidateQueries({ queryKey: ['lists'] });
       queryClient.invalidateQueries({ queryKey: ['public-lists'] });

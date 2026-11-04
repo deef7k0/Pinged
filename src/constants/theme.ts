@@ -185,6 +185,13 @@ export const Colors = {
     segmentTrack: 'rgba(255, 255, 255, 0.08)',
     segmentThumb: '#3A3F4B',
     /**
+     * reacticx's masked tab bar (2026-11-04): the pill that slides along the
+     * track — its demo's #F2F2F2 — and the near-black the chosen tab's words
+     * are inside it, 17:1. The words outside it stay `textSecondary`.
+     */
+    segmentPill: '#F2F2F2',
+    segmentPillInk: '#0B0C0F',
+    /**
      * The resting edge of a *choice* — a selection card, a filter or sort pill,
      * an unchosen segment: the reference's `onSurfaceVariant` at 20%. Choices
      * are outlined and actions are filled; the edge is what says "one of

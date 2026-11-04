@@ -35,7 +35,16 @@ export type LogoInk = {
    * the ground a logo brought with it. Null for a cut-out.
    */
   ground: string | null;
+  /**
+   * Where the drawing is inside the file, as shares of its width and height
+   * (`inkBounds`) — a logo uploaded on a canvas larger than itself is cropped
+   * to this on the game page. Absent on a measurement from before it existed.
+   */
+  bounds?: InkBounds | null;
 };
+
+/** A box inside an image, each side a share of the image, 0–1. */
+export type InkBounds = { x: number; y: number; width: number; height: number };
 
 /** How a logo is drawn. */
 export type LogoTreatment =
@@ -203,4 +212,43 @@ export function logoNeedsLightInk(logoLuminance: number | null, page: string): b
   const light = Math.max(logoLuminance, pageLuminance);
   const dark = Math.min(logoLuminance, pageLuminance);
   return (light + 0.05) / (dark + 0.05) < 3;
+}
+
+/**
+ * Any visible pixel, for `inkBounds`: far fainter than `OPAQUE_ALPHA`, because
+ * a thin wordmark read off a 90px thumbnail is mostly half-covered pixels.
+ */
+const VISIBLE_ALPHA = 24;
+
+/**
+ * The box round everything visible in an image, as shares of it, one pixel
+ * wider each side than it reads (the thumbnail it is read from is coarse, and
+ * cutting the end off a letter is worse than a sliver of air). Null for an
+ * image with nothing visible in it.
+ */
+export function inkBounds({ data, width, height }: LogoPixels): InkBounds | null {
+  let left = width;
+  let top = height;
+  let right = -1;
+  let bottom = -1;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (data[(y * width + x) * 4 + 3] < VISIBLE_ALPHA) continue;
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+    }
+  }
+  if (right < 0) return null;
+  left = Math.max(0, left - 1);
+  top = Math.max(0, top - 1);
+  right = Math.min(width - 1, right + 1);
+  bottom = Math.min(height - 1, bottom + 1);
+  return {
+    x: left / width,
+    y: top / height,
+    width: (right - left + 1) / width,
+    height: (bottom - top + 1) / height,
+  };
 }

@@ -1,34 +1,22 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState } from 'react';
-import { StyleSheet, View, type GestureResponderEvent } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { PressableScale } from '@/components/ui/pressable-scale';
-import { ScoreBar, ScoreReadout } from '@/components/ui/score-meter';
+import { ScoreReadout } from '@/components/ui/score-meter';
+import { SeekBar } from '@/components/ui/seek-bar';
 import { Text } from '@/components/ui/text';
-import { MAX_SCORE, MIN_SCORE, clampScore } from '@/constants/score';
-import { Radius, Spacing, TapTarget } from '@/constants/theme';
+import { MAX_SCORE, MIN_SCORE, clampScore, scoreColor } from '@/constants/score';
+import { Radius, Spacing, TapTarget, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 const DEFAULT_SCORE = 75;
 
 /**
- * The track's thickness: 24, at the owner's direction (2026-10-15: "I also
- * want the review score bar to be thicker"). It was the review page's 14, the
- * same bar; a bar that is dragged wants more of itself under the thumb than
- * one that is only read, so the review page keeps 14.
+ * The bar at rest: 10, and three and a half times that while held — the
+ * seek bar's own ratio. Thicker than reacticx's 8, at the owner's earlier
+ * word (2026-10-15: "I also want the review score bar to be thicker").
  */
-const TRACK_HEIGHT = 24;
-
-/*
- * The track becomes 44/48 to a thumb.
- *
- * The responder props and the accessibility role live on this padded wrapper,
- * not on the bar, so `locationX` is still measured against the bar's own width
- * (the padding is vertical only — same x origin, same width). DESIGN.md § 23
- * says a control that looks smaller is one whose padding is doing the work;
- * before this the props sat on the 14dp view itself and nothing was.
- */
-const TRACK_INSET = Math.max(0, (TapTarget - TRACK_HEIGHT) / 2);
+const TRACK_HEIGHT = 10;
 
 export type ScoreInputProps = {
   /** 0-100, or null when unrated. */
@@ -45,18 +33,11 @@ export type ScoreInputProps = {
 };
 
 /**
- * Score picker: a big number, its verdict, a draggable track, and ±1 nudges.
+ * Score picker: a big number, its verdict, reacticx's seek bar, and ±1 nudges.
  *
- * The number, the verdict and the bar are `<ScoreReadout>` and `<ScoreBar>`, the
- * same two the review page reads a score with — so what you set here is drawn
- * exactly as it will be read. This component adds the touch handling around
- * them and nothing visual of its own but the nudges and the clear button.
- *
- * The track uses React Native's responder props directly rather than a
- * PanResponder or a slider dependency. PanResponder has to be created once and
- * held, which means either a stale `onChange` closure or writing a ref during
- * render (which the React Compiler rules reject); responder props are read
- * fresh at event time, so neither problem exists.
+ * The number and the verdict are `<ScoreReadout>`, as the review page reads a
+ * score. The bar is `<SeekBar>` (2026-11-03), where it was the review page's
+ * `<ScoreBar>` under a raw responder.
  *
  * The ± buttons are not redundant with the drag: hitting exactly 87 by dragging
  * on a phone-width track is impossible, and precise scores are the entire point
@@ -64,14 +45,8 @@ export type ScoreInputProps = {
  */
 export function ScoreInput({ value, onChange, disabled = false, hint }: ScoreInputProps) {
   const theme = useTheme();
-  const [trackWidth, setTrackWidth] = useState(0);
 
   const score = value ?? DEFAULT_SCORE;
-
-  function handleTrack(event: GestureResponderEvent) {
-    if (trackWidth <= 0) return;
-    onChange(clampScore((event.nativeEvent.locationX / trackWidth) * MAX_SCORE));
-  }
 
   function nudge(delta: number) {
     onChange(clampScore(score + delta));
@@ -105,28 +80,19 @@ export function ScoreInput({ value, onChange, disabled = false, hint }: ScoreInp
         )}
       </View>
 
-      {/* Responder props are omitted entirely rather than no-op'd when disabled,
-          so the track does not swallow touches meant for the scroll view. */}
+      {/* reacticx's seek bar (the owner's, 2026-11-03): drag or tap along it,
+          and it swells under the finger. Filled in the score's own colour, so
+          the bar says good, mixed or bad before the number is read. */}
       <View
-        style={styles.trackHit}
-        onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width)}
-        {...(disabled
-          ? null
-          : {
-              onStartShouldSetResponder: () => true,
-              onMoveShouldSetResponder: () => true,
-              onResponderGrant: handleTrack,
-              onResponderMove: handleTrack,
-            })}
+        style={[styles.trackHit, disabled && styles.dim]}
         accessibilityRole={disabled ? 'progressbar' : 'adjustable'}
         accessibilityLabel="Score"
         accessibilityValue={{ min: MIN_SCORE, max: MAX_SCORE, now: value ?? undefined }}
         /*
          * `adjustable` promises the increment/decrement gesture; without these it
          * announces itself as adjustable and then does nothing when swiped. The
-         * drag path is `locationX` on a raw responder, which offers assistive
-         * tech nothing at all, so these actions are the *only* way to score a
-         * game with a screen reader.
+         * drag is a pan gesture, which offers assistive tech nothing at all, so
+         * these actions are the *only* way to score a game with a screen reader.
          */
         {...(disabled
           ? null
@@ -140,7 +106,14 @@ export function ScoreInput({ value, onChange, disabled = false, hint }: ScoreInp
                 if (event.nativeEvent.actionName === 'decrement') nudge(-1);
               },
             })}>
-        <ScoreBar score={value} dim={disabled} height={TRACK_HEIGHT} />
+        <SeekBar
+          value={(value ?? 0) / MAX_SCORE}
+          onValueChange={(share) => onChange(clampScore(share * MAX_SCORE))}
+          activeColor={value === null ? theme.textMuted : scoreColor(value, theme)}
+          inactiveColor={withAlpha(theme.text, 0.12)}
+          height={TRACK_HEIGHT}
+          disabled={disabled}
+        />
       </View>
 
       {!disabled && (
@@ -181,7 +154,8 @@ const styles = StyleSheet.create({
      line of type, and a glyph has no baseline to share. */
   readoutRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x16 },
   readout: { flex: 1, minWidth: 0 },
-  trackHit: { paddingVertical: TRACK_INSET, justifyContent: 'center' },
+  trackHit: { justifyContent: 'center' },
+  dim: { opacity: 0.5 },
   nudges: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8 },
   spacer: { flex: 1 },
   nudge: {

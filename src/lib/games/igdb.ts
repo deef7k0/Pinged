@@ -5,12 +5,14 @@ import { editionKindFor, editionRank } from '../../constants/game-editions';
 import { supabase } from '../supabase';
 import { precisionOf, type DatePrecision } from './calendar';
 import { chooseHero } from './hero-art';
+import { chooseLogo } from './logo-art';
 import { rememberGame } from './seen-games';
 import {
   freshFrom,
   monthEnd,
   pickAwaited,
   pickFresh,
+  pickPortraits,
   releaseDaysOf,
   type SpotlightCandidate,
 } from './spotlight';
@@ -156,7 +158,8 @@ function imageUrl(image: IgdbImage | undefined, size: string): string | null {
  */
 const GAME_FIELDS = `
   fields name, summary, storyline, url, total_rating, first_release_date,
-         cover.image_id, artworks.image_id, screenshots.image_id,
+         cover.image_id, cover.width, cover.height,
+         artworks.image_id, screenshots.image_id,
          artworks.width, artworks.height, artworks.artwork_type,
          screenshots.width, screenshots.height,
          genres.name, platforms.name, platforms.abbreviation,
@@ -194,6 +197,13 @@ function companyNamed(raw: IgdbGame, role: 'developer' | 'publisher'): string | 
   return match?.company?.name ?? null;
 }
 
+/** A cover's height over its width, as uploaded — what the game page draws it at. */
+function aspectOf(image: IgdbImage | undefined): number | null {
+  const width = image?.width;
+  const height = image?.height;
+  return width && height && width > 0 && height > 0 ? height / width : null;
+}
+
 function toGame(raw: IgdbGame): Game {
   const releaseDate = raw.first_release_date
     ? new Date(raw.first_release_date * 1000).toISOString().slice(0, 10)
@@ -209,6 +219,7 @@ function toGame(raw: IgdbGame): Game {
     sourceId: String(raw.id),
     title: raw.name ?? 'Untitled',
     coverUrl: imageUrl(raw.cover, 'cover_big'),
+    coverAspect: aspectOf(raw.cover),
     heroUrl: imageUrl(hero?.image, '1080p'),
     description: raw.summary ?? raw.storyline ?? null,
     releaseDate,
@@ -230,6 +241,9 @@ function toGame(raw: IgdbGame): Game {
       .filter((url): url is string => !!url),
     ...editionOf(raw),
     steamAppId: steamAppIdOf(raw),
+    /* The logo the page sets where the name was — in the artworks already
+       asked for. See `logo-art.ts`. */
+    logo: chooseLogo(raw.artworks),
   };
 }
 
@@ -365,6 +379,13 @@ export type SpotlightGame = {
 export type Spotlight = {
   /** The biggest games that have just come out — at most two. */
   fresh: SpotlightGame[];
+  /**
+   * Explore's carousel, on portrait art: the biggest just out, then the most
+   * awaited (`pickPortraits`). `art` is the landscape art where there is any,
+   * else empty — the carousel draws the cover. Optional: a spotlight kept on
+   * the device from before it has none.
+   */
+  portraits?: SpotlightGame[];
   /** The most followed game still to come. */
   awaited: SpotlightGame | null;
   /** The days of this month a notable game releases on, for the calendar slide. */
@@ -407,7 +428,7 @@ export async function getSpotlight(now: number, signal?: AbortSignal): Promise<S
     ),
   ]);
 
-  type Row = SpotlightCandidate & { slide: SpotlightGame | null };
+  type Row = SpotlightCandidate & { slide: SpotlightGame | null; card: SpotlightGame };
 
   const describe = (raw: IgdbSpotlightGame): Row | null => {
     if (!raw.first_release_date) return null;
@@ -430,6 +451,12 @@ export async function getSpotlight(now: number, signal?: AbortSignal): Promise<S
             precision,
           }
         : null,
+      card: {
+        game: toSearchResult(toFullGame(raw)),
+        art: art ?? '',
+        releasedAt: raw.first_release_date,
+        precision,
+      },
     };
   };
 
@@ -445,8 +472,10 @@ export async function getSpotlight(now: number, signal?: AbortSignal): Promise<S
   );
 
   const slideOf = (row: Row) => row.slide;
+  const portraits = pickPortraits(window, ahead, now);
   return {
     fresh: fresh.map(slideOf).filter((slide): slide is SpotlightGame => slide !== null),
+    portraits: [...portraits.fresh, ...portraits.awaited].map((row) => row.card),
     awaited: awaited?.slide ?? null,
     releaseDays: releaseDaysOf(window, now),
   };

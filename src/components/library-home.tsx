@@ -18,6 +18,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { MAX_PINS, getLibraryPins, unpinGame } from '@/lib/api';
 import type { CachedGame, LogWithRelations } from '@/lib/database.types';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 /** The library's lists, as the rows under the pinned games. */
 export type LibraryRow = {
@@ -66,7 +67,10 @@ export function LibraryHome({
 
   const unpin = useMutation({
     mutationFn: (gameId: string) => unpinGame(userId, gameId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['library-pins', userId] }),
+    onSuccess: () => {
+      toast.success('Unpinned');
+      return queryClient.invalidateQueries({ queryKey: ['library-pins', userId] });
+    },
     onError: (error) =>
       showAlert('Could not unpin', error instanceof Error ? error.message : undefined),
   });

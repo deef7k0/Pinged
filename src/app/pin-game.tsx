@@ -13,6 +13,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { MAX_PINS, getLibraryPins, pinGame } from '@/lib/api';
 import { getGameById, type GameSearchResult } from '@/lib/games';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 /**
  * Pick a game to pin to the head of your library (0043) — the library's "+".
@@ -45,6 +46,7 @@ export default function PinGameScreen() {
       );
     },
     onSuccess: () => {
+      toast.success('Pinned to your library');
       queryClient.invalidateQueries({ queryKey: ['library-pins', userId] });
       router.back();
     },

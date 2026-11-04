@@ -4,7 +4,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { QuoteBlock } from '@/components/quote-block';
 import { Avatar } from '@/components/ui/avatar';
-import { CARD_INSET, cardShape, useCardMaterial } from '@/components/ui/card-material';
+import { CARD_INSET, cardShape, useCardMaterial, useCardless } from '@/components/ui/card-material';
 import { ScoreLine } from '@/components/ui/score';
 import { Text } from '@/components/ui/text';
 import { Spacing, Type } from '@/constants/theme';
@@ -114,6 +114,8 @@ export const MemberReviewCard = memo(function MemberReviewCard({
 }: MemberReviewCardProps) {
   const theme = useTheme();
   const material = useCardMaterial();
+  /* The Apple TV game page draws no cards: the review stands on the page. */
+  const cardless = useCardless();
 
   const rounded = score === null ? null : Math.round(score);
   const words = text.trim();
@@ -123,12 +125,16 @@ export const MemberReviewCard = memo(function MemberReviewCard({
 
   return (
     <View
-      style={[
-        cardShape,
-        { backgroundColor: fill ?? material.fill, borderColor: material.edge },
-        styles.card,
-        style,
-      ]}>
+      style={
+        cardless
+          ? style
+          : [
+              cardShape,
+              { backgroundColor: fill ?? material.fill, borderColor: material.edge },
+              styles.card,
+              style,
+            ]
+      }>
       {spoiler ? (
         <View style={styles.covered}>
           {/* `danger`, as `<SpoilerNotice>` uses it: read this before you act.

@@ -28,6 +28,7 @@ import { getGameById, type Game } from '@/lib/games';
 import { platformOptionsFor } from '@/lib/platform-options';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 const MAX_NOTES = 500;
 
@@ -165,6 +166,7 @@ function PlaythroughForm({
       else await addPlaythrough(userId, game.id, input);
     },
     onSuccess: () => {
+      toast.success('Playthrough saved');
       invalidate();
       router.back();
     },
@@ -175,6 +177,7 @@ function PlaythroughForm({
       if (run) await deletePlaythrough(run.id);
     },
     onSuccess: () => {
+      toast.success('Playthrough deleted');
       invalidate();
       router.back();
     },

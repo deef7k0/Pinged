@@ -14,6 +14,7 @@ import { blockUser, getProfile, isBlockedByMe, unblockUser } from '@/lib/api';
 import { displayNameFor } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 /**
  * Someone else's profile: the bar with their handle in it, then
@@ -64,7 +65,10 @@ export default function ProfileScreen() {
     mutationFn: (block: boolean) => (block ? blockUser(id!) : unblockUser(id!)),
     /* A block changes what nearly every list shows — reviews, comments,
        activity, follows — so everything is asked again. It is rare. */
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: (_result, block) => {
+      toast.success(block ? 'Blocked' : 'Unblocked');
+      return queryClient.invalidateQueries();
+    },
     onError: (error) =>
       showAlert('That didn’t work', error instanceof Error ? error.message : undefined),
   });

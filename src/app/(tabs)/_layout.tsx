@@ -52,13 +52,15 @@ export default function TabsLayout() {
           }}
         />
 
+        {/* What Search showed before anything was typed (the owner's,
+            2026-11-03) — Apple TV's Store and Home under it. */}
         <Tabs.Screen
-          name="search"
+          name="explore"
           options={{
-            title: 'Search',
-            tabBarAccessibilityLabel: 'Search',
+            title: 'Explore',
+            tabBarAccessibilityLabel: 'Explore',
             tabBarIcon: ({ color, focused, size }) => (
-              <Ionicons name={focused ? 'search' : 'search-outline'} size={size} color={color} />
+              <Ionicons name={focused ? 'compass' : 'compass-outline'} size={size} color={color} />
             ),
           }}
         />
@@ -87,6 +89,20 @@ export default function TabsLayout() {
             tabBarAccessibilityLabel: 'Profile',
             tabBarIcon: ({ color, focused, size }) => (
               <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />
+            ),
+          }}
+        />
+
+        {/* The field and its results. Not in the bar's pill: a round key of
+            its own at the right, as Apple TV's (`<AppTabBar>`). Last, so it
+            is last for a screen reader too. */}
+        <Tabs.Screen
+          name="search"
+          options={{
+            title: 'Search',
+            tabBarAccessibilityLabel: 'Search',
+            tabBarIcon: ({ color, focused, size }) => (
+              <Ionicons name={focused ? 'search' : 'search-outline'} size={size} color={color} />
             ),
           }}
         />

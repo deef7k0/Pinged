@@ -1,6 +1,6 @@
 import { decode as decodeJpeg } from 'jpeg-js';
 
-import { logoInkOf, meanOpaqueLuminance, type LogoInk } from '@/lib/logo-ink';
+import { inkBounds, logoInkOf, meanOpaqueLuminance, type LogoInk } from '@/lib/logo-ink';
 import { decodePng, type DecodedImage } from '@/lib/png';
 import { USER_AGENT } from '@/lib/wikidata/client';
 
@@ -130,7 +130,9 @@ export async function measureLogoInk(measureUrl: string): Promise<LogoInk | null
   const buffer = await response.arrayBuffer();
   if (buffer.byteLength > MAX_BYTES) return null;
   const image = decodeImage(new Uint8Array(buffer));
-  return image ? logoInkOf(image) : null;
+  if (!image) return null;
+  const ink = logoInkOf(image);
+  return ink ? { ...ink, bounds: inkBounds(image) } : null;
 }
 
 async function fetchImage(url: string): Promise<DecodedImage | null> {

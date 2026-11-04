@@ -372,6 +372,12 @@ export async function getOrCreateSingletonList(
   return created;
 }
 
+/**
+ * How many games Favourites holds: a person's Top 10. The profile pins the
+ * first four. 0047's trigger holds the database to the same number.
+ */
+export const FAVOURITES_MAX = 10;
+
 /** Favourites, ready for the four-poster identity row. */
 export async function getFavorites(userId: string): Promise<ListWithItems | null> {
   const { data, error } = await supabase
@@ -532,6 +538,12 @@ export async function toggleSingletonMembership(
     .from('list_items')
     .select('*', { count: 'exact', head: true })
     .eq('list_id', list.id);
+
+  /* Favourites holds ten — the Top 10 (the owner's, 2026-11-03). 0047 says
+     the same in the database; this says it before a request is spent. */
+  if (kind === 'favorites' && (count ?? 0) >= FAVOURITES_MAX) {
+    throw new Error('Your favourites hold ten games. Take one off first.');
+  }
 
   await addToList(list.id, game, { position: count ?? 0 });
 }

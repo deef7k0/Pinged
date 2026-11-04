@@ -21,10 +21,11 @@ import Animated, {
 
 import { MarqueeText } from '@/components/ui/marquee-text';
 import { PressGlyph } from '@/components/ui/press-glyph';
+import { GlassSurface, useLiquidGlass } from '@/components/ui/liquid-glass';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import { PRESS_MOTION } from '@/constants/press-motion';
-import { MaxContentWidth, Palette, Spacing, withAlpha } from '@/constants/theme';
+import { MaxContentWidth, Palette, withAlpha } from '@/constants/theme';
 import {
   BAR_SLIDE,
   BAR_SPRING,
@@ -83,6 +84,8 @@ const RIM =
 const SHEEN = 'linear-gradient(135deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0) 58%)';
 /** How dark the pane is over whatever is behind it. */
 const PANE_SCRIM = 0.27;
+/** How far a grouped key sits in from the capsule's ends, so its held circle clears them. */
+const GROUP_PAD = 2;
 
 /** Compose's `FastOutSlowInEasing`, the default of the reference's `tween(300)`. */
 const FROST_EASING = Easing.bezier(...FROST.easing);
@@ -99,7 +102,7 @@ const DEFAULT_HEADER = 0.38;
  * glyph in the bar. `<TopBarDisc>` reads it, so a screen writes its right-hand
  * controls once and they are right in both.
  */
-const TopBarForm = createContext<'disc' | 'bar'>('disc');
+const TopBarForm = createContext<'disc' | 'bar' | 'group'>('disc');
 
 /**
  * The top bar — SimpMusic's, at the owner's direction: its size, how it
@@ -475,7 +478,7 @@ function ArtBar({
         importantForAccessibility={pinned ? 'no-hide-descendants' : 'auto'}>
         <View style={styles.discRow} pointerEvents="box-none">
           {leading ? <GlassDisc {...leading} intensity={intensity} /> : <View />}
-          {!!right && <View style={styles.discs}>{right}</View>}
+          {!!right && <GlassGroup intensity={intensity}>{right}</GlassGroup>}
         </View>
       </Animated.View>
 
@@ -623,10 +626,8 @@ function GlassBar({
         <View style={styles.discRow} pointerEvents="box-none">
           {leading ? <GlassDisc {...leading} intensity={intensity} /> : <View />}
           {!!right && (
-            <View
-              style={styles.discs}
-              onLayout={(event) => setRightWidth(Math.round(event.nativeEvent.layout.width))}>
-              {right}
+            <View onLayout={(event) => setRightWidth(Math.round(event.nativeEvent.layout.width))}>
+              <GlassGroup intensity={intensity}>{right}</GlassGroup>
             </View>
           )}
         </View>
@@ -776,7 +777,7 @@ function BarRow({
       <View style={[styles.row, { marginTop: inset }]}>
         {leading && <BarKey {...leading} />}
         {children}
-        {!!right && <View style={styles.keys}>{right}</View>}
+        {!!right && <BarGroup>{right}</BarGroup>}
       </View>
     </TopBarForm.Provider>
   );
@@ -839,7 +840,84 @@ export type TopBarDiscProps = {
  */
 export function TopBarDisc(props: TopBarDiscProps) {
   const form = useContext(TopBarForm);
+  if (form === 'group') return <GroupKey {...props} />;
   return form === 'bar' ? <BarKey {...props} /> : <GlassDisc {...props} />;
+}
+
+/**
+ * A page's right-hand controls as one connected bar (the owner's, 2026-11-03:
+ * "make the buttons at the top right in every screen to be all in one single
+ * bar… like if it was the navigation bar"): one capsule of glass — the
+ * disc's own rim, blur, scrim and sheen, drawn once — with the keys side by
+ * side in it. One control is a capsule of one, which is the disc it was.
+ */
+function GlassGroup({ intensity = 60, children }: { intensity?: number; children: ReactNode }) {
+  const theme = useTheme();
+  const chrome = useScreenChrome();
+  const liquid = useLiquidGlass();
+
+  if (liquid) {
+    return (
+      <View style={[styles.group, styles.liquid]}>
+        <GlassSurface radius={DISC / 2} overPage />
+        <TopBarForm.Provider value="group">{children}</TopBarForm.Provider>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.group}>
+      <View style={[styles.fill, { experimental_backgroundImage: RIM }]} pointerEvents="none" />
+      <View style={styles.groupPane} pointerEvents="none">
+        <BlurView
+          intensity={intensity}
+          tint="dark"
+          style={styles.fill}
+          {...(Platform.OS === 'android'
+            ? {
+                blurMethod: 'dimezisBlurView' as const,
+                blurTarget: chrome?.blurTarget,
+                blurReductionFactor: 4,
+              }
+            : null)}
+        />
+        <View style={[styles.fill, { backgroundColor: withAlpha(theme.shadowInk, PANE_SCRIM) }]} />
+        <View style={[styles.fill, { experimental_backgroundImage: SHEEN }]} />
+      </View>
+      <TopBarForm.Provider value="group">{children}</TopBarForm.Provider>
+    </View>
+  );
+}
+
+/** The same in the bar, once the page has scrolled: a capsule of the control grey. */
+function BarGroup({ children }: { children: ReactNode }) {
+  const theme = useTheme();
+  const liquid = useLiquidGlass();
+  return (
+    <View style={[styles.group, liquid ? styles.liquid : { backgroundColor: theme.controlFill }]}>
+      {liquid && <GlassSurface radius={DISC / 2} flat overPage />}
+      <TopBarForm.Provider value="group">{children}</TopBarForm.Provider>
+    </View>
+  );
+}
+
+/** A key inside a group: the glyph alone, a round state layer when held. */
+function GroupKey({ icon, label, onPress, nudge = 0 }: TopBarDiscProps) {
+  const theme = useTheme();
+
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      scaleTo={0.92}
+      pressedColor={theme.controlPressed}
+      style={StyleSheet.flatten([styles.groupKey, { backgroundColor: withAlpha(theme.text, 0) }])}>
+      <PressGlyph>
+        <Ionicons name={icon} size={22} color={theme.text} style={{ marginLeft: nudge }} />
+      </PressGlyph>
+    </PressableScale>
+  );
 }
 
 /**
@@ -848,6 +926,7 @@ export function TopBarDisc(props: TopBarDiscProps) {
  */
 function BarKey({ icon, label, onPress, nudge = 0 }: TopBarDiscProps) {
   const theme = useTheme();
+  const liquid = useLiquidGlass();
 
   return (
     <PressableScale
@@ -860,6 +939,7 @@ function BarKey({ icon, label, onPress, nudge = 0 }: TopBarDiscProps) {
          nothing so there is a colour for the press to ease in from. */
       pressedColor={theme.controlPressed}
       style={StyleSheet.flatten([styles.key, { backgroundColor: withAlpha(theme.text, 0) }])}>
+      {liquid && <GlassSurface radius={TOP_BAR_KEY_FILL / 2} flat overPage />}
       <PressGlyph>
         <Ionicons
           name={icon}
@@ -877,6 +957,7 @@ function GlassDisc({ icon, label, onPress, intensity = 60, nudge = 0 }: TopBarDi
   const theme = useTheme();
   const chrome = useScreenChrome();
   const reduceMotion = useReducedMotion();
+  const liquid = useLiquidGlass();
 
   /* The glass lighting where it is touched — Convx's `InteractiveHighlight`
      (`PRESS_MOTION.sheen`): a white wash and a soft spot under the finger,
@@ -885,7 +966,6 @@ function GlassDisc({ icon, label, onPress, intensity = 60, nudge = 0 }: TopBarDi
      under Reduce Motion too, at once rather than on the spring. */
   const lit = useSharedValue(0);
   const [spot, setSpot] = useState({ x: DISC / 2, y: DISC / 2 });
-  const sheenStyle = useAnimatedStyle(() => ({ opacity: lit.get(), transform: [{ scale: 1 }] }));
   const sheenSpring = {
     mass: PRESS_MOTION.sheen.mass,
     stiffness: PRESS_MOTION.sheen.stiffness,
@@ -903,7 +983,36 @@ function GlassDisc({ icon, label, onPress, intensity = 60, nudge = 0 }: TopBarDi
       }}
       onPressOut={() => lit.set(reduceMotion ? 0 : withSpring(0, sheenSpring))}
       scaleTo={0.96}
-      style={StyleSheet.flatten(styles.disc)}>
+      style={StyleSheet.flatten([styles.disc, liquid && styles.liquid])}>
+      {liquid ? (
+        <GlassSurface radius={DISC / 2} overPage />
+      ) : (
+        <GlassPane intensity={intensity} chrome={chrome} lit={lit} spot={spot} />
+      )}
+
+      <PressGlyph>
+        <Ionicons name={icon} size={24} color={theme.text} style={{ marginLeft: nudge }} />
+      </PressGlyph>
+    </PressableScale>
+  );
+}
+
+/** The disc's own glass, when liquid glass is off: rim, blur, scrim, sheen and the touch's light. */
+function GlassPane({
+  intensity,
+  chrome,
+  lit,
+  spot,
+}: {
+  intensity: number;
+  chrome: ReturnType<typeof useScreenChrome>;
+  lit: SharedValue<number>;
+  spot: { x: number; y: number };
+}) {
+  const theme = useTheme();
+  const sheenStyle = useAnimatedStyle(() => ({ opacity: lit.get(), transform: [{ scale: 1 }] }));
+  return (
+    <>
       {/* The rim. It fills the disc; the pane over it is one dp smaller all
           round, so one dp of this is what shows. */}
       <View style={[styles.fill, { experimental_backgroundImage: RIM }]} pointerEvents="none" />
@@ -938,11 +1047,7 @@ function GlassDisc({ icon, label, onPress, intensity = 60, nudge = 0 }: TopBarDi
           ]}
         />
       </View>
-
-      <PressGlyph>
-        <Ionicons name={icon} size={24} color={theme.text} style={{ marginLeft: nudge }} />
-      </PressGlyph>
-    </PressableScale>
+    </>
   );
 }
 
@@ -1004,7 +1109,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  keys: { flexDirection: 'row', alignItems: 'center' },
   key: {
     width: TOP_BAR_KEY_FILL,
     height: TOP_BAR_KEY_FILL,
@@ -1024,7 +1128,34 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
   },
-  discs: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8 },
+  /* Liquid glass draws outside its control (its shadow): nothing clips it. */
+  liquid: { overflow: 'visible' },
+  /* The connected bar of right-hand controls: one capsule, the disc's height. */
+  group: {
+    height: DISC,
+    minWidth: DISC,
+    borderRadius: DISC / 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: GROUP_PAD,
+    overflow: 'hidden',
+  },
+  groupPane: {
+    position: 'absolute',
+    top: 1,
+    left: 1,
+    right: 1,
+    bottom: 1,
+    borderRadius: (DISC - 2) / 2,
+    overflow: 'hidden',
+  },
+  groupKey: {
+    width: DISC - GROUP_PAD * 2,
+    height: DISC - GROUP_PAD * 2,
+    borderRadius: (DISC - GROUP_PAD * 2) / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   disc: {
     width: DISC,
     height: DISC,

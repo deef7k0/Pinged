@@ -20,7 +20,8 @@ export type CoverAspect = 'square' | 'portrait';
  * Where a lookup stands: not asked (nothing to ask, or Reduce Motion),
  * asking, an animated cover to show, or none.
  */
-export type CoverStatus = 'idle' | 'loading' | 'found' | 'not_found';
+/** `unavailable`: the lookup failed this session (no network, a rate limit) — not remembered. */
+export type CoverStatus = 'idle' | 'loading' | 'found' | 'not_found' | 'unavailable';
 
 /**
  * How an animated file is drawn: an animated image (WebP, APNG, GIF) by
@@ -150,6 +151,19 @@ export function animatedFormatOf(url: string): AnimatedFormat | null {
     return 'image';
   }
   return null;
+}
+
+/**
+ * Whether Skia can play this file in the game page's hero, under its one
+ * blur: an animated **WebP or GIF**, or a **video** (WebM, MP4), each read
+ * frame by frame (`useAnimationFrames`). Never an **APNG**: Skia has no APNG
+ * decoder, so one is its first frame there, still forever — what the owner
+ * saw as covers "paused" (2026-11-04). An APNG is expo-image's, over the art.
+ */
+export function skiaAnimates(url: string | null | undefined): boolean {
+  if (!url) return false;
+  const path = url.split(/[?#]/)[0].toLowerCase();
+  return /\.(webp|gif|webm|mp4|m4v)$/.test(path);
 }
 
 /**

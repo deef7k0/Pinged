@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { Link, type Href } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import { PingAudienceSetting } from '@/components/pings/ping-audience-setting';
 import {
@@ -17,10 +17,13 @@ import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
 import { PageScrollView } from '@/components/ui/page-scroll';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, Screen } from '@/components/ui/screen';
+import { useLiquidGlass } from '@/components/ui/liquid-glass';
 import { SelectionCard } from '@/components/ui/selection-card';
 import { Text } from '@/components/ui/text';
 import { Radius, Spacing, TapTarget } from '@/constants/theme';
 import { useAnimatedArtwork } from '@/hooks/use-animated-artwork';
+import { useGameTitle } from '@/hooks/use-game-title';
+import { setLiquidGlass } from '@/lib/liquid-glass';
 import { useCopyStage3d } from '@/hooks/use-copy-stage-3d';
 import { STAGE_3D_AVAILABLE, THIRTY_TWO_BIT } from '@/lib/copy-stage-3d';
 import { useGameColours } from '@/hooks/use-game-colours';
@@ -107,6 +110,8 @@ export default function SettingsScreen() {
   const theme = useTheme();
   const gameColours = useGameColours();
   const animatedArtwork = useAnimatedArtwork();
+  const gameTitle = useGameTitle();
+  const liquidGlass = useLiquidGlass();
   const copyStage3d = useCopyStage3d();
   const [signingOut, setSigningOut] = useState(false);
 
@@ -204,6 +209,58 @@ export default function SettingsScreen() {
                   hint="Every cover stays still, and nothing is downloaded for it. A game’s cover can still be played from its page."
                   selected={!animatedArtwork.on}
                   onPress={() => animatedArtwork.setOn(false)}
+                />
+              </View>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="title">
+            <AccordionTrigger
+              icon="text-outline"
+              title="Game title"
+              summary={gameTitle.shown ? 'Shown' : 'Hidden'}
+            />
+            <AccordionContent>
+              <View style={styles.choices} accessibilityRole="radiogroup">
+                <SelectionCard
+                  title="Shown"
+                  hint="A game’s page shows its logo or its name over the cover, and the name in the bar as you scroll."
+                  selected={gameTitle.shown}
+                  onPress={() => gameTitle.setShown(true)}
+                />
+                <SelectionCard
+                  title="Hidden"
+                  hint="A game’s page never shows its name: the cover speaks for itself. Other screens still name it."
+                  selected={!gameTitle.shown}
+                  onPress={() => gameTitle.setShown(false)}
+                />
+              </View>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="glass">
+            <AccordionTrigger
+              icon="water-outline"
+              title="Liquid glass"
+              summary={liquidGlass ? 'On' : 'Off'}
+            />
+            <AccordionContent>
+              <View style={styles.choices} accessibilityRole="radiogroup">
+                <SelectionCard
+                  title="Liquid glass"
+                  hint={
+                    Platform.OS === 'ios'
+                      ? 'The back button, the tab bar, menus and the round keys are drawn in Apple’s liquid glass.'
+                      : 'The back button, the tab bar, menus and the round keys are drawn as glass: the page blurred behind them, a rim of light round them.'
+                  }
+                  selected={liquidGlass}
+                  onPress={() => setLiquidGlass(true)}
+                />
+                <SelectionCard
+                  title="Solid"
+                  hint="Pinged’s own controls, as they have always been."
+                  selected={!liquidGlass}
+                  onPress={() => setLiquidGlass(false)}
                 />
               </View>
             </AccordionContent>

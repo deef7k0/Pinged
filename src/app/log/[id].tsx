@@ -70,6 +70,7 @@ import { PLAY_FILTERS, type ReviewPlayFilter } from '@/lib/review-facets';
 import { QUOTE_MAX, displayOf, normaliseQuote, type ReviewDisplay } from '@/lib/review-quote';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 /** How long the form waits after the last keystroke before writing a draft. */
 const DRAFT_DEBOUNCE_MS = 800;
@@ -542,6 +543,7 @@ function LogForm({ game, existing, draft, userId }: LogFormProps) {
       if (userId) await clearDraft(userId, game.id);
     },
     onSuccess: () => {
+      toast.success(review.trim() || reviewTitle.trim() ? 'Review saved' : 'Log saved');
       tap(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
       invalidate();
       queryClient.removeQueries({ queryKey: ['log-draft', userId, game.id] });
@@ -556,6 +558,7 @@ function LogForm({ game, existing, draft, userId }: LogFormProps) {
       await clearDraft(userId, game.id);
     },
     onSuccess: () => {
+      toast.success('Log deleted');
       tap(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning));
       invalidate();
       queryClient.removeQueries({ queryKey: ['log-draft', userId, game.id] });

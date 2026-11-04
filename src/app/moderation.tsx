@@ -44,6 +44,7 @@ import { displayBarcode } from '@/lib/barcode';
 import { displayNameFor, timeAgo } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 /**
  * Reasons a claim is turned down. Preset rather than typed: the contributor sees
@@ -384,6 +385,7 @@ function ReportCard({ entry }: { entry: SimilarityReportQueueRow }) {
   const decide = useMutation({
     mutationFn: (action: 'hide' | 'restore') => moderateSimilarity(entry.similarity_id, action),
     onSuccess: () => {
+      toast.success('Decision saved');
       queryClient.invalidateQueries({ queryKey: ['similarity-reports'] });
       queryClient.invalidateQueries({ queryKey: ['community-similar', entry.game_a] });
       queryClient.invalidateQueries({ queryKey: ['community-similar', entry.game_b] });
@@ -470,6 +472,7 @@ function SuggestionReportCard({ entry }: { entry: SuggestionReportQueueRow }) {
     mutationFn: (action: 'remove' | 'dismiss') =>
       moderateSuggestion(entry.similarity_id, entry.author_id, action),
     onSuccess: (_result, action) => {
+      toast.success('Decision saved');
       queryClient.invalidateQueries({ queryKey: ['suggestion-reports'] });
       if (action !== 'remove') return;
       queryClient.invalidateQueries({ queryKey: ['similar-suggestions', entry.similarity_id] });
@@ -559,6 +562,7 @@ function ReviewReportCard({ entry }: { entry: ReviewReportQueueRow }) {
   const decide = useMutation({
     mutationFn: (action: 'remove' | 'dismiss') => moderateReview(entry.log_id, action),
     onSuccess: (_result, action) => {
+      toast.success('Decision saved');
       queryClient.invalidateQueries({ queryKey: ['review-reports'] });
       if (action !== 'remove') return;
       /* Everywhere a review is printed, so the removed words go from this
@@ -704,6 +708,7 @@ function UserContentReportCard({ entry }: { entry: UserContentReportQueueRow }) 
     mutationFn: (action: 'remove' | 'dismiss') =>
       moderateUserContent(entry.kind, entry.target_id, action),
     onSuccess: (_result, action) => {
+      toast.success('Decision saved');
       queryClient.invalidateQueries({ queryKey: ['user-content-reports'] });
       if (action !== 'remove') return;
       if (entry.kind === 'profile') {
@@ -909,6 +914,7 @@ function ClaimCard({ entry, siblings }: { entry: ContributionWithRelations; sibl
     mutationFn: ({ decision, note }: { decision: 'approve' | 'reject'; note?: string }) =>
       moderateContribution(entry.id, decision, note),
     onSuccess: () => {
+      toast.success('Decision saved');
       queryClient.invalidateQueries({ queryKey: ['moderation-queue'] });
       queryClient.invalidateQueries({ queryKey: ['barcode', entry.barcode] });
       queryClient.invalidateQueries({ queryKey: ['game-releases', entry.game_id] });

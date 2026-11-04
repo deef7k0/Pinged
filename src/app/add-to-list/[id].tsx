@@ -12,6 +12,7 @@ import { Spacing } from '@/constants/theme';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { addToList, appendToList, getList, removeFromList } from '@/lib/api';
 import { getGameById, type GameSearchResult } from '@/lib/games';
+import { toast } from '@/lib/toast';
 
 /**
  * Pick a game to add to a collection.
@@ -75,6 +76,7 @@ export default function AddToListScreen() {
       if (replace && replace !== game.id) await removeFromList(id!, replace);
     },
     onSuccess: () => {
+      toast.success('Added to the collection');
       // The same three keys the collection screen invalidates after an edit —
       // the list itself, the profile's list rail, and favourites, which is just
       // a collection with a fixed kind and can be the target here too.

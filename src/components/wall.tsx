@@ -15,6 +15,7 @@ import { FontFamily, Radius, Spacing, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { postToWall, type ActivityEntry, type ActivityKind, type WallPost } from '@/lib/api';
 import { displayNameFor, timeAgo } from '@/lib/format';
+import { toast } from '@/lib/toast';
 
 const MAX_LENGTH = 500;
 
@@ -66,6 +67,7 @@ export function WallComposer({
   const post = useMutation({
     mutationFn: () => postToWall(authorId, wallOwnerId, body),
     onSuccess: () => {
+      toast.success('Posted to the wall');
       setBody('');
       queryClient.invalidateQueries({ queryKey: ['wall', wallOwnerId] });
     },

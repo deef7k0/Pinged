@@ -74,6 +74,8 @@ export const GameGridTile = memo(function GameGridTile({
         steamAppId={steamAppId}
         width={width}
         rounded="image"
+        /* A hold that already means something keeps its meaning. */
+        zoomable={!onLongPress}
       />
       <View style={styles.caption}>
         <Text variant="itemTitle" numberOfLines={2} style={styles.title}>

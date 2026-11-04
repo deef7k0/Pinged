@@ -32,7 +32,8 @@ import { igdbLogoSource, measureLogoInk } from '@/lib/logo-luminance';
  */
 const TTL_MS = 60 * 24 * 60 * 60 * 1000;
 
-const CACHE_VERSION = 1;
+/* 2: measurements carry `bounds` (where the drawing is in its file). */
+const CACHE_VERSION = 2;
 const CACHE_KEY = `logo-ink:v${CACHE_VERSION}`;
 
 /**

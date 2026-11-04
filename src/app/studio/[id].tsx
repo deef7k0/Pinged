@@ -10,7 +10,7 @@ import { LOGO_WIDTH_RATIO, StudioIdentity } from '@/components/studio-identity';
 import { TrailerBackdrop } from '@/components/trailer-backdrop';
 import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
 import { HandoffTitle } from '@/components/ui/handoff-title';
-import { PageFill, PinnedHero } from '@/components/ui/pinned-hero';
+import { PageFill, PinnedHero, shownTail } from '@/components/ui/pinned-hero';
 import { PageFlatList } from '@/components/ui/page-scroll';
 import { Poster } from '@/components/ui/poster';
 import { PressableScale } from '@/components/ui/pressable-scale';
@@ -432,6 +432,9 @@ export default function StudioScreen() {
               solidAt={solidAt}
               scrim={0.4}
               veil={VEIL}
+              /* Convx's long blur and its mirrored tail: the fade from the
+                 banner into the page is the blur's own. */
+              tail
               onLoad={({ width: artWidth, height: artHeight }) => {
                 if (
                   banner &&
@@ -490,7 +493,9 @@ export default function StudioScreen() {
             <View>
               {/* The solid part's soft top edge, under the name block: the art
                     the name floats on gives way to the page here. */}
-              <View pointerEvents="none" style={[styles.lip, { top: bannerHeight - LIP }]}>
+              <View
+                pointerEvents="none"
+                style={[styles.lip, { top: bannerHeight + shownTail(bannerHeight) - LIP }]}>
                 <LinearGradient
                   colors={lipColours(page)}
                   locations={
@@ -535,6 +540,9 @@ export default function StudioScreen() {
                   )}
                 </View>
               </View>
+
+              {/* The blurred tail under the banner, before the solid part. */}
+              <View style={{ height: shownTail(bannerHeight) }} />
 
               {/* The page's solid part: the rails, opaque, rising over the art. */}
               <View style={[styles.solid, { backgroundColor: page }]}>

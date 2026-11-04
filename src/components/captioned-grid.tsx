@@ -13,6 +13,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { setItemCaption, type ListItem } from '@/lib/api';
+import { toast } from '@/lib/toast';
 
 /**
  * Three across, and it is a rule rather than a fitting.
@@ -228,7 +229,10 @@ function CaptionEditor({
 
   const save = useMutation({
     mutationFn: () => setItemCaption(listId, item.game_id, value),
-    onSuccess: onDone,
+    onSuccess: () => {
+      toast.success('Caption saved');
+      return onDone();
+    },
   });
 
   return (

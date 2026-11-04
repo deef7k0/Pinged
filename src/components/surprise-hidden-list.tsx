@@ -20,6 +20,7 @@ import {
   type HiddenGame,
 } from '@/lib/surprise-hidden';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 /**
  * Small enough to be a row's leading mark, large enough to recognise.
@@ -77,6 +78,7 @@ export function SurpriseHiddenList({ userId, value, ...slot }: SurpriseHiddenLis
   const unhide = useMutation({
     mutationFn: (gameId: string) => unhideGame(userId, gameId),
     onSuccess: (next: HiddenGame[]) => {
+      toast.success('Back in Surprise Me');
       queryClient.setQueryData(['surprise-hidden', userId], next);
     },
   });
@@ -84,6 +86,7 @@ export function SurpriseHiddenList({ userId, value, ...slot }: SurpriseHiddenLis
   const clear = useMutation({
     mutationFn: () => clearHiddenGames(userId),
     onSuccess: (next: HiddenGame[]) => {
+      toast.success('Every hidden game is back');
       queryClient.setQueryData(['surprise-hidden', userId], next);
     },
   });

@@ -22,6 +22,7 @@ import {
 } from '@/lib/api';
 import { displayNameFor, timeAgo } from '@/lib/format';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 /**
  * How many comments a page renders before handing off to the thread screen.
@@ -144,7 +145,10 @@ export function CommentSection({
       if (!userId) throw new Error('Sign in to comment.');
       await deleteComment(userId, commentId);
     },
-    onSuccess: invalidate,
+    onSuccess: () => {
+      toast.success('Comment deleted');
+      return invalidate();
+    },
   });
 
   const heading = title ?? `${roots.length} ${roots.length === 1 ? 'comment' : 'comments'}`;

@@ -5,7 +5,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Keyboard, Platform, StyleSheet, View, type TextInput } from 'react-native';
 
 import { useTabBarClearance } from '@/components/app-tab-bar';
-import { DiscoverFeed } from '@/components/discover-feed';
 import { GameSearchResults, MIN_QUERY_LENGTH } from '@/components/game-search-results';
 import { CollapsingField } from '@/components/search/collapsing-field';
 import { CatalogueResults } from '@/components/search/catalogue-results';
@@ -20,8 +19,10 @@ import { PeopleResults } from '@/components/search/people-results';
 import { PlatformDirectory } from '@/components/search/platform-directory';
 import { ReviewResults } from '@/components/search/review-results';
 import { SEARCH_SCOPE_INFO, scopeInfo } from '@/components/search/search-scopes';
+import { SearchBrowse } from '@/components/search/search-browse';
 import { StudioResults } from '@/components/search/studio-results';
 import { SearchHistory } from '@/components/search-history';
+import { Avatar } from '@/components/ui/avatar';
 import { HeaderFade } from '@/components/ui/frosted-top-bar';
 import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
@@ -38,7 +39,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { TextField } from '@/components/ui/text-field';
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -77,22 +78,23 @@ const SCOPE_TABS = SEARCH_SCOPE_INFO.map((scope) => ({ key: scope.key, label: sc
 /**
  * Search: a field, and the six things it can look through as tabs under it.
  *
- * ## The tabs are always there
+ * ## At rest it is Apple TV's Search
  *
- * Games, Reviews, People, Collections, Studios, Platforms — a row of
- * pills under the field (`<TabBar>`), on from the moment the tab opens, with
- * Games chosen. Each is its own list (`*Results`), with content before a word
- * is typed or a sentence saying why it has none; Games untyped is Discover — a
- * slider of the month's biggest releases, then rows of what is popular, what
- * is like the last game you reviewed, what the people here rated highest.
+ * The owner's reference (2026-11-03): "Search" large at the top left, your
+ * avatar at the right, the field, and under it a grid of landscape tiles two
+ * across (`<SearchBrowse>`) — no tabs. What the tab used to show before a word
+ * was typed (Discover, and the Reviews and Collections charts) moved to the
+ * Explore tab, whose page is `<DiscoverFeed>`; "This explore tab does not have
+ * any searchable stuff", and this one now has nothing else.
  *
- * For one pass the tab rested on a menu instead: eight large buttons, one per
- * scope and one for the calendar, with the pills arriving only after a choice.
- * The owner took it out. A menu in front of the search is a tap before
- * anything can be seen, and it hid Discover — the screen's best answer to
- * "what should I play" — behind the first of its buttons. The scopes are tabs
- * again, and the calendar is the last slide at the head of Discover (it was a
- * button there, until the slider took the button's place).
+ * ## The tabs come in with a search
+ *
+ * Games, Reviews, People, Collections, Studios, Platforms — a row of pills
+ * under the field (`<TabBar>`) the moment the field is touched or holds
+ * anything, and while any scope but Games is chosen, whose untyped view is
+ * still its own list (`*Results`). A tap on the Search key while it is open
+ * returns it to rest. A menu of buttons in front of the field was tried once
+ * and taken out by the owner; this is not that — the field is always there.
  *
  * ## One field, shared
  *
@@ -115,6 +117,7 @@ export default function SearchScreen() {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
   const userId = useAuth((state) => state.session?.user.id);
+  const me = useAuth((state) => state.profile);
 
   /*
    * A facet — a genre, a theme, an engine… — whose games the Games tab shows
@@ -268,6 +271,15 @@ export default function SearchScreen() {
    */
   const searching = remote && input.trim() !== query;
 
+  /*
+   * Browsing: nothing typed, nothing focused, the Games scope — Apple TV's
+   * Search at rest (the owner's reference, 2026-11-03): the field and a grid
+   * of tiles, no tabs. The scopes come in as soon as there is a search to
+   * scope, and stay while one other than Games is chosen, whose untyped
+   * view is still its own.
+   */
+  const browsing = !focused && input === '' && scope === 'games' && !facet && !lookup;
+
   /** What a focused field brings over the scope: "Search by", a kind's values, the history. */
   function renderPanel() {
     /* A kind chosen in "Search by": its values, matching what is typed. */
@@ -385,7 +397,7 @@ export default function SearchScreen() {
             header={<FacetSuggestions query={query} onPick={pickFacet} />}
           />
         ) : (
-          <DiscoverFeed />
+          <SearchBrowse />
         );
     }
   }
@@ -419,28 +431,18 @@ export default function SearchScreen() {
             <Text variant="largeTitle" accessibilityRole="header">
               Search
             </Text>
-            <View style={[styles.keys, { backgroundColor: theme.controlFill }]}>
-              <PressableScale
-                accessibilityRole="button"
-                accessibilityLabel="Release calendar"
-                onPress={() => router.push('/calendar')}
-                scaleTo={0.95}
-                style={styles.key}>
-                <PressGlyph>
-                  <Ionicons name="calendar-outline" size={21} color={theme.text} />
-                </PressGlyph>
-              </PressableScale>
-              <PressableScale
-                accessibilityRole="button"
-                accessibilityLabel="Scan a game's barcode"
-                onPress={() => router.push('/scan')}
-                scaleTo={0.95}
-                style={styles.key}>
-                <PressGlyph>
-                  <Ionicons name="barcode-outline" size={22} color={theme.text} />
-                </PressGlyph>
-              </PressableScale>
-            </View>
+            {/* The reference's avatar at the right: your profile. */}
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="Your profile"
+              onPress={() => router.navigate('/profile')}
+              scaleTo={0.94}>
+              <Avatar
+                uri={me?.avatar_url ?? null}
+                name={me?.display_name ?? me?.username}
+                size={34}
+              />
+            </PressableScale>
           </View>
         </CollapsingField>
       </FocusFold>
@@ -495,6 +497,18 @@ export default function SearchScreen() {
                   scaleTo={0.85}>
                   <Ionicons name="close-circle" size={20} color={theme.textMuted} />
                 </PressableScale>
+              ) : input.length === 0 ? (
+                /* The scanner, back in the field's trailing slot: a barcode
+                   is a search too. */
+                <PressableScale
+                  accessibilityRole="button"
+                  accessibilityLabel="Scan a game's barcode"
+                  onPress={() => router.push('/scan')}
+                  scaleTo={0.85}>
+                  <PressGlyph>
+                    <Ionicons name="barcode-outline" size={21} color={theme.textMuted} />
+                  </PressGlyph>
+                </PressableScale>
               ) : undefined
             }
           />
@@ -505,16 +519,20 @@ export default function SearchScreen() {
           (`<TabBar>`) that scrolls, since six scopes are wider than a phone.
           The placeholder names the scope too. Outside the header's padding:
           the bar brings the page margin itself. */}
-      <TabBar
-        tabs={SCOPE_TABS}
-        value={scope}
-        onChange={(next) => {
-          /* Another tab is another search: the facet was the Games tab's. */
-          if (facet) clearFacet();
-          setScope(next);
-        }}
-        label="What to search"
-      />
+      {!browsing && (
+        <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(160)}>
+          <TabBar
+            tabs={SCOPE_TABS}
+            value={scope}
+            onChange={(next) => {
+              /* Another tab is another search: the facet was the Games tab's. */
+              if (facet) clearFacet();
+              setScope(next);
+            }}
+            label="What to search"
+          />
+        </Animated.View>
+      )}
 
       {/* The scope stays mounted, keeping its place, and what a focused
           field brings fades in over it — 350ms in, 400 out — on the page's
@@ -589,8 +607,6 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.x8,
   },
   /* The reference's capsule: two 44dp keys in one pill. */
-  keys: { flexDirection: 'row', borderRadius: Radius.pill, paddingHorizontal: Spacing.x4 },
-  key: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   header: { paddingHorizontal: Spacing.x16, paddingTop: Spacing.x12 },
   panel: { paddingHorizontal: Spacing.x16, paddingTop: Spacing.x16 },
 });

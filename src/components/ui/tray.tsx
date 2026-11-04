@@ -13,6 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Toaster } from '@/components/ui/toast';
 import { withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -196,6 +197,9 @@ function OpenTray({
         </GestureDetector>
         {children}
       </Animated.View>
+      {/* Toasts said while the sheet is up: a sheet is a window of its own on
+          Android, over the root's. Only the newest `<Toaster>` draws. */}
+      <Toaster />
     </Modal>
   );
 }

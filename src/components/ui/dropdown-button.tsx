@@ -12,6 +12,7 @@ import {
 import Animated, { css, cubicBezier, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GlassSurface, useLiquidGlass } from '@/components/ui/liquid-glass';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { useSelectable } from '@/components/ui/selectable';
 import { Text } from '@/components/ui/text';
@@ -146,6 +147,7 @@ export function DropdownButton<T extends string>({
   filled = false,
 }: DropdownButtonProps<T>) {
   const theme = useTheme();
+  const liquid = useLiquidGlass();
   const accent = useAccent();
   const selectable = useSelectable();
   const reduceMotion = useReducedMotion();
@@ -292,10 +294,13 @@ export function DropdownButton<T extends string>({
           style={StyleSheet.flatten([
             styles.button,
             small && styles.buttonSmall,
-            fill
-              ? { backgroundColor: fill.fill, borderColor: fill.fill }
-              : { borderColor: open ? accent.edge : theme.outline },
+            liquid
+              ? { borderColor: 'transparent' }
+              : fill
+                ? { backgroundColor: fill.fill, borderColor: fill.fill }
+                : { borderColor: open ? accent.edge : theme.outline },
           ])}>
+          {liquid && <GlassSurface radius={Radius.pill} flat />}
           {current.icon && <Ionicons name={current.icon} size={16} color={ink} />}
           <Text variant="button" numberOfLines={1} style={{ color: ink }}>
             {current.short ?? current.label}
@@ -342,8 +347,8 @@ export function DropdownButton<T extends string>({
                 top: menu.top,
                 left: menu.left,
                 width: menu.width,
-                backgroundColor: accent.m3.surfaceContainerHigh,
-                borderColor: accent.m3.outlineVariant,
+                backgroundColor: liquid ? 'transparent' : accent.m3.surfaceContainerHigh,
+                borderColor: liquid ? 'transparent' : accent.m3.outlineVariant,
                 /* Grow out of the button: its centre, on the edge the menu
                    meets it at. */
                 transformOrigin: [
@@ -354,6 +359,7 @@ export function DropdownButton<T extends string>({
               },
               motion,
             ]}>
+            {liquid && <GlassSurface radius={Radius.sheet} />}
             {/* The clip is a child, not the menu itself: on iOS a view that
                 clips its children also clips its own shadow. */}
             <View style={styles.clip}>

@@ -32,6 +32,7 @@ import {
   sendLabel,
 } from '@/lib/pings';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 type Params = {
   kind?: string;
@@ -137,6 +138,8 @@ function SendFlow({ target }: { target: PingTarget }) {
   const send = useMutation({
     mutationFn: () => sendPings(userId!, [...chosen], target, message),
     onSuccess: (outcome) => {
+      if (outcome.failed.length === 0)
+        toast.success(outcome.sent === 1 ? 'Ping sent' : 'Pings sent');
       setResult(outcome);
       void queryClient.invalidateQueries({ queryKey: ['pingable-people'] });
       if (outcome.failed.length === 0) setTimeout(() => router.back(), 1100);

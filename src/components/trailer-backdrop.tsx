@@ -40,6 +40,9 @@ export type TrailerBackdropProps = {
    * until the page has covered it (`<PinnedHero coverAt>`).
    */
   until?: number;
+  /** Once and then `onEnd` — the game page's header — instead of round and round. */
+  loop?: boolean;
+  onEnd?: () => void;
   /** The artwork, drawn over the video until the video's first frame. */
   children: ReactNode;
 };
@@ -72,7 +75,14 @@ export type TrailerBackdropProps = {
  * Material 3 colour (`<PinnedHero>`), and the blur and the drain go over it
  * too.
  */
-export function TrailerBackdrop({ url, height, until, children }: TrailerBackdropProps) {
+export function TrailerBackdrop({
+  url,
+  height,
+  until,
+  loop = true,
+  onEnd,
+  children,
+}: TrailerBackdropProps) {
   const chrome = useScreenChrome();
   const resting = useSharedValue(0);
   const scrollY = chrome?.scrollY ?? resting;
@@ -99,7 +109,13 @@ export function TrailerBackdrop({ url, height, until, children }: TrailerBackdro
     <View style={{ height }}>
       {playable && (
         <Suspense fallback={null}>
-          <TrailerVideo url={playable} playing={inView} onFirstFrame={() => setDrawn(playable)} />
+          <TrailerVideo
+            url={playable}
+            playing={inView}
+            loop={loop}
+            onEnd={onEnd}
+            onFirstFrame={() => setDrawn(playable)}
+          />
         </Suspense>
       )}
       {/* A CSS transition on a React prop: the fade cannot lose its end

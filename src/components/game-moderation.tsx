@@ -9,6 +9,7 @@ import { setGameLabelLocally, useGameLabel } from '@/hooks/use-game-labels';
 import { isModerator, setGameLabel } from '@/lib/api';
 import type { Game } from '@/lib/games';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 const LABEL: GameLabel = 'must_play';
 
@@ -46,6 +47,7 @@ export const GameModeratorCard = memo(function GameModeratorCard({ game }: { gam
   const label = useMutation({
     mutationFn: (on: boolean) => setGameLabel(userId!, game, LABEL, on),
     onSuccess: (_result, on) => {
+      toast.success(on ? 'Labelled Must Play' : 'Must Play label removed');
       setGameLabelLocally(game.id, LABEL, on);
       queryClient.invalidateQueries({ queryKey: ['labelled-games', LABEL] });
       queryClient.invalidateQueries({ queryKey: ['labelled-game-ids', LABEL] });

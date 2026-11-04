@@ -1,47 +1,33 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import {
-  Easing,
-  useReducedMotion,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AccessibilityInfo, StyleSheet, View } from 'react-native';
+import { Easing, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { SurprisePageWash } from '@/components/surprise-page-wash';
-import { PAGER_SPRING, useDealGesture } from '@/components/surprise-deal-gesture';
 import { SurpriseSettings } from '@/components/surprise-settings';
-import {
-  revealLayout,
-  SurpriseReveal,
-  SurpriseRevealSkeleton,
-  type DealDirection,
-} from '@/components/surprise-reveal';
+import { SurpriseCarousel } from '@/components/surprise-carousel';
 import { SurpriseSoundtrackPanel } from '@/components/surprise-soundtrack-panel';
 import { TopReviewCard } from '@/components/top-review-card';
-import { SwipeEdge } from '@/components/surprise-swipe-edge';
 import { Button } from '@/components/ui/button';
 import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
 import { PageScrollView } from '@/components/ui/page-scroll';
 import { EmptyState, ErrorState, Screen } from '@/components/ui/screen';
+import { Skeleton } from '@/components/ui/surface';
 import { Text } from '@/components/ui/text';
 import { Motion, Palette, Spacing } from '@/constants/theme';
 import { useAnimatedArtwork } from '@/hooks/use-animated-artwork';
 import { peekAnimatedCover, prefetchAnimatedCover } from '@/hooks/use-animated-cover';
 import { useDiscRoom, useTopBarInset } from '@/hooks/use-header-height';
-import { peekSquareCover, prefetchSquareCover } from '@/hooks/use-square-cover';
 import { useReadingLanguages } from '@/hooks/use-reading-languages';
-import { useTheme } from '@/hooks/use-theme';
 import { AccentProvider, useGameAccent } from '@/hooks/use-accent';
 import { extractSeedColor } from '@/hooks/use-album-art-color';
 import { getTopGameReview, getUserLogs, setProgress } from '@/lib/api';
 import { readingKey } from '@/lib/discovery';
 import { getGameById } from '@/lib/games';
 import { isUnreleased } from '@/lib/games/release';
+import { sharpCoverUrl } from '@/lib/games/sharp-cover';
 import {
   canUseForYou,
   getSurpriseBatch,
@@ -64,10 +50,10 @@ import {
   METADATA_AHEAD,
   SETTLE_MS,
   animationFor,
-  chooseCardShape,
   planPrefetch,
   type PlannedCard,
 } from '@/lib/surprise-prefetch';
+import { toast } from '@/lib/toast';
 import { useAuth } from '@/store/auth';
 
 /**
@@ -110,17 +96,6 @@ const EMPTY_COMBINED =
   'No game has every one of your picks combined. Take one away, or switch the selection mode to Any of.';
 
 /**
- * How long the "you have hidden this game" panel stays over the artwork.
- *
- * Ten seconds, which is long by the standards of a toast and right for this one:
- * it is two sentences, the second names a screen the reader has to remember, and
- * nothing else on the page reports that the double tap did anything. Dismissal
- * is not required — dealing to another card takes it down early, and the card
- * underneath stays fully usable the whole time.
- */
-const NOTICE_MS = 10_000;
-
-/**
  * Stable empty array for a pending batch.
  *
  * A bare `?? []` mints a fresh reference on every render, which would re-run the
@@ -138,13 +113,6 @@ const EMPTY_BATCH: readonly GameSearchResult[] = [];
  * to force-quit inside this window.
  */
 const PREFS_WRITE_MS = 600;
-
-/**
- * About how long a page takes to slide into place on `PAGER_SPRING` — a
- * critically damped spring at 400, which is within a dp of rest by then. The
- * card's animation, and anything fetched ahead, wait this and `SETTLE_MS` more.
- */
-const SLIDE_MS = 300;
 
 /**
  * Surprise Me — one dealt game, and one song from it.
@@ -175,23 +143,8 @@ const SLIDE_MS = 300;
  * for, and it is most of what separates this from a dice roll with a title on it.
  */
 export default function SurpriseScreen() {
-  const { width, height } = useWindowDimensions();
   const router = useRouter();
-  const layout = revealLayout(width, height);
 
-  /*
-   * The swipe, owned here rather than by the reveal: the finger's travel, which
-   * the room and the two edge lights read. The gesture springs it back to
-   * nothing on release.
-   */
-  const dealX = useSharedValue(0);
-  const bloom = useSharedValue(0);
-  /*
-   * Where the deck stands, in dp: card n of the deck is centred at n × width.
-   * Every batch's cards are counted (`base`), so nothing is ever reset to
-   * zero under the reader's eyes — see `useDealGesture`.
-   */
-  const pageX = useSharedValue(0);
   const reduceMotion = useReducedMotion();
 
   /*
@@ -297,38 +250,12 @@ export default function SurpriseScreen() {
    */
   const [round, setRound] = useState(0);
   const [cursor, setCursor] = useState(0);
-  /**
-   * How many cards of earlier batches came before this one's first. The deck
-   * is one strip across every batch, so a new batch's first card stands where
-   * the strip already is.
-   */
-  const [base, setBase] = useState(0);
-  /** A finger is on the deck: nothing is fetched and the animation holds. */
-  const [dragging, setDragging] = useState(false);
-  /** The deck place the strip last came to rest on — see `settled`. */
+  /** The card the carousel last came to rest on — see `rested`. */
   const [restedOn, setRestedOn] = useState<number | null>(null);
+  /** The room the carousel stands in, measured. */
+  const [room, setRoom] = useState<{ width: number; height: number } | null>(null);
   /** False until the first deal, which is what separates the form from the reveal. */
   const [dealt, setDealt] = useState(false);
-  /**
-   * Whether the "you have hidden this game" panel is over the artwork.
-   *
-   * A boolean rather than the hidden game's id: it only ever describes the card
-   * currently on screen, and `deal()` clears it, so there is no second card it
-   * could belong to.
-   */
-  const [notice, setNotice] = useState(false);
-  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  /* The timer outlives the screen if nobody clears it, and its callback would
-     then set state on an unmounted tree. Cleanup only — nothing is synced into
-     state here, so the React Compiler's no-setState-in-effects rule is intact. */
-  useEffect(
-    () => () => {
-      if (noticeTimer.current) clearTimeout(noticeTimer.current);
-    },
-    []
-  );
-
   /*
    * The filters are in the key; the hidden list deliberately is not.
    *
@@ -397,7 +324,6 @@ export default function SurpriseScreen() {
   const played = useMemo(() => playedGameIds(exclusionLogs), [exclusionLogs]);
   const alreadyPlayed = !!game && played.has(game.id);
 
-  const theme = useTheme();
   /* This component renders the provider, so it cannot consume it — `useGameAccent`
      is the hook for exactly that position. Resolves to the house blue until the
      cover's hue is extracted. */
@@ -447,12 +373,11 @@ export default function SurpriseScreen() {
    * and nothing else (`lib/surprise-prefetch.ts`). A timer's callback sets the
    * state, not the effect.
    */
-  const place = base + cursor;
+  const place = round * 10_000 + cursor;
   useEffect(() => {
-    if (dragging) return;
-    const timer = setTimeout(() => setRestedOn(place), SLIDE_MS + SETTLE_MS);
+    const timer = setTimeout(() => setRestedOn(place), SETTLE_MS);
     return () => clearTimeout(timer);
-  }, [place, dragging]);
+  }, [place]);
   const rested = restedOn === place;
 
   /*
@@ -472,17 +397,13 @@ export default function SurpriseScreen() {
    * A drag clears the timer before it fires.
    */
   useEffect(() => {
-    if (!rested || dragging) return;
+    if (!rested) return;
 
     const ahead = (distance: number) => games[cursor + distance];
     for (let distance = 1; distance <= METADATA_AHEAD; distance += 1) {
       const card = ahead(distance);
       if (!card) break;
-      prefetchSquareCover(card.id, card.title);
-      if (animatedOn) {
-        prefetchAnimatedCover(card.id, card.title, 'square');
-        prefetchAnimatedCover(card.id, card.title, 'portrait');
-      }
+      if (animatedOn) prefetchAnimatedCover(card.id, card.title, 'portrait');
     }
 
     const planned: PlannedCard[] = [];
@@ -490,18 +411,14 @@ export default function SurpriseScreen() {
       const card = ahead(distance);
       if (!card) break;
       const answers = {
-        square: peekSquareCover(card.id),
-        animatedSquare: animatedOn ? peekAnimatedCover(card.id, 'square') : null,
+        square: null,
+        animatedSquare: null,
         animatedPortrait: animatedOn ? peekAnimatedCover(card.id, 'portrait') : null,
       };
-      const shape = chooseCardShape(answers, { animated: animatedOn, patience: true });
       planned.push({
         distance,
-        still:
-          shape === 'square'
-            ? (answers.square ?? card.coverUrl)
-            : (card.coverUrl ?? card.heroUrl ?? null),
-        animation: shape ? animationFor(shape, answers) : null,
+        still: sharpCoverUrl(card.coverUrl) ?? card.heroUrl ?? null,
+        animation: animatedOn ? animationFor('portrait', answers) : null,
       });
     }
     const plan = planPrefetch(planned);
@@ -516,7 +433,7 @@ export default function SurpriseScreen() {
         staleTime: Infinity,
       });
     }
-  }, [rested, dragging, games, cursor, animatedOn, queryClient]);
+  }, [rested, games, cursor, animatedOn, queryClient]);
 
   /*
    * The review worth showing for this card.
@@ -571,12 +488,14 @@ export default function SurpriseScreen() {
       // A status changed what you have played: For You's tiers with it (0046).
       queryClient.invalidateQueries({ queryKey: ['pings', 'for_you'] });
       queryClient.invalidateQueries({ queryKey: ['my-log', userId, game?.id] });
+      toast.success('Added to your backlog', { description: game?.title });
       AccessibilityInfo.announceForAccessibility(`${game?.title} added to your backlog`);
     },
     /* A silent failed write is what the critique caught on the star. The label
        carries the failure and stays pressable, so the recovery is the same
        button rather than a dialog. */
     onError: () => {
+      toast.error('Couldn’t add it to your backlog');
       AccessibilityInfo.announceForAccessibility(
         'Could not add to your backlog. Tap to try again.'
       );
@@ -623,124 +542,21 @@ export default function SurpriseScreen() {
       hideGame(userId!, target),
     onSuccess: (next: HiddenGame[], target) => {
       queryClient.setQueryData(['surprise-hidden', userId], next);
-      showNotice();
+      toast.success('Hidden from Surprise Me', {
+        description: `${target.title} won’t come up again.`,
+      });
       AccessibilityInfo.announceForAccessibility(`${target.title} hidden. It won’t come up again.`);
     },
   });
-
-  /**
-   * Raise the "you have hidden this" panel over the artwork, and drop it again.
-   *
-   * The card does not change, so this is the *only* thing that tells anybody the
-   * double tap landed — which is why it is a panel over the cover for ten
-   * seconds rather than a toast at the edge of the screen. A re-hide while it is
-   * already up restarts the ten rather than stacking a second timer, and
-   * `deal()` takes it down early: the panel is about the card behind it, so it
-   * must not outlive that card.
-   */
-  function showNotice() {
-    if (noticeTimer.current) clearTimeout(noticeTimer.current);
-    setNotice(true);
-    noticeTimer.current = setTimeout(() => setNotice(false), NOTICE_MS);
-  }
-
-  function clearNotice() {
-    if (noticeTimer.current) clearTimeout(noticeTimer.current);
-    noticeTimer.current = null;
-    setNotice(false);
-  }
 
   /**
    * A fresh batch, with the strip where it stands: the new batch's first card
    * takes the place of the card in front (`base`), so nothing moves.
    */
   function restartDeck() {
-    setBase((value) => value + cursor);
     setCursor(0);
     setRound((value) => value + 1);
   }
-
-  /**
-   * Move the deck. The whole point of the batch: fifty deals before a request.
-   *
-   * Only running off the end spends anything, and it spends it by bumping
-   * `round`, which changes the query key. Everything before that is one state
-   * update, which is why the swipe can be as cheap as it feels.
-   *
-   * A swipe has already sent the strip on its way (`slid`); the key, the rotor
-   * and the button slide it here, the same spring.
-   */
-  function deal(direction: DealDirection, slid = false) {
-    if (direction === -1 && cursor === 0) return;
-    if (!slid) {
-      const target = (place + direction) * width;
-      pageX.set(reduceMotion ? target : withSpring(target, PAGER_SPRING));
-    }
-    backlog.reset();
-    /* The panel names the card behind it, so it does not survive that card. */
-    clearNotice();
-
-    if (direction === -1) {
-      setCursor((value) => Math.max(0, value - 1));
-      return;
-    }
-
-    if (cursor + 1 < games.length) {
-      setCursor((value) => value + 1);
-      return;
-    }
-
-    /* Off the end of the batch: the strip is on its way to the place after
-       the last card, where the next batch's first will stand. */
-    setBase((value) => value + games.length);
-    setCursor(0);
-    setRound((value) => value + 1);
-  }
-
-  /*
-   * The strip at the right place for a new width — a phone turned, a window
-   * resized. Only then: a deal's spring must never be cut short by it.
-   */
-  useLayoutEffect(() => {
-    pageX.set(place * width);
-    // Width alone: the deck's place is the gesture's and `deal`'s to move.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width]);
-
-  /*
-   * Two gestures, raced, and they must be two *objects*.
-   *
-   * An RNGH gesture carries recogniser state, so one instance cannot be two
-   * recognisers. Each accepts only its own direction — a drag to the left deals
-   * forward, a drag to the right goes back — which is what lets them share the
-   * whole screen without contending: a given drag can only ever satisfy one of
-   * them, and `Race` settles it on the first frame either way.
-   */
-  const dealSlid = (direction: DealDirection) => deal(direction, true);
-  const dealNext = useDealGesture({
-    direction: 1,
-    dealX,
-    bloom,
-    pageX,
-    page: place,
-    pageWidth: width,
-    commitAt: layout.commitAt,
-    canGoBack: cursor > 0,
-    onDeal: dealSlid,
-    onDragChange: setDragging,
-  });
-  const dealPrevious = useDealGesture({
-    direction: -1,
-    dealX,
-    bloom,
-    pageX,
-    page: place,
-    pageWidth: width,
-    commitAt: layout.commitAt,
-    canGoBack: cursor > 0,
-    onDeal: dealSlid,
-    onDragChange: setDragging,
-  });
 
   /*
    * Reviews written while you were away.
@@ -775,9 +591,6 @@ export default function SurpriseScreen() {
   /* The band the floating discs occupy, reserved in content. See the masthead. */
   const headerHeight = useDiscRoom();
   const barInset = useTopBarInset();
-
-  /* One recogniser for the whole screen. See the note at `<GestureDetector>`. */
-  const swipe = useMemo(() => Gesture.Race(dealNext, dealPrevious), [dealNext, dealPrevious]);
 
   /* A deck already dealt under exactly these settings. See the CTA below. */
   const resumable = games.length > 0 && cursor > 0;
@@ -937,192 +750,116 @@ export default function SurpriseScreen() {
       <Screen
         edges={['bottom']}
         miniPlayer={false}
-        /* The same flat fill the game page took, for the same reasons — see the
-           note on `background` there. This screen never scrolled, so the
-           "scroll-driven" gradient was pinned at rest anyway: all it ever did
-           was put the game's brightest colour behind the one card on screen. */
+        /* The page in the card in front's own darkest tone, settling into the
+           next one's as the list comes to rest (`<SurprisePageWash>`). */
         background={accent.page}
-        /*
-          The animated page, over the flat one.
-          
-          `background` stays as the floor — it is what the first frame paints and
-          what Android's blur target falls back to — and this rides above it,
-          inside the same view, so the frosted discs sample the colour the page is
-          actually showing rather than the one it was on when the deal started.
-        */
         backdrop={<SurprisePageWash from={washFrom} to={washTo} progress={wash} />}
         topBar={<FrostedTopBar back right={gear} />}>
-        {/*
-          One detector around the whole screen, replacing two overlay strips.
+        <View style={styles.stage}>
+          {/* The screen's name, in the band the discs stand in. */}
+          <View style={[styles.masthead, { height: headerHeight, paddingTop: barInset }]}>
+            <Text variant="h4" accessibilityRole="header">
+              Surprise Me
+            </Text>
+          </View>
 
-          The strips were absolutely positioned rectangles laid *over* the
-          content, and every complaint about the gesture came from that shape:
-          they started 28dp in from the bezel, they stopped where the cover
-          began, and they were floored above the controls — so the swipe existed
-          in two narrow columns in the upper middle of the display and nowhere
-          else. You had to find it.
-
-          A pan on the container has no geometry to get wrong. It starts at the
-          literal edge of the display, at any height, over the artwork, over the
-          cards, anywhere. It does not eat taps either: both gestures wait for
-          `ACTIVATE_AT` of horizontal travel before activating, so a press that
-          does not move still reaches the button under it, and one that does move
-          cancels that press the way any scroll view would.
-
-          `Race`, not `Simultaneous`: the two are one-sided and opposite, so at
-          most one can ever claim a drag — and racing them makes that explicit
-          rather than relying on it.
-        */}
-        <GestureDetector gesture={swipe}>
-          <View style={styles.stage}>
-            {/*
-              No hero. The page is a flat fill in the game's own darkest tone and
-              nothing else.
-
-              A band of landscape key art used to run across the top with the
-              cover rising into it, borrowed from the game page's masthead. That
-              composition needs two things this screen no longer has: a portrait
-              cover narrow enough to sit *in front of* the art with the art
-              visible either side of it, and a reason to show two pieces of
-              artwork for one game. The square cover is 84% of the width, so the
-              hero was a strip of a second image peeking out above it — and
-              `heroUrl` is frequently the same picture as the cover, cropped. One
-              game, one image.
-            */}
-            {/*
-              The screen's own heading, in the band the floating discs occupy.
-
-              Over a card this page's bar is two discs of glass in the corners
-              and nothing between them — it carries a name only once a page has
-              scrolled its artwork away, and this page never scrolls. So the
-              name is stated in content: a row exactly `useDiscRoom()` tall,
-              with the status-bar inset as its top padding, so the word centres
-              in the band the discs centre in and the three read as one row.
-
-              It is also the fix for the artwork. The square is 84% of the width
-              and the content started at the top of the display, so the two discs
-              sat *on* the cover. This row reserves their band as solid
-              background, which is where they belong.
-            */}
-            <View style={[styles.masthead, { height: headerHeight, paddingTop: barInset }]}>
-              <Text variant="h4" accessibilityRole="header">
-                Surprise Me
-              </Text>
-            </View>
-
-            <View style={styles.body}>
-              {game ? (
-                /* Keyed on the game: a new card is a new mount, so its arrival
-                 springs run and the soundtrack lookup, the chosen track and the
-                 audio player all reset without an effect watching for it. */
-                <SurpriseReveal
-                  games={games}
-                  cursor={cursor}
-                  base={base}
-                  pageX={pageX}
-                  pageWidth={width}
-                  settled={rested}
-                  dragging={dragging}
-                  canGoBack={cursor > 0}
-                  onDeal={(direction) => deal(direction)}
-                  onOpenGame={() =>
-                    router.push({ pathname: '/game/[id]', params: { id: game.id } })
-                  }
-                  /* Double-tapping the cover. The card it removes is the card the
-                   finger is on, which is why the id and the title are read here
-                   rather than inside the mutation. */
-                  onHide={() =>
-                    hide.mutate({ id: game.id, title: game.title, coverUrl: game.coverUrl })
-                  }
-                  hidden={notice}
-                  alreadyPlayed={alreadyPlayed}
-                  dealX={dealX}
-                  bloom={bloom}
-                  onBacklog={() => backlog.mutate()}
-                  backlog={{
-                    done: backlog.isSuccess,
-                    busy: backlog.isPending,
-                    failed: backlog.isError,
-                  }}
-                  review={
-                    <TopReviewCard
-                      review={review.data ?? null}
-                      loading={review.isPending}
-                      /* A game that is not out cannot be reviewed: the card
-                         says when it can, and is not a door to the form. */
-                      onWriteReview={
-                        isUnreleased(game)
-                          ? undefined
-                          : () => router.push({ pathname: '/log/[id]', params: { id: game.id } })
-                      }
-                      notOutUntil={isUnreleased(game) ? (game.releaseDate ?? undefined) : undefined}
-                      onOpenReview={() => {
-                        if (review.data) {
-                          router.push({
-                            pathname: '/review/[id]',
-                            params: { id: review.data.log.id },
-                          });
+          <View
+            style={styles.body}
+            onLayout={(event) => {
+              const { width: w, height: h } = event.nativeEvent.layout;
+              setRoom((was) =>
+                was && was.width === w && was.height === h ? was : { width: w, height: h }
+              );
+            }}>
+            {room && games.length > 0 ? (
+              /* Keyed on the round: a fresh deal is a fresh list, from its top. */
+              <SurpriseCarousel
+                key={round}
+                games={games}
+                index={cursor}
+                onIndexChange={(next) => {
+                  backlog.reset();
+                  setCursor(next);
+                }}
+                settled={rested}
+                animated={animatedOn}
+                width={room.width}
+                height={room.height}
+                onOpenGame={(entry) =>
+                  router.push({ pathname: '/game/[id]', params: { id: entry.id } })
+                }
+                onMore={restartDeck}
+                details={(entry) =>
+                  entry.id === game?.id ? (
+                    <View style={styles.details}>
+                      {alreadyPlayed && (
+                        <Text variant="bodySmall" color="textSecondary">
+                          You’ve already played this one.
+                        </Text>
+                      )}
+                      <View style={styles.actions}>
+                        <Button
+                          title={
+                            backlog.isSuccess
+                              ? 'On your backlog'
+                              : backlog.isError
+                                ? 'Try again'
+                                : 'Add to backlog'
+                          }
+                          icon={backlog.isSuccess ? 'checkmark' : 'bookmark-outline'}
+                          loading={backlog.isPending}
+                          disabled={backlog.isSuccess}
+                          onPress={() => backlog.mutate()}
+                        />
+                        <Button
+                          title="Hide"
+                          variant="secondary"
+                          icon="eye-off-outline"
+                          onPress={() =>
+                            hide.mutate({
+                              id: entry.id,
+                              title: entry.title,
+                              coverUrl: entry.coverUrl,
+                            })
+                          }
+                        />
+                      </View>
+                      <TopReviewCard
+                        review={review.data ?? null}
+                        loading={review.isPending}
+                        onWriteReview={
+                          isUnreleased(entry)
+                            ? undefined
+                            : () => router.push({ pathname: '/log/[id]', params: { id: entry.id } })
                         }
-                      }}
-                    />
-                  }
-                  layout={layout}
-                  soundtrack={
-                    <SurpriseSoundtrackPanel
-                      key={game.id}
-                      game={game}
-                      trackMode={prefs.trackMode}
-                    />
-                  }
-                />
-              ) : (
-                <SurpriseRevealSkeleton layout={layout} />
-              )}
-            </View>
-            {/*
-              The swipe lights, and they are the **last** thing in the stage.
-
-              They belong to the *display*, not to the artwork: the gesture starts
-              at the bezel, so the light does too, and each one reaches exactly
-              half the screen — see `<SwipeEdge>` for why that boundary is the
-              radius rather than a container edge.
-
-              They were mounted first, under the body, on the argument that the
-              cover and the type should paint over them. That held while the cover
-              was a 165dp poster with clear margin either side. It does not hold
-              now: the square runs to 84% of the width, so the word telling you
-              what releasing will do sat *behind the artwork* — the one moment the
-              light exists for was the one moment you could not read it. Painting
-              last fixes it and costs nothing, because the layer is
-              `pointerEvents="none"` and fully transparent at rest.
-            */}
-            {game && (
-              <>
-                <SwipeEdge
-                  side="left"
-                  dealX={dealX}
-                  bloom={bloom}
-                  commitAt={layout.commitAt}
-                  screenWidth={width}
-                  screenHeight={height}
-                  color={accent.color}
-                  background={theme.background}
-                />
-                <SwipeEdge
-                  side="right"
-                  dealX={dealX}
-                  bloom={bloom}
-                  commitAt={layout.commitAt}
-                  blocked={cursor === 0}
-                  screenWidth={width}
-                  screenHeight={height}
-                  color={accent.color}
-                  background={theme.background}
-                />
-              </>
+                        notOutUntil={
+                          isUnreleased(entry) ? (entry.releaseDate ?? undefined) : undefined
+                        }
+                        onOpenReview={() => {
+                          if (review.data) {
+                            router.push({
+                              pathname: '/review/[id]',
+                              params: { id: review.data.log.id },
+                            });
+                          }
+                        }}
+                      />
+                      <SurpriseSoundtrackPanel
+                        key={entry.id}
+                        game={entry}
+                        trackMode={prefs.trackMode}
+                      />
+                    </View>
+                  ) : null
+                }
+              />
+            ) : (
+              <View style={styles.loading}>
+                <Skeleton width="100%" height={(room?.height ?? 500) * 0.8} radius={24} />
+              </View>
             )}
           </View>
-        </GestureDetector>
+        </View>
       </Screen>
     </AccentProvider>
   );
@@ -1140,6 +877,9 @@ const styles = StyleSheet.create({
      preference for a tonal step over an edge. */
   footer: { paddingTop: Spacing.x16, paddingBottom: Spacing.x8 },
   stage: { flex: 1 },
+  details: { gap: Spacing.x16 },
+  actions: { flexDirection: 'row', gap: Spacing.x8, flexWrap: 'wrap' },
+  loading: { flex: 1, justifyContent: 'center', paddingHorizontal: 14 },
   masthead: { alignItems: 'center', justifyContent: 'center' },
   /*
    * `zIndex`, explicitly. Paint order among siblings is document order on iOS,

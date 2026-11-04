@@ -76,6 +76,7 @@ import { displayNameFor } from '@/lib/format';
 import { cardShows } from '@/lib/review-quote';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 /** Lines of the review its card prints — the reviews sheet's own measure. */
 const REVIEW_LINES = 10;
@@ -328,6 +329,7 @@ function CopyDetail({
   const remove = useMutation({
     mutationFn: () => deleteCopy(copy.id),
     onSuccess: () => {
+      toast.success('Copy removed from your collection');
       queryClient.invalidateQueries({ queryKey: ['copies', copy.user_id] });
       queryClient.invalidateQueries({ queryKey: ['user-game-stats', copy.user_id] });
       queryClient.removeQueries({ queryKey: ['copy', copy.id] });

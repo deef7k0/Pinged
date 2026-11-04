@@ -10,7 +10,8 @@ import { PingPlate } from '@/components/pings/ping-plate';
 import { PingSpotlight } from '@/components/pings/ping-spotlight';
 import { Button } from '@/components/ui/button';
 import { DropdownButton, type DropdownOption } from '@/components/ui/dropdown-button';
-import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
+import { HeaderFade } from '@/components/ui/frosted-top-bar';
+import { PressGlyph } from '@/components/ui/press-glyph';
 import { PageFlatList, PageScrollView } from '@/components/ui/page-scroll';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, Screen } from '@/components/ui/screen';
@@ -253,22 +254,33 @@ export default function PingsScreen() {
   }
 
   return (
-    <Screen
-      edges={[]}
-      insetHeader
-      topBar={
-        <FrostedTopBar
-          title="Pings"
-          largeTitle={false}
-          right={
-            <TopBarDisc icon="add" label="New ping" onPress={() => router.push('/new-ping')} />
-          }
-        />
-      }>
+    /* The tab's name, large at the top left with + at the right — Apple
+       TV's (the owner's references, 2026-11-03) — then the tabs, then the
+       list, which dissolves into them as it scrolls (`<HeaderFade>`). */
+    <Screen edges={['top']}>
+      <View style={styles.titleRow}>
+        <Text variant="largeTitle" accessibilityRole="header">
+          Pings
+        </Text>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel="New ping"
+          onPress={() => router.push('/new-ping')}
+          scaleTo={0.92}
+          pressedColor={theme.controlPressed}
+          style={StyleSheet.flatten([styles.newKey, { backgroundColor: theme.controlFill }])}>
+          <PressGlyph>
+            <Ionicons name="add" size={24} color={theme.text} />
+          </PressGlyph>
+        </PressableScale>
+      </View>
       <View style={styles.tabs}>
         <TabBar tabs={tabs} value={tab} onChange={setTab} label="Pings" />
       </View>
-      {body()}
+      <View style={styles.body}>
+        {body()}
+        <HeaderFade />
+      </View>
     </Screen>
   );
 }
@@ -408,6 +420,21 @@ function BoardSkeleton({ header, width }: { header: React.ReactElement; width: n
 }
 
 const styles = StyleSheet.create({
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.x16,
+    paddingTop: Spacing.x8,
+  },
+  newKey: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  body: { flex: 1 },
   tabs: { paddingTop: Spacing.x8 },
   content: { paddingHorizontal: Spacing.x16, paddingTop: Spacing.x12, flexGrow: 1, gap: 0 },
   header: { gap: Spacing.x12, marginBottom: Spacing.x20 },

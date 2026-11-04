@@ -34,6 +34,7 @@ import { displayNameFor, timeAgo } from '@/lib/format';
 import { getGameById } from '@/lib/games';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 type SuggestionSort = 'upvoted' | 'newest' | 'oldest';
 
@@ -187,7 +188,10 @@ function PairDetail({ pair, gameId }: { pair: CommunitySimilarGame; gameId: stri
      meant to drop the words. */
   const remove = useMutation({
     mutationFn: () => removeSimilarityVote(userId!, pair.similarity_id),
-    onSuccess: refresh,
+    onSuccess: () => {
+      toast.success('Your vote is removed');
+      return refresh();
+    },
   });
 
   function askRemove() {

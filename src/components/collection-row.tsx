@@ -141,6 +141,7 @@ export const CollectionRow = memo(function CollectionRow({
           title={game?.title}
           width={COVER}
           rounded="image"
+          zoomable={!onStartSelecting && !selecting}
         />
 
         <View style={styles.text}>

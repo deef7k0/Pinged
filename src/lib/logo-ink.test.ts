@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  inkBounds,
   logoInkOf,
   logoNeedsLightInk,
   logoTreatment,
@@ -162,5 +163,20 @@ describe('a studio logo on its page', () => {
     assert.equal(logoNeedsLightInk(0.025, page), true);
     /* Not measured (the web build has no decoder): drawn light. */
     assert.equal(logoNeedsLightInk(null, page), true);
+  });
+});
+
+describe('inkBounds', () => {
+  it('finds the drawing inside a larger canvas, a pixel wider each side', () => {
+    /* 10 × 10, ink in columns 3–6 of rows 4–5. */
+    const bounds = inkBounds(
+      image(10, 10, (x, y) => (x >= 3 && x <= 6 && y >= 4 && y <= 5 ? WHITE : CLEAR))
+    );
+    assert.deepEqual(bounds, { x: 0.2, y: 0.3, width: 0.6, height: 0.4 });
+  });
+
+  it('counts faint pixels, and says null for an empty image', () => {
+    assert.ok(inkBounds(image(4, 4, (x) => (x === 1 ? [255, 255, 255, 40] : CLEAR))));
+    assert.equal(inkBounds(image(4, 4, () => CLEAR)), null);
   });
 });

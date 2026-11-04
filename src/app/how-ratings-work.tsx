@@ -29,6 +29,7 @@ import {
 } from '@/lib/community-rating';
 import { timeAgoPosted } from '@/lib/format';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 /**
  * How the GameLog score works, and how much the reader's own ratings count.
@@ -318,7 +319,10 @@ function ModeratorReport() {
 
   const recalculate = useMutation({
     mutationFn: recalculateCommunityRatings,
-    onSuccess: () => invalidateCommunityRatings(queryClient),
+    onSuccess: () => {
+      toast.success('Ratings recalculated');
+      return invalidateCommunityRatings(queryClient);
+    },
   });
 
   const data = report.data;

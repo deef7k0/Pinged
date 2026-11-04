@@ -12,6 +12,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { getGamingStats } from '@/lib/api';
 import { USERNAME_FORM, requireProvider, type UsernameProviderId } from '@/lib/gaming';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 const ICONS: Record<UsernameProviderId, keyof typeof Ionicons.glyphMap> = {
   playstation: 'logo-playstation',
@@ -52,6 +53,7 @@ export function UsernameAccount({
   const resync = useMutation({
     mutationFn: () => instance.sync({ userId, section: 'library' }),
     onSuccess: () => {
+      toast.success('Importing your games');
       for (const key of ['gaming-account', 'gaming-stats', 'gaming-library', 'gaming-sync-state']) {
         queryClient.invalidateQueries({ queryKey: [key, provider, userId] });
       }

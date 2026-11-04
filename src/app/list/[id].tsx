@@ -54,6 +54,7 @@ import {
 import { sortGames, type GameSort } from '@/lib/games';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 /** A game's cover in a tier list's row, in dp. */
 const POSTER = 58;
@@ -198,6 +199,7 @@ export default function ListDetailScreen() {
   const remove = useMutation({
     mutationFn: (gameId: string) => removeFromList(id!, gameId),
     onSuccess: (_result, gameId) => {
+      toast.success('Removed from the collection');
       invalidate();
       /* The removed game's own page counts the collections it is in and lists
          them. Keyed by game, so `['lists']` above does not reach them — and this
@@ -231,6 +233,9 @@ export default function ListDetailScreen() {
   const removeSelected = useMutation({
     mutationFn: (gameIds: string[]) => removeManyFromList(id!, gameIds),
     onSuccess: (_result, gameIds) => {
+      toast.success(
+        gameIds.length === 1 ? 'Removed from the collection' : `${gameIds.length} games removed`
+      );
       clearSelection();
       invalidate();
       /* Each removed game's own page counts and lists the collections it is in,
@@ -299,6 +304,7 @@ export default function ListDetailScreen() {
       await deleteList(userId, id!);
     },
     onSuccess: () => {
+      toast.success('Collection deleted');
       invalidate();
       router.back();
     },
@@ -314,6 +320,7 @@ export default function ListDetailScreen() {
   const setCover = useMutation({
     mutationFn: (gameId: string) => setListCover(id!, gameId),
     onSuccess: () => {
+      toast.success('Cover changed');
       invalidate();
       setPickingCover(false);
     },
@@ -453,6 +460,10 @@ export default function ListDetailScreen() {
             solidAt={solidAt}
             scrim={COLLECTION_SCRIM_TOP}
             contentPosition={heroArt.contentPosition}
+            /* Convx's long blur and its mirrored tail: the fade from the art
+               into the page is the blur's own (`<CollectionHeader>` leaves
+               part of the tail showing before its solid part). */
+            tail
           />
         )}
       </>
@@ -504,7 +515,13 @@ export default function ListDetailScreen() {
           onEditDetails={() =>
             router.push({ pathname: '/edit-list/[id]', params: { id: data.id } })
           }
-          onDelete={() => destroy.mutate()}
+          /* Favourites and the wishlist are the account's own, made by the
+             app and kept even when empty: never deleted (0047). */
+          onDelete={
+            data.kind === 'favorites' || data.kind === 'wishlist'
+              ? undefined
+              : () => destroy.mutate()
+          }
           onPickCover={() => {
             /* One mode at a time: both change what a tap on a game does. */
             clearSelection();
@@ -866,6 +883,7 @@ export default function ListDetailScreen() {
                   title={item.game?.title}
                   width={POSTER}
                   rounded="image"
+                  zoomable={!canSelect && !selecting && !pickingCover}
                 />
                 {pickingCover && data.cover_game_id === item.game_id && (
                   <View style={[styles.coverMark, { backgroundColor: theme.primary }]}>
@@ -1045,6 +1063,9 @@ const GridTile = memo(function GridTile({
         title={item.game?.title}
         width={width}
         rounded="image"
+        /* A hold chooses games to remove for the owner; it lifts the cover
+           for everybody else. */
+        zoomable={!canSelect && mode === 'open' && !selecting}
       />
       {rank !== null && mode === 'open' && (
         <View style={[styles.rankPill, { backgroundColor: theme.scrim }]}>

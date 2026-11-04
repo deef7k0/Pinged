@@ -21,6 +21,7 @@ import { displayNameFor } from '@/lib/format';
 import { getGameById, type Game, type GameSearchResult } from '@/lib/games';
 import { SUGGESTION_MESSAGE_MAX, canSuggest } from '@/lib/pings';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 /**
  * Suggest a game for somebody's ping: pick it, then say why.
@@ -109,6 +110,7 @@ function SuggestFlow({ ping, alreadyMine }: { ping: PingFeedRow; alreadyMine: st
   const send = useMutation({
     mutationFn: () => suggestGame(userId!, ping.id, chosen!, message),
     onSuccess: () => {
+      toast.success('Suggestion sent');
       void queryClient.invalidateQueries({ queryKey: ['ping-suggestions', ping.id] });
       void queryClient.invalidateQueries({ queryKey: ['ping', ping.id] });
       void queryClient.invalidateQueries({ queryKey: ['pings'] });

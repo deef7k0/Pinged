@@ -13,7 +13,15 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { CARD_GAP, CARD_INSET, cardShape, useCardMaterial } from '@/components/ui/card-material';
+import Ionicons from '@expo/vector-icons/Ionicons';
+
+import {
+  CARD_GAP,
+  CARD_INSET,
+  cardShape,
+  useCardMaterial,
+  useCardless,
+} from '@/components/ui/card-material';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Reveal } from '@/components/ui/reveal';
 import { Text } from '@/components/ui/text';
@@ -63,6 +71,8 @@ function metricsFor(windowWidth: number) {
      * another reference (`constants/cover-rail`).
      */
     wide: { width: at(284.5), height: at(160) },
+    /** A square tile — a store in Where to buy — a little shorter than a wide one. */
+    square: { width: at(120), height: at(120) },
     /**
      * From a card's text to its More (`<ExpandableText>`). A card's own corner,
      * inset and gaps are the review card's now, fixed dp (`card-material`).
@@ -158,7 +168,44 @@ export function SectionHeader({
 }) {
   const metrics = useSectionMetrics();
   const inset = useSectionInset();
+  const cardless = useCardless();
   const hasMore = !!more || !!moreSlot;
+
+  /*
+   * Apple TV's heading, on the game page (`CardlessContext`): the name in
+   * `h2`, and where it leads somewhere a chevron straight after it — "Trailers
+   * ›" — the whole line the door, in place of a More at the far end.
+   */
+  if (cardless) {
+    const words = (
+      <>
+        <Text variant="h2" accessibilityRole="header" numberOfLines={1} style={styles.tvTitle}>
+          {title}
+        </Text>
+        {more && <Ionicons name="chevron-forward" size={20} color={TV_CHEVRON} />}
+      </>
+    );
+    return (
+      <View style={[styles.tvHeader, { paddingHorizontal: inset }]}>
+        {more ? (
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={more.accessibilityLabel}
+            onPress={more.onPress}
+            hitSlop={TV_SLOP}
+            scaleTo={0.98}
+            style={StyleSheet.flatten(styles.tvDoor)}>
+            {words}
+          </PressableScale>
+        ) : (
+          <View style={styles.tvDoor}>{words}</View>
+        )}
+        <View style={styles.title} />
+        {action}
+        {moreSlot}
+      </View>
+    );
+  }
 
   return (
     <View
@@ -214,16 +261,17 @@ export function SectionCard({
 }) {
   const inset = useSectionInset();
   const material = useCardMaterial();
+  const cardless = useCardless();
 
   const card = StyleSheet.flatten([
-    cardShape,
+    !cardless && cardShape,
     {
       marginHorizontal: inset,
       backgroundColor: material.fill,
       borderColor: material.edge,
       gap: CARD_GAP,
     },
-    padded && { padding: CARD_INSET },
+    padded && !cardless && { padding: CARD_INSET },
     style,
   ]);
 
@@ -269,10 +317,10 @@ export function Section({
 }
 
 /**
- * The one shape left here. Box art was the other, at the reference's album
- * height; rows of games are `<GameCoverRail>` now, in a `<Panel>`.
+ * Wide (screenshots, trailers) or square (a store). Box art was another, at
+ * the reference's album height; rows of games are `<GameCoverRail>` now.
  */
-export type ArtShape = 'wide';
+export type ArtShape = 'wide' | 'square';
 
 /**
  * A row of artwork under a heading: the reference's `LazyRow` of
@@ -399,8 +447,20 @@ export function ArtRail<T>({
   );
 }
 
+/* Quiet, as Apple TV's: the heading's ink is the white, its chevron a step down. */
+const TV_CHEVRON = 'rgba(255,255,255,0.6)';
+const TV_SLOP = { top: 12, bottom: 12, left: 0, right: 0 };
+
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center' },
+  tvHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 40,
+    marginBottom: 2,
+  },
+  tvDoor: { flexDirection: 'row', alignItems: 'center', gap: 2, flexShrink: 1 },
+  tvTitle: { flexShrink: 1 },
   title: { flex: 1 },
   more: { justifyContent: 'center' },
   /* Two lines held open, the reference's `heightIn(min = thumbSize + 70.dp)`:

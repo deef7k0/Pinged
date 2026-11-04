@@ -30,6 +30,7 @@ import { formatDuration, formatRunningTime } from '@/lib/soundtrack-pick';
 import { useAuth } from '@/store/auth';
 import { player, usePlayer, type PlayerPhase, type PlayerQueue } from '@/store/player';
 import { Loader } from '@/components/ui/loader';
+import { toast } from '@/lib/toast';
 
 /** The disc at the head of the list. */
 const DISC = 196;
@@ -178,6 +179,7 @@ function Soundtrack({
       return starSong(userId, track.urn, { gameId, gameTitle: title });
     },
     onSuccess: () => {
+      toast.success('Song saved to your profile');
       queryClient.invalidateQueries({ queryKey: ['starred-song', userId] });
     },
   });

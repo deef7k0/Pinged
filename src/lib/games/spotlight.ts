@@ -134,6 +134,44 @@ export function pickAwaited<T extends SpotlightCandidate>(
   return waiting[0] ?? null;
 }
 
+/**
+ * Explore's carousel (the owner's, 2026-11-03): the games "out now and coming
+ * soon" on their *portrait* art, so the landscape rule does not apply — every
+ * spotlight candidate has a cover (`cover != null` in its request). The
+ * biggest just out first, as `pickFresh` ranks them, then the most followed
+ * still to come.
+ */
+export const PORTRAITS = { fresh: 5, awaited: 3 } as const;
+
+export function pickPortraits<T extends SpotlightCandidate>(
+  window: readonly T[],
+  ahead: readonly T[],
+  now: number
+): { fresh: T[]; awaited: T[] } {
+  const today = new Date(now * 1000);
+  const month = monthStart(today.getUTCFullYear(), today.getUTCMonth());
+  const from = freshFrom(now);
+
+  const out = window.filter(
+    (game) => game.precision === 'day' && game.releasedAt <= now && game.releasedAt >= from
+  );
+  const thisMonth = out.filter((game) => game.releasedAt >= month).sort(byWeight);
+  const before = out.filter((game) => game.releasedAt < month).sort(byWeight);
+  const fresh = [...thisMonth, ...before].slice(0, PORTRAITS.fresh);
+
+  const taken = new Set(fresh.map((game) => game.id));
+  const awaited: T[] = [];
+  for (const game of [...ahead, ...window]
+    .filter((candidate) => candidate.releasedAt > now)
+    .sort((a, b) => b.hypes - a.hypes || a.releasedAt - b.releasedAt)) {
+    if (awaited.length >= PORTRAITS.awaited) break;
+    if (taken.has(game.id)) continue;
+    taken.add(game.id);
+    awaited.push(game);
+  }
+  return { fresh, awaited };
+}
+
 const MONTHS = [
   'January',
   'February',

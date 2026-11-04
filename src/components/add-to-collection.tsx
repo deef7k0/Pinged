@@ -16,6 +16,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { appendToList, getLists } from '@/lib/api';
 import type { Game } from '@/lib/games';
 import { useAuth } from '@/store/auth';
+import { errorText, toast } from '@/lib/toast';
 
 /**
  * The art beside each row: a slot this size, and the collection's one cover in
@@ -96,7 +97,12 @@ export function AddToCollection({ game, visible, onClose }: AddToCollectionProps
     mutationFn: async (listId: string) => {
       await appendToList(listId, game);
     },
+    onError: (error) => toast.error('Couldn’t add it', { description: errorText(error) }),
     onSuccess: (_result, listId) => {
+      const title = collections.find((list) => list.id === listId)?.title;
+      toast.success(title ? `Added to ${title}` : 'Added to the collection', {
+        description: game.title,
+      });
       queryClient.invalidateQueries({ queryKey: ['lists'] });
       queryClient.invalidateQueries({ queryKey: ['list', listId] });
       queryClient.invalidateQueries({ queryKey: ['list-membership'] });

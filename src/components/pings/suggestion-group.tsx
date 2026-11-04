@@ -27,6 +27,7 @@ import { getGameById, type Game } from '@/lib/games';
 import { suggestedBy, type SuggestionGroup } from '@/lib/pings';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/components/ui/dialog';
+import { listToastFor, toast } from '@/lib/toast';
 
 /** The suggested game's box, at the head of its card. */
 const COVER = 64;
@@ -175,7 +176,10 @@ function Reason({
 
   const withdraw = useMutation({
     mutationFn: () => withdrawSuggestion(suggestion.id),
-    onSuccess: refresh,
+    onSuccess: () => {
+      toast.success('Suggestion withdrawn');
+      return refresh();
+    },
   });
 
   function askWithdraw() {
@@ -303,7 +307,8 @@ function GameActions({ gameId, title }: { gameId: string; title: string }) {
       if (!userId) throw new Error('You must be signed in.');
       await toggleSingletonMembership(userId, kind, await loadGame(), next);
     },
-    onSuccess: () => {
+    onSuccess: (_result, { kind, next }) => {
+      toast.success(listToastFor(kind, next));
       void queryClient.invalidateQueries({ queryKey: ['list-membership', userId, gameId] });
       void queryClient.invalidateQueries({ queryKey: ['favorites', userId] });
       void queryClient.invalidateQueries({ queryKey: ['lists', userId] });

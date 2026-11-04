@@ -1,3 +1,4 @@
+import { useEventListener } from 'expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
@@ -9,6 +10,13 @@ export type TrailerVideoProps = {
   playing: boolean;
   /** The first frame is drawn — the artwork over it may fade now. */
   onFirstFrame: () => void;
+  /**
+   * Round and round, as behind a studio's banner (the default) — or once,
+   * for the game page's header, which goes back to the cover when the
+   * trailer is over (`onEnd`).
+   */
+  loop?: boolean;
+  onEnd?: () => void;
 };
 
 /**
@@ -50,10 +58,16 @@ const FORWARD_BUFFER_S = 6;
  *   drawn over this and fades out only on `onFirstFrame`, so a slow stream or
  *   a failed one leaves the picture where it was — never a black square.
  */
-export function TrailerVideo({ url, playing, onFirstFrame }: TrailerVideoProps) {
+export function TrailerVideo({
+  url,
+  playing,
+  onFirstFrame,
+  loop = true,
+  onEnd,
+}: TrailerVideoProps) {
   const player = useVideoPlayer({ uri: url, contentType: 'hls' }, (created) => {
     created.muted = true;
-    created.loop = true;
+    created.loop = loop;
     created.audioMixingMode = 'mixWithOthers';
     created.staysActiveInBackground = false;
     created.showNowPlayingNotification = false;
@@ -62,6 +76,8 @@ export function TrailerVideo({ url, playing, onFirstFrame }: TrailerVideoProps) 
   });
 
   /* A command to the native player, not React state. */
+  useEventListener(player, 'playToEnd', () => onEnd?.());
+
   useEffect(() => {
     if (playing) player.play();
     else player.pause();

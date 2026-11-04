@@ -34,6 +34,7 @@ import type { Game } from '@/lib/games';
 import { platformOptionsFor } from '@/lib/platform-options';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 /** How far one tap on the stepper moves the percentage. */
 const PERCENT_STEP = 5;
@@ -117,6 +118,7 @@ export function ProgressSheet({ game, log, onClose, onOpenPlaythroughs }: Progre
       await setProgress(userId, game, progressPatch(choice, log));
     },
     onSuccess: () => {
+      toast.success('Progress saved');
       invalidate();
       onClose();
     },
@@ -136,6 +138,7 @@ export function ProgressSheet({ game, log, onClose, onOpenPlaythroughs }: Progre
       await deleteLog(userId, game.id);
     },
     onSuccess: () => {
+      toast.success('Log removed');
       invalidate();
       queryClient.invalidateQueries({ queryKey: ['playthroughs', userId, game.id] });
       /* Removing the log removes its score, which moves this game's

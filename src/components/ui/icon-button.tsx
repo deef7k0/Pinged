@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet } from 'react-native';
 
+import { GlassSurface, useLiquidGlass } from '@/components/ui/liquid-glass';
 import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { TapTarget } from '@/constants/theme';
@@ -50,6 +51,7 @@ export function IconButton({
 }: IconButtonProps) {
   const theme = useTheme();
   const accent = useAccent();
+  const liquid = useLiquidGlass();
   const { box, glyph } = SIZES[size];
   /* Vertical only. These sit in rows — up, down, remove — and sideways slop
      would overlap a neighbour and hand its tap to whichever was drawn last. */
@@ -71,7 +73,8 @@ export function IconButton({
 
   /* The reference's glyph key: the action fill and no edge. Only `active` —
      a key that is *on* — takes the selected look, wash and edge. */
-  const fill = plain ? 'transparent' : active ? accent.wash : theme.controlFill;
+  const glass = liquid && !plain && !active;
+  const fill = plain || glass ? 'transparent' : active ? accent.wash : theme.controlFill;
   const edge = active ? accent.edge : 'transparent';
 
   return (
@@ -92,6 +95,9 @@ export function IconButton({
         { backgroundColor: fill, borderColor: edge },
         disabled && styles.inert,
       ])}>
+      {/* Settings → Liquid glass: a resting key is glass; an "on" key keeps
+          its wash, so its state still reads. */}
+      {glass && <GlassSurface radius={box / 2} flat />}
       <PressGlyph pop={active}>
         <Ionicons name={icon} size={glyph} color={color} />
       </PressGlyph>

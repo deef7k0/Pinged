@@ -186,7 +186,12 @@ npm test           # node:test — pure modules only: the M3 scheme generator, t
                    # is lent on Hermes (lib/copy-scene); and Pings — every
                    # vocabulary and limit against 0046's text, what counts as
                    # played, the familiarity line, the cursor, suggestions by
-                   # game, and that every ping opens a route (lib/pings)
+                   # game, and that every ping opens a route (lib/pings);
+                   # and Apple TV's pages — the cover's height and the words
+                   # placed so the Log pill is where the blur begins
+                   # (constants/game-header), Explore's hero and its
+                   # big cards (constants/explore), and Explore's portraits
+                   # (lib/games/spotlight)
 
 node scripts/discovery-sql.mjs   # 0038's functions on a real Postgres
                    # (PGlite, in-process) over every migration, with seven
@@ -203,6 +208,9 @@ node scripts/pings-sql.mjs   # 0046 on PGlite: who may ping whom, the
                    # For You tiers and their cursor walked a row at a time,
                    # the counts and guards on suggestions, blocks, reports,
                    # and a deleted account leaving nothing. Same PGlite
+node scripts/favourites-sql.mjs   # 0047 on PGlite: Favourites holds ten,
+                   # Favourites and the wishlist can be emptied and not deleted,
+                   # and a deleted account still takes both. Same PGlite
 node --import ./scripts/esm-register.mjs scripts/legal-pages.mjs
                    # writes public/legal/*.html from constants/legal.ts
 node scripts/community-rating-report.mjs [--out f.md]   # a read-only dry
@@ -360,6 +368,12 @@ PATH via `~/.profile`. SDK 57 needs Node ≥ 22.13.
    send sheet and Settings → Pings each say pings arrive with the next update,
    the inbox's Pings tab is empty, and nothing else breaks. Check it with
    `node scripts/pings-sql.mjs`. See § Pinged.
+16. A Top 10 — run migration `0047`. Two triggers: Favourites refuses an
+   eleventh game, and Favourites and the wishlist refuse a DELETE sent
+   directly (a cascade from a deleted account passes). Nothing breaks
+   without it — the app checks the ten itself and hides Delete on both.
+   Check it with `node scripts/favourites-sql.mjs`. See § reacticx, second
+   batch.
 
 ## Adding a route
 
@@ -372,7 +386,8 @@ not by `expo export`. A brand-new route file will fail typecheck until you run
 ```
 src/
   app/               Expo Router routes (file = route)
-    (tabs)/          home, search, pings, profile (Pings took News's slot)
+    (tabs)/          home, explore, pings, profile — and search, drawn as its
+                     own round key beside the bar's pill (§ Apple TV)
     ping/[id]        one request to the community: what was asked, its games,
                      every suggestion grouped by game; the owner's controls
     new-ping         ask the community, or ?edit= a request (modal)
@@ -381,7 +396,8 @@ src/
                      (?kind=&target=&title=&subtitle=&image=) (modal)
     news             News and Events, opened from Home's two sections
     notifications    the inbox behind Home's bell: Pings, then Notifications
-    game/[id]        game detail + reviews + action row
+    game/[id]        a game's page: the cover pinned, Apple TV's words on its
+                     foot, three tabs, an Overview without cards (§ Apple TV)
     log/[id]         create/edit a log (modal)
     achievements/[id]  per-game achievement list
     list/[id]        a list / tier list / award show
@@ -527,12 +543,29 @@ src/
                                         the page moved. A pushed screen that
                                         scrolls uses one
                      app-tab-bar        the bottom navigation: expo-glass-tabs'
-                                        floating glass bar (Home, Search, Pings,
-                                        Profile) — a sliding highlight, scrub,
+                                        floating glass bar (Home, Explore, Pings,
+                                        Profile; Search a round glass key of
+                                        its own beside it, Apple TV's) — a
+                                        sliding highlight, scrub,
                                         minimized on scroll — floating over the
                                         page (§ reacticx and glass tabs). Tab screens pad their
                                         scroll content by `useTabBarClearance()`
                                         — a new tab screen must too
+                     game-overview      the game page's Overview, the
+                                        community's half in Apple's layouts:
+                                        Ratings & Reviews (score, graph, a
+                                        rail of reviews) and Played by as faces
+                     game-header        the game page's header words: name,
+                                        genres, the Log pill and ⋯ menus, the
+                                        synopsis with MORE, the facts line,
+                                        "Developed by"
+                     game-information   Apple TV's Information box: the one
+                                        filled block on the game page
+                     explore/           Explore's hero (the Store screen's,
+                                        a carousel of portraits) and its big
+                                        cards (Home's "Severance" block)
+                     search/search-browse  the Search tab at rest: two-across
+                                        landscape tiles
                      award-show / award-slot  an award ballot, and one row of it
                      game-filter-bar    genre / platform / studio / year pills
                      game-lineage       original game / editions & extras
@@ -1231,11 +1264,21 @@ for 2:3, so the crop cuts the logo. `lib/games/steamgriddb.ts` is not a provider
 and must never become one: nothing there may put a game *into* the app, only art
 onto a game already in it.
 
-**There is no game logo anywhere, by the owner's decision** (2026-10-22): a
-game's transparent logo — Wikimedia Commons by its Wikidata item, then
-SteamGridDB's `/logos` — stood in for its name on the game page, then on a
-review's page, and the owner had every line of it removed: "I don't think it
-fits in any screen". Do not rebuild it.
+**The game page's name is the game's logo again, on trial** (2026-11-03,
+the owner: "try and see how it looks on the game page"). It was removed on
+2026-10-22 ("I don't think it fits in any screen") when it came from Commons
+and SteamGridDB; now it is IGDB's own — an artwork whose `artwork_type` is a
+logo (white, then colour, then black drawn white), already in `GAME_FIELDS`'
+answer, so it costs no request (`chooseLogo`, `lib/games/logo-art.ts`, pure
+and tested; `Game.logo`). `<TitleMark>` in `game-header` draws it, measuring
+it first (`useLogoInk`, which now also reads `bounds` — where the drawing is
+in its file; cache `logo-ink:v2`): the file is cropped to its ink (Kingdom
+Come II's fills half its canvas, Phantom Blade Zero's is a strip on 16:9),
+and every logo is drawn at one area, Red Dead Redemption 2's, which the owner
+called "decent" (`logoBox`, `LOGO_AREA`). Drawn as it is unless dark all over
+(`gameLogoLook` — the platform logos' silhouette rule turned Disco Elysium
+into a white blob); the name in type for one with its own ground or a file
+that fails. Nowhere else draws a logo.
 
 **Its static square has three surfaces**, all through `useSquareCover()`: Surprise Me,
 a review's own page — the square as the hero at its top, full width and
@@ -1573,6 +1616,13 @@ once it has a frame.
   store kept in AsyncStorage for a month, **"none" included**. What would
   not play is the session's alone, never written to disk.
   `enabled: false` holds the lookup but still reads a known answer.
+  **Only an answer is remembered, never a failure** (2026-11-03): a lookup
+  that could not ask — no key in the build, a 429, a 5xx, no network, a
+  file's HEAD unreachable — throws `SgdbUnavailable`, is `unavailable` for
+  the session and is not written. Before, each was stored as "none" for a
+  month, and the 21 October APK was built without the SteamGridDB key, so
+  every game opened on it read "no animated cover" on every later build.
+  The cache is `animated-cover:v4`, which dropped those.
 - **Animated artwork is a setting** (`useAnimatedArtwork`, Settings and
   onboarding; on by default, kept per account on the device). Off, Surprise
   Me and a review's hero are still and look nothing up. The game page's
@@ -1646,6 +1696,13 @@ checked live. To judge on a device: the 600×900 WebP's decoding cost, the mask
 over the cover's foot, and the zoom's feel.
 
 ## Search: six tabs under one field, and three pages behind it
+
+> **Superseded in part (2026-11-03, § Apple TV).** Everything below about
+> Search *untyped* — Discover, its slider, its rows, the Reviews and
+> Collections tabs' charts — now lives in the **Explore** tab, and the slider
+> is Explore's portrait hero. Search at rest is a grid of tiles, and its tabs
+> appear only with a search. The typed scopes, facets and IGDB notes below
+> still hold.
 
 The Search tab is **a field with six tabs under it** (`<TabBar>`): Games,
 Reviews, People, Collections, Studios, Platforms — always on screen,
@@ -3271,6 +3328,10 @@ What survived of them is geometry, not colour: SimpMusic's scrim ramp
 
 ### The pinned hero
 
+> **2026-11-03 (§ Apple TV): the game page and the studio pin the *cover*
+> now**, portrait, with Apple TV's words on its foot; everything below about
+> the pinned hero's motion still holds.
+
 The masthead's Apple Music transition, which the owner kept: the art is
 `<Screen backdrop>`, not in the scroller (`<PinnedHero>`, `PINNED_HERO`,
 `lib/scroll-motion`). At rest it is the old hero (38%, the owner's dissolve
@@ -3333,7 +3394,11 @@ and blurs with it, and pauses at `solidAt`. Things that are easy to break:
   (`heroWash`, `washStops`: a smoothstep from 307/393 of a side to 1.21) is the
   page's foot fade there, in place of `MASTHEAD_FADE`, as one gradient over
   every copy — not in the shader as Convx draws it, since the shader cannot
-  wash a playing trailer. It begins where the blur begins and leaves about
+  wash a playing trailer. The blurred copy's own top fades in by *distance*, a smootherstep over
+  `fadeSpan` (0.22 of a side) from the knee — the owner's "the top fades
+  almost like a gradient with the blur" (2026-11-03); it was led by the
+  radius, whole at 7.5pt, about 30dp, which read as an edge. The knee and
+  the foot did not move. It begins where the blur begins and leaves about
   two fifths of the art at its foot, which the tail carries on from.
   **It puts art behind the game's name again** (ruling 2 of the masthead, "the
   art has gone by the title", no longer holds with Skia): measured white on
@@ -3991,6 +4056,8 @@ and the event page's foot bar are all for a device.
   replaced collapsed into `statusPlayed` under simulated protanopia. A
   *selected control* carries two non-hue signals too — its wash is lighter than
   the resting fill and its edge far brighter than the resting edge.
+- **Superseded (2026-11-04): in-page tabs are reacticx's masked tab bar** —
+  § reacticx, third batch. The segmented control below is gone.
 - **In-page tabs are reacticx's segmented control, and there is one
   implementation** (`<TabBar>`) — the owner's (2026-11-02: "Make the tabs in
   the app look like this"), read from `organisms/segmented-control` (MIT): a
@@ -4078,6 +4145,9 @@ and the event page's foot bar are all for a device.
   where the colour *is* the datum — a rarity band, a status — and tints the label
   only, never the fill. A run of filled colour capsules reads as a row of buttons
   demanding to be pressed, and chips are not buttons.
+- **Superseded (2026-11-03): Surprise Me is a vertical carousel of
+  portrait covers** — § reacticx, second batch. The stack below is gone from
+  the screen (`surprise-reveal` survives only for onboarding's preview).
 - **Surprise Me's art is a filling stack, reacticx's** — the owner's
   direction (2026-11-02), reacticx's `FlingStack` (`molecules/filling-stack`,
   MIT): the card in front and three behind it, each 18 higher and 5% smaller
@@ -4706,6 +4776,10 @@ and the event page's foot bar are all for a device.
   `import()` behind a latching availability flag and falls back to
   `lib/artwork-color.ts` (pure-JS `jpeg-js`, works anywhere). Dev builds get the
   native extractor; Expo Go gets the decoder; neither branch is a degraded mode.
+- **Superseded (2026-11-03): the game page is Apple TV's now** (§ Apple TV) —
+  the masthead row, the action row, the stats strip and the Overview's cards
+  described in the next bullets are gone (the pinned hero and the three tabs
+  stayed); they stay here as the record of what the owner ruled on before.
 - **The game page's masthead is a film's page in Letterboxd, measured.** The
   owner's second reference (2026-10-08, a screenshot of a 360dp display at 3×):
   every size and interval was read off it and is in
@@ -5675,6 +5749,140 @@ the older rule is noted where it stood.
 - **Tabs, Search's carousel and Surprise Me's stack** are the same day's
   first message — § Search and § Conventions.
 
+## Apple TV: the game page, a studio, Explore and Search (2026-11-03)
+
+The owner's brief, with references (Apple TV's app — PRIMETIME, F1 The Movie,
+Resident Evil — its website's Severance page, its Home and Store, and its
+Android Search): "re-design the game page and studio page into this new Apple
+TV style… REPLICATE AS SHOWN"; a new **Explore** tab holding what Search
+showed untyped; Search reduced to its field; "the name of every tab… with a
+big bold text at the top left corner". It reverses a great deal; where an
+older section disagrees, this one is the current state.
+
+**The header, second pass (the owner's, the same day: "I do not see any blur
+or fade at all in the game page… the apple music transition with the scroll
+blur needs to be in the cover. The cover being pinned and everything we had
+before, that needs to be there… go back to the three tabs").** The first pass
+drew the art in a Skia canvas of its own (rit3zh's stretch shader); on the
+owner's phone it drew no blur and no fade, and it is deleted — `StretchHeader`,
+its canvas and `lib/stretch-artwork`. Why it drew nothing was not found (no
+device here). What stands:
+
+- **The cover is `<PinnedHero>`** — the game page's and a studio's — with
+  everything it had: pinned behind the page, the drift, Convx's row-by-row
+  blur climbing it, the mirrored tail and wash, the drain into the page's
+  colour by the time the name is under the bar (`solidAt`). Portrait, 2:3 at
+  the display's width (`coverHeight`, `constants/game-header`), sharp
+  (`sharpCoverUrl`), and **moving** where it has an animated cover — an
+  `<AnimatedCoverImage>` over the still in the hero's `media` slot. The room
+  above the words is a door to `<CoverViewer>`.
+- **The Apple TV words lie on its foot, the title where the blur begins**
+  (`wordsTop`, `blurStart` in `lib/progressive-blur`: Convx's knee, 0.78 of a
+  side) — the owner's, moved there from the Log pill the same day, the title
+  a step smaller (28). **The blur is longer than Convx's** so the words stay
+  on it: the hero (art and mirrored tail) is 585/393 of a side, not 495, and
+  the wash is whole at 1.42, not 1.21 (`PROGRESSIVE_BLUR`). Only the game page
+  and the studio draw the tail. **And it starts above the title** — the
+  owner, after seeing the title blend into sharp art: "make it so the blur
+  goes up to where the game title is". These two heroes (`<PinnedHero tail>`,
+  `<ProgressiveBlur long>`) take their own knee, 0.5 of a side
+  (`longKnee`; about 20pt of blur at the title), and their wash starts at
+  0.56 (`longWashFrom`), so the page's colour is already rising behind the
+  name. The collection page keeps Convx's 0.78. The words
+  are `<GameHeaderWords>`: the name where Apple TV sets a logo (still no game
+  logo), the genres, **a white pill** and **a round ⋯**, the synopsis in **two
+  lines with MORE** (a mask, and a sheet), **the facts** (year, time to beat,
+  the score — Pinged's, else IGDB's — the age rating boxed, Must Play) and
+  **"Developed by …"**. A studio's are its name or logo and its line.
+- **The pill logs**: "Log", then your progress's word; a menu of write / edit
+  the review, log / change the progress, read your review, playthroughs. An
+  unreleased game's pill is the wishlist. **⋯ is favourite, wishlist, add to
+  a collection**, and the collections it is in. The old action row, stats
+  strip, "your log" block and masthead cover are gone (`game-actions`,
+  `game-stats-strip`, `cover-halo` deleted).
+- **The name can be hidden** — Settings → Game title (the owner's,
+  2026-11-03): hidden, a game's page draws no logo or name over the cover
+  and none in the bar (`useGameTitle`, `lib/game-title`, per account on the
+  device, `NEVER_PERSIST`). The title's box stays, at no height, so the
+  words and the bar keep their places; a screen reader still hears the name.
+- **The trailer**: 4.5 s in (trailers on, no Reduce Motion), or from the play
+  disc or its tile, the pinned art fades out, comes back as the landscape
+  hero (the old 38%) with the trailer behind it (`<TrailerBackdrop loop=
+  {false} onEnd>`), and the words rise to it (`LinearTransition`); when it
+  ends, back to the cover the same way. The disc is also the switch for
+  trailers playing by themselves.
+- **The three tabs are back** — Overview, Soundtrack, Similar — with the
+  pinned copy under the bar (`<PinnedTabBar>`, restored). Soundtrack and
+  Similar are as they were.
+- **The page's colour is seeded by the cover** (it was the hero from
+  2026-10-31, when the hero was what the page drained from). A studio's too;
+  its banner store remembers a cover (`studio-banner:v2`).
+- **The Overview, no cards** (`CardlessContext`, `ui/card-material`): headings
+  Apple TV's — `h2`, a chevron straight after where they lead on. Trailers and
+  screenshots, events and platforms first (the owner's), then — because the
+  community's cards "look weird now" without their card — **Apple's own
+  layouts** (`components/game-overview`): **Ratings & Reviews** as the App
+  Store's (the score large with its verdict and count, the rating graph beside
+  it, then the reviews as a rail of soft boxes, the most liked first, "See
+  all" the sheet) and **Played by** as Apple TV's Cast & Crew (round faces,
+  friends first and badged, the score under each). Then On Pinged, where to
+  buy, your copy, awards, achievements, the series, **the Information box**
+  and **Details** as label over value. The review boxes and the Information
+  box are Apple's one boxed thing: white at 7% over the page, a 12 corner, no
+  edge or shadow — not the old card. Sheets keep their cards.
+
+**Explore** (`(tabs)/explore`, `<DiscoverFeed>`) is what Search showed
+untyped. Top to bottom, the owner's order: **the Store screen's hero** — the
+games out now and coming soon (`pickPortraits`: five just out, three awaited)
+on their portrait covers, full width under the status bar, the art lagging
+its page by 12% and drawn that much wider ("zoomed in a little so that the
+parallax effect can be noticed"), moving on every six seconds until touched,
+page dots, the page's colour rising over its foot, "Explore" large over its
+top left and the calendar key at the right (`<ExploreHero>`,
+`constants/explore`); **Highly rated**; **Popular this month as Apple TV
+Home's big card** (`<FeatureCards>`: 86% of the display, 1.07 wide to tall,
+the hero cropped, the rank over the name); then Similar to, Beloved, the Top
+1000, and three of the Reviews and the Collections charts with "See all".
+
+**Search** at rest is Apple TV's Android Search: "Search" large, your avatar
+at the right (your profile), the field (the scanner in its trailing slot),
+and a two-across grid of landscape tiles (`<SearchBrowse>`: the Top 1000 and
+the calendar as doors, then this month's popular games on their key art,
+named). **The scope tabs appear with a search** — the field touched or
+holding anything, or a scope other than Games chosen — and are otherwise
+hidden. Typed, every scope is what it was.
+
+**The tab bar** is Home · Explore · Pings · Profile in the glass pill, and
+**Search a round glass key of its own** beside it (`SEARCH_ROUTE`), lit when
+in front, shrinking with the pill. **Every tab opens on its name in
+`largeTitle` at the top left**: Home's in a row over its chips (the bar is
+112), Explore's over its art, Search's, Pings' over its tabs, and Profile's
+with your handle under it.
+
+**The third pass (2026-11-03, the owner, after seeing the second)**: the
+title is the game's logo (§ Artwork); Information and Details follow the
+trailers and screenshots; Ratings & Reviews is the score alone and one
+review under it (no graph, no rail); On Pinged is three centred rows — a
+glyph, then "25 playing now"; Where to buy is a rail of square tiles (the
+store's mark on its colour, its name and price under it — `ArtRail
+shape="square"`), no Show all; and **the trailer is never blurred** — the
+landscape hero is `<PinnedHero blur={false}>` with `TRAILER_FADE`, a solid
+fade over its bottom 28% only. The studio page is back to its look from
+before Apple TV, and Explore leads with the old square parallax slider
+(`<SpotlightSlider>`) under its name — the portrait hero is deleted. The
+long hero's blur starts a little lower (`longKnee` 0.56, `longWashFrom` 0.6;
+"make it not go too much further up"). **A page's right-hand controls are
+one connected bar** ("like if it was the navigation bar"): `<TopBarDisc>`s
+in `right` are drawn as keys in one glass capsule over artwork
+(`GlassGroup`) and one control-grey capsule in the bar (`BarGroup`); Home's
++ and bell and the Profile tab's + and Settings are a capsule each too.
+
+**Seen on a phone once, the first pass, which drew no blur** (above). The
+second pass is types, lint and `npm test` here. To judge on a device: the
+blur starting at the Log pill, the words' legibility on the cover's foot, the
+fade between the cover and the trailer, the MORE mask, the review rail and
+the faces, Explore's parallax and glide, and the tab bar's search key.
+
 ## Pinged: pings to people, and pings to everybody (0046)
 
 The owner's rebrand and brief (2026-10-31): the app is **Pinged** — "You ping
@@ -5782,6 +5990,207 @@ PGlite pass. To judge on a device: the stage's swipe against the page's
 scroll and its arrival, the fan's turned cards, the stamp's place on the
 band and the name beside it, the filters' row, the send sheet's footer over
 the keyboard, and the inbox rows.
+
+## reacticx, second batch: toasts, glass, a Top 10 (2026-11-03)
+
+The owner's message of 2026-11-03, six references at once. Not seen on a phone.
+
+- **Toasts** (`lib/toast` — `toast.success / .error / .info`, `<Toaster>` in
+  `ui/toast`): reacticx's `Toast`, its numbers (18 corner, three shown, 16
+  out and 5% smaller behind, tap to spread 14 apart, swipe 45dp away, four
+  seconds, the `glide` spring), **at the top** — the foot is the tab bar's.
+  One `<Toaster>` in the root and one inside every `<Tray>`'s window (a sheet
+  is a window of its own on Android); the newest mounted draws. About sixty
+  mutations say what they did on success (`listToastFor` for favourites and
+  the wishlist); things you watch happen — a like, a vote — say nothing. A
+  new write that leaves the screen or changes nothing visible says so too.
+- **Shimmer** (`ui/shimmer`, so every `<Skeleton>`): reacticx's band — half
+  the block's width, five stops, linear 1.5s, edge to edge. Still a
+  Reanimated CSS animation on the UI thread. § Loading's SimpMusic sweep is
+  replaced; its argument for the UI thread stands.
+- **Scoring a review** (`ui/seek-bar` in `<ScoreInput>`): reacticx's seek
+  bar as its demo sets it — no thumb, 10 tall swelling 3.5× under the
+  finger, 5% wider, a rigid haptic on grab and release, tap to jump —
+  filled in the score's own colour. The ±1/±10 nudges stay.
+- **Liquid glass, a setting, off by default** (Settings → Liquid glass,
+  `lib/liquid-glass`, `<GlassSurface>` / `useLiquidGlass` in
+  `ui/liquid-glass`). On: the top bar's back disc, its right-hand capsule
+  and bar keys, the tab bar and its search key, `<DropdownButton>` and its
+  menu, `<AnchoredMenu>`, a resting `<IconButton>`, Home's and Profile's
+  key capsules, Explore's calendar key. **Never a card or a primary
+  action.** iOS with `expo-liquid-glass-view` linked draws Apple's glass
+  (the package is iOS-only and asks for its native view on import, so it is
+  `require`d behind `requireOptionalNativeModule('ExpoLiquidGlass')`).
+  Everywhere else — **Android, the owner's phone** — the material is rebuilt
+  from Podium's glass (GHOSTxASR/podium-music-player, ADR-007 / `Glass.kt`,
+  read for its numbers; it is GPL, so nothing is copied): its "blur" tier —
+  12dp of the page blurred, a 30% dark tint, the accent's glow from the top
+  (16% to nothing at 80%), a 1dp rim of light, a 24/8 shadow at 28% — and
+  its "solid" tier (62% tint) where Android has no blur target (outside a
+  `<Screen>`: the tab bar, menus in a Modal). Its lens refraction is a
+  Compose library and is not reproduced.
+- **A page's right-hand top bar controls are one capsule** (2026-11-03,
+  earlier the same day): § Apple TV's third pass.
+- **The game page plays its animated cover in place**: a key in the top
+  bar's capsule (sparkles / pause) asks for the portrait animation by hand
+  (`explicit`, whatever Settings → Animated artwork says), holds the
+  trailer's autoplay back, and says by toast when the game has none.
+- **Surprise Me** is reacticx's vertical page carousel (`surprise-carousel`)
+  at its demo's numbers (14 in, 6 apart, 0.88 / 60% either side, a haptic
+  on rest): portrait covers, the one in front playing its animated portrait
+  when Animated artwork is on, title and "developer · year" at the foot over
+  a fade; the card opens the game; a glass key in its corner turns it over
+  in place — the score, genres, platforms, synopsis (the game page's own
+  `['game', id]`), then Backlog, Hide, the top review and its song. The last
+  card deals more. Hiding and Backlog are toasts now; the swipe deck, its
+  edges and the hidden panel are gone. The owner's sentence about the info
+  key was cut off ("information about the game like the…"); what it holds is
+  a reading.
+- **Android's glass blurs only over the page** (`<GlassSurface overPage>`,
+  the top bar's controls alone). A glass key inside the page — Surprise Me's
+  info key was the first — made a `<BlurView>` inside its own blur target,
+  which draws itself forever: Expo Go closed on Surprise Me with no log.
+  Everywhere else Android draws the solid tier. Never give a blur inside
+  `<Screen>`'s content `blurTarget`.
+- **Superseded in part (2026-11-04, § reacticx, third batch)**: Skia plays
+  only an animated WebP or GIF now, never a video; `AnimatedProgressiveBlur`
+  and the mesh under the cover in front (`<CoverFront>`) are gone.
+- **The game page's animated cover moves under its blur too** — rit3zh's
+  apple-music-animated-artwork's method: the animation is decoded once in
+  Skia (`useAnimatedImageValue`, or `useVideo` for a WebM / MP4) and its
+  frame drawn sharp over the art and into the row-by-row blur's picture
+  (`AnimatedProgressiveBlur`, `<PinnedHero animation>`, `HERO_ANIMATES`).
+  Before, expo-image played it and the blur was made from the still, so the
+  foot never moved. Without Skia the old overlay is drawn.
+- **Tapping the cover no longer zooms** (`<CoverViewer>` is deleted): from
+  the very top of the page only, the words and everything under them fade
+  out, SimpMusic's Apple Music mesh fades in under the cover in place of the
+  solid page (`<CoverFront>`), the top bar's keys fade with the words (the
+  owner's, 2026-11-03), and the page cannot scroll; a tap anywhere or
+  back returns. The Static / Animated words went with the viewer — the top
+  bar's sparkles key is the animated cover's control now. The cover's blur and
+  its wash ease down to its edge as it comes to the front (650ms, in and
+  out; `<PinnedHero lowered>`, the shader's `drop` uniform,
+  `COVER_FRONT_KNEE` 0.97 sides — just above the art's foot), so the cover
+  is seen whole, and rise back when the page returns.
+- **A Top 10** (`top-ten/[id]`, from the "Top 10" key on a profile's
+  Favourites): reacticx's circular carousel (`ui/circular-carousel`: ±2
+  cards, drop ⅛/¼, 0.85/0.75, 80/50%, 20°/40°, Android blur) of the
+  person's Favourites, and under the cover in front "Number 1" in big white
+  ExtraBold, changing with reacticx's dynamic text (`ui/dynamic-text`:
+  rising forward, falling back, a damped spring). **Favourites holds ten**
+  (`FAVOURITES_MAX`, 0047), the profile pins the first four, and it and the
+  wishlist cannot be deleted (Delete is hidden on both; 0047 refuses it).
+
+## reacticx, third batch: the cover's shape, one blur, masked tabs, a lens (2026-11-04)
+
+The owner's message of 2026-11-04, eight requests at once. Types, lint and
+`npm test` pass; **none of it has been seen on a phone.**
+
+- **The game page's cover is its own shape** ("They must not be cropped or
+  resized… fit perfectly to the sides of the screen. If doing this means
+  making the header smaller or bigger… its fine"): the display's width and
+  the cover's own height for it (`coverHeight(width, aspect)`,
+  `constants/game-header`). The shape is IGDB's — `GAME_FIELDS` asks for
+  `cover.width, cover.height` now (`Game.coverAspect`) — else the loaded
+  file's (`<PinnedHero onLoad>`), else 3:4 until it is known. It was 2:3,
+  capped at 74% of the display, and IGDB's covers are mostly 3:4, so every
+  one was zoomed and cut. A shape outside 1–2 is no box and is bounded.
+- **One blur, and it never changes** ("maybe see if it's better to have
+  only one blur that never changes and is the one that works for the
+  video"): `<PinnedHero>` mounts one `<ProgressiveBlur>`, which draws the
+  still, then the animation's frames (`animatedUri`), then the still again —
+  there is no `AnimatedProgressiveBlur` to swap in, so Static ⇄ Animated no
+  longer remounts the blur. Its own frame canvas draws the animation sharp.
+- **The game page's blur is back as it was before 2026-11-04**, by the
+  owner's word after seeing this batch ("Go back to the previous blur… the
+  one before… and make the clear view artwork cover like before too"): no
+  solid fade while it loads (the review's `<HeroFoot>` keeps one), the
+  720p blur source, the wash as it was, and the cover in front is
+  `<CoverFront>` again — SimpMusic's mesh under the cover — with the blur
+  and wash sliding down to the cover's edge (`slide`, `COVER_FRONT_KNEE`).
+  What stayed from the batch: the cover's own shape, the one blur component
+  that draws the animation's frames, and the title-off position below.
+- **Game title off: the blur begins near the cover's foot**
+  (`TITLELESS_KNEE`, 0.88 sides; the cover in front is 0.97): "so that the
+  logo in the cover can be seen, but not quite like the one with the full
+  clear view". The words start at 0.98 (`TITLELESS_WORDS_KNEE`), just above
+  the foot — raised from 1.10 at the owner's word. `<PinnedHero knee>`.
+  **The blur runs on under all the words** (`<PinnedHero extend>`,
+  `heroExtension`): the page measures the words and the tail and its wash
+  are lengthened so the wash is whole only below their foot — "the header
+  info and buttons sit half on the blur and half on the game page" (the
+  owner). Title off only; with the title on the hero is Convx's length.
+  **A dropped blur is squeezed, never slid** (`droppedRow`, and the wash
+  scaled toward its own foot): the curve from the new start to the cover's
+  foot is the whole curve, so at the foot and down the tail the blur and
+  the wash (`washStops(from, extend)`) are as heavy as with no drop. For one build the drop slid the
+  whole curve down: at the cover's foot the blur was a few points, the
+  bottom edge showed, and the mirrored tail read as a sharp reflection — "a
+  3d look… not a fade" (the owner). Do not slide it again. The climb is
+  never dropped.
+- **Animated covers that crashed or sat still** (Death Stranding was the
+  owner's example; the file itself was not looked up here). Three causes in
+  Skia, read from its source (`@shopify/react-native-skia` 2.6.2):
+  - its `useVideo` on Android hands a frame over and disposes it at once
+    (`copyFrameOnAndroid`), so the next draw throws "Attempted to access a
+    disposed object" on the UI thread — the app closes; its decoder also
+    runs a frame per display frame and never loops;
+  - Skia has no APNG decoder: an APNG is its first frame, still forever;
+  - `useAnimatedImageValue` throws on a file it cannot decode, times every
+    frame by the first one, and stops on a play-once file.
+  So the one blur reads **an animated WebP or GIF, or a video**
+  (`skiaAnimates`, tested) through the app's own loop
+  (`useAnimationFrames` in `ui/progressive-blur`): each image frame its own
+  duration and a finished file decoded afresh; a video opened on a runtime
+  of its own (`cover-video`), muted, read at its own frame rate, the frame
+  on screen kept and the one before it disposed, rewound at its end on
+  Android, and given back if it shows nothing in 6s; every dispose on the
+  UI thread. **Not an APNG** — Skia cannot animate one — nor a file Skia
+  refuses (`onAnimationFail`): those are drawn over the art by
+  `<AnimatedCoverImage>` (expo-image, expo-video) with the still's blur
+  under them.
+- **Convx's blur on a studio, a collection and a review** ("the blur that
+  act's as the fade for the header and background"): the long blur and its
+  mirrored tail (`<PinnedHero tail>`), and half the tail left showing under
+  the art before the page's solid part begins (`shownTail`) — about a
+  ninth of the art's height more page above the first shelf. The review's
+  square hero is not pinned; `<HeroFoot>` lays the same blur and wash over
+  it and its tail behind the row under it. This reverses "a studio and a
+  collection do not take it" (§ One colour method).
+- **Details is in Information's box** on the Overview (`INFO_BOX`, the
+  one filled block there — now two).
+- **Tabs are reacticx's masked tab bar** (`<TabBar>`, `organisms/
+  masked-tab-bar`): the row drawn twice, once on the track in the quiet ink
+  and once inside the white pill in near-black (`segmentPill`,
+  `segmentPillInk`; a game's `primary` / `onPrimary`), the inner copy
+  shifted back as the pill moves, so the words change colour under its
+  edge. Its springs are the reference's (`PILL_SPRING` 30/150/0.5, the
+  press 20/150, the follow 220/24, 4dp of swell). Tap glides; dragging the
+  pill follows the finger and settles on the nearest tab — horizontal only,
+  where reacticx's starts on touch, so a page still scrolls over it. Words
+  as wide as their tabs and a scrolling row, as before. The segmented
+  control's thumb, wobble and hairlines are gone.
+- **Hold any cover and it lifts** — reacticx's matched geometry
+  (`ui/cover-zoom`, `<CoverZoomHost>` in the root layout): `<Poster>` has a
+  380ms long press (`zoomable`, on by default) that measures it in the
+  window and grows a copy to the middle of the screen (500ms,
+  bezier 0.33/0.01/0/1, 80% of the width or 60% of the height) over a
+  blurred page on iOS, a darkened one on Android (a Modal has no blur
+  target); its 1080p fades in over it. Tap, back, or a 100dp drag puts it
+  back, and the page's own cover reappears only when it lands. Headers are
+  not `<Poster>`s, so they are left out by construction. **Off where a hold
+  already means something** — choosing games to remove from a collection,
+  taking a Must Play label off (`GameGridTile onLongPress`).
+- **The tab bar's highlight is expo-liquid-lens's lens**, with Liquid glass
+  on and Skia in the build (`ui/liquid-lens`, `lib/liquid-lens` — its WGSL
+  rewritten in SkSL, compiled in CanvasKit by `npm test`): the tabs' glyphs
+  (Ionicons' font) and words (Poppins) drawn by Skia under a rounded lens
+  that bends them near its rim (8 / 11), tints them white inside its band,
+  fills with a breath of white, and stretches and flattens with its speed
+  and swells while pressed. The reference draws it with WebGPU, which this
+  app does not ship. The plain highlight stays everywhere else. The rim is
+  at 7% — the reference's is 7% of its 6% fill, which is not seen.
 
 ## Store-release compliance (audited 2026-10-29)
 

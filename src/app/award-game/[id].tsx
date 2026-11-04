@@ -14,6 +14,7 @@ import { Spacing } from '@/constants/theme';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { getAwards, setAwardGame } from '@/lib/api';
 import { getGameById, searchGamesFiltered, type GameFilters } from '@/lib/games';
+import { toast } from '@/lib/toast';
 
 /**
  * Pick the winner of one award.
@@ -84,6 +85,7 @@ export default function AwardGamePickerScreen() {
       await setAwardGame(id!, game);
     },
     onSuccess: () => {
+      toast.success('Winner chosen');
       queryClient.invalidateQueries({ queryKey: ['awards', list] });
       queryClient.invalidateQueries({ queryKey: ['list', list] });
       queryClient.invalidateQueries({ queryKey: ['lists'] });

@@ -51,9 +51,10 @@ describe('the top bar', () => {
   it('stands on reacticx’s header fade, never a blur — every bar, the glass one too', () => {
     /* The owner had the bar's blur removed (2026-10-14), kept Apple's glass
        on three pages (2026-10-23), then asked for reacticx's header fade
-       "across the app" (2026-11-02). The one `<BlurView>` left is the disc of
-       glass over artwork, which is a button. */
-    assert.equal((bar.match(/^\s*<BlurView\b/gm) ?? []).length, 1);
+       "across the app" (2026-11-02). The two `<BlurView>`s left are buttons:
+       the back disc of glass over artwork, and the capsule the right-hand
+       controls share (`GlassGroup`, 2026-11-03). */
+    assert.equal((bar.match(/^\s*<BlurView\b/gm) ?? []).length, 2);
     assert.doesNotMatch(bar, /AnimatedBlurView|function GlassFrost/);
     assert.doesNotMatch(
       bar.slice(bar.indexOf('function Frost('), bar.indexOf("/** The bar's row")),

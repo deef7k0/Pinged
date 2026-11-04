@@ -43,6 +43,7 @@ import { displayNameFor } from '@/lib/format';
 import { getGameById } from '@/lib/games';
 import { useAuth } from '@/store/auth';
 import { Loader } from '@/components/ui/loader';
+import { toast } from '@/lib/toast';
 
 /** How long the "didn't read cleanly" hint stays up after a misread. */
 const MISREAD_MS = 1800;
@@ -612,6 +613,7 @@ function PendingResult({
   const confirm = useMutation({
     mutationFn: (claimId: string) => confirmReleaseContribution(claimId),
     onSuccess: (outcome, claimId) => {
+      toast.success('Release confirmed');
       queryClient.invalidateQueries({ queryKey: ['barcode', barcode] });
       const claim = claims.find((entry) => entry.id === claimId);
       if (claim) queryClient.invalidateQueries({ queryKey: ['game-releases', claim.game_id] });

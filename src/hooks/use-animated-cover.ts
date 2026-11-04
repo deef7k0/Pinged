@@ -57,8 +57,11 @@ const TTL_MS = 30 * 24 * 60 * 60 * 1000;
 /* 2: answers stored before 2026-10-21 named SteamGridDB's 267×400 WebM
    preview where the full animation is now preferred (`sgdbCandidates`), and
    none carried its weight. 3: an answer is a list to fall back through, with
-   joke grids left out (`rankGrids`). Every game is asked again, once. */
-const CACHE_VERSION = 3;
+   joke grids left out (`rankGrids`). 4: a failed lookup — and every lookup
+   on the 21 October APK, built without the SteamGridDB key — had been stored
+   as "none" for a month; failures are never stored now. Every game is asked
+   again, once. */
+const CACHE_VERSION = 4;
 const CACHE_KEY = `animated-cover:v${CACHE_VERSION}`;
 
 /** `assets: []` is a real, cached answer: no animated cover in this shape. */
@@ -72,6 +75,13 @@ const failedUrls = new Set<string>();
  * one at least as heavy is passed over too (`pickPlayable`).
  */
 let failedAtBytes = Number.POSITIVE_INFINITY;
+
+/**
+ * Lookups that failed this session — no key, no network, a rate limit —
+ * which are not answers and are never written to disk. Asked again on the
+ * next launch, or by `retry`.
+ */
+const unavailable = new Set<string>();
 
 const inflight = new Set<string>();
 const subscribers = new Set<() => void>();
@@ -121,7 +131,7 @@ function keyOf(gameId: string, aspect: CoverAspect): string {
 
 /** Look one game and shape up, unless it is known or already being asked. */
 function ensure(key: string, gameId: string, title: string | null, aspect: CoverAspect): void {
-  if (memory.has(key) || inflight.has(key)) return;
+  if (memory.has(key) || inflight.has(key) || unavailable.has(key)) return;
   inflight.add(key);
   notify();
 
@@ -132,6 +142,9 @@ function ensure(key: string, gameId: string, title: string | null, aspect: Cover
       const assets = await findAnimatedCovers({ gameId, title, aspect });
       memory.set(key, { assets, storedAt: Date.now() });
       schedulePersist();
+    } catch (error) {
+      unavailable.add(key);
+      console.warn(`[animated-cover] ${key} could not be looked up; not remembered.`, error);
     } finally {
       inflight.delete(key);
       notify();
@@ -211,7 +224,7 @@ export function useAnimatedCover({
      list, so it is the same object until a failure moves the pick on. */
   const picked = useSyncExternalStore(
     subscribe,
-    () => (key ? pickedFor(key) : null),
+    () => (key ? snapshotFor(key) : null),
     () => null
   );
 
@@ -227,12 +240,13 @@ export function useAnimatedCover({
     const entry = memory.get(key);
     for (const asset of entry?.assets ?? []) failedUrls.delete(asset.url);
     memory.delete(key);
+    unavailable.delete(key);
     schedulePersist();
     ensure(key, gameId, title ?? null, aspect);
   };
 
   const reportFailure = (error?: unknown) => {
-    if (!picked || picked === NONE || failedUrls.has(picked.url)) return;
+    if (!picked || picked === NONE || picked === UNAVAILABLE || failedUrls.has(picked.url)) return;
     failedUrls.add(picked.url);
     if (picked.quality === 'full' && typeof picked.bytes === 'number') {
       failedAtBytes = Math.min(failedAtBytes, picked.bytes);
@@ -249,6 +263,7 @@ export function useAnimatedCover({
   };
 
   if (!key) return { ...IDLE, retry, reportFailure };
+  if (picked === UNAVAILABLE) return { ...IDLE, status: 'unavailable', retry, reportFailure };
   if (!picked) {
     return { ...IDLE, status: enabled ? 'loading' : 'idle', retry, reportFailure };
   }
@@ -267,6 +282,15 @@ export function useAnimatedCover({
 
 /** A known answer with nothing playable left in it. */
 const NONE = 'none';
+
+/** A lookup that failed this session: not an answer (`unavailable`). */
+const UNAVAILABLE = 'unavailable';
+
+/** What the hook's store reads: the pick, or that the lookup failed. */
+function snapshotFor(key: string): AnimatedAsset | typeof NONE | typeof UNAVAILABLE | null {
+  if (!memory.has(key) && unavailable.has(key)) return UNAVAILABLE;
+  return pickedFor(key);
+}
 
 /** What a stored answer says to play now, after this session's failures. */
 function pickedFor(key: string): AnimatedAsset | typeof NONE | null {

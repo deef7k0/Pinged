@@ -4,6 +4,7 @@ import { Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-n
 import Animated, { css, cubicBezier, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GlassSurface, useLiquidGlass } from '@/components/ui/liquid-glass';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import { Elevation, Motion, Radius, Spacing } from '@/constants/theme';
@@ -103,6 +104,7 @@ export function AnchoredMenu({
   children: ReactNode;
 }) {
   const accent = useAccent();
+  const liquid = useLiquidGlass();
   const reduceMotion = useReducedMotion();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
@@ -153,13 +155,15 @@ export function AnchoredMenu({
             top,
             left,
             width: menuWidth,
-            backgroundColor: accent.m3.surfaceContainerHigh,
-            borderColor: accent.m3.outlineVariant,
+            backgroundColor: liquid ? 'transparent' : accent.m3.surfaceContainerHigh,
+            borderColor: liquid ? 'transparent' : accent.m3.outlineVariant,
             /* Grows out of the trigger's middle, on the edge it meets. */
             transformOrigin: [anchor.x + anchor.width / 2 - left, 0, 0],
           },
           motion,
         ]}>
+        {/* Settings → Liquid glass: the menu is glass. */}
+        {liquid && <GlassSurface radius={16} />}
         <View style={styles.clip}>{children}</View>
       </Animated.View>
     </Modal>

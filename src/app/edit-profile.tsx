@@ -14,6 +14,7 @@ import { Spacing } from '@/constants/theme';
 import { updateProfile } from '@/lib/api';
 import { USERNAME_PROVIDERS } from '@/lib/gaming';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 /** SteamID64 is exactly 17 digits — mirrors the CHECK constraint in 0002. */
 const STEAM_ID_PATTERN = /^[0-9]{17}$/;
@@ -56,6 +57,7 @@ export default function EditProfileScreen() {
       });
     },
     onSuccess: async () => {
+      toast.success('Profile saved');
       await refreshProfile();
       queryClient.invalidateQueries({ queryKey: ['profile', userId] });
       router.back();

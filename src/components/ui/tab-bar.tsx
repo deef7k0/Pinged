@@ -1,6 +1,6 @@
-import type Ionicons from '@expo/vector-icons/Ionicons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Platform, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -8,13 +8,9 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  withSequence,
   withSpring,
-  withTiming,
 } from 'react-native-reanimated';
 
-import { PaintGlyph, inkTransition } from '@/components/ui/paint-fill';
-import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import { Radius, Spacing, TapTarget, Type, withAlpha } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
@@ -57,7 +53,7 @@ export type TabBarProps<T extends string> = {
   /**
    * `spread` is the game page's: a taller track (its tabs are the page's main
    * control, 15 type). `start` and `center` are kept for their callers and
-   * draw the same thing — a segmented control always spans its row.
+   * draw the same thing — the bar always spans its row.
    */
   align?: 'start' | 'center' | 'spread';
   /**
@@ -67,53 +63,49 @@ export type TabBarProps<T extends string> = {
   inset?: number;
 };
 
-type Segment = { x: number; width: number };
+type Box = { x: number; width: number };
+
+/** reacticx's `PILL_SPRING`: the pill gliding to a tab. */
+const PILL_SPRING = { damping: 30, stiffness: 150, mass: 0.5 } as const;
+/** …and its press: the pill swelling by `PRESS_GROW` either side while held. */
+const PRESS_SPRING = { damping: 20, stiffness: 150, mass: 1 } as const;
+const PRESS_GROW = 4;
+/** The pill following a finger that has it: reacticx's follow spring, 220 / 24. */
+const FOLLOW_SPRING = { stiffness: 220, damping: 24, mass: 1 } as const;
+
+/** Between the track's edge and the pill — reacticx's 5. */
+const TRACK_PAD = 5;
 
 /**
- * reacticx's spring for the thumb: heavily overdamped, so it glides and lands
- * without a bounce (`organisms/segmented-control`, MIT).
- */
-const THUMB_SPRING = { stiffness: 80, damping: 90, mass: 1 } as const;
-
-/** A tap: the thumb swells to 1.3 over 350ms and wobbles back (reacticx's `triggerTapScale`). */
-const POP_SCALE = 1.3;
-const POP_MS = 350;
-const POP_RETURN = { stiffness: 10, damping: 5, mass: 0.8 } as const;
-/** Held for a scrub: 1.2, and back on release. */
-const SCRUB_SCALE = 1.2;
-
-/** Between the track's edge and the thumb (reacticx's 2dp margin). */
-const TRACK_PAD = 2;
-
-/**
- * The app's tabs — reacticx's segmented control (the owner's, 2026-11-02:
- * "Make the tabs in the app look like this", `organisms/segmented-control`,
- * read from its source). One implementation: every in-page tab row is this.
+ * The app's tabs — reacticx's masked tab bar (the owner's, 2026-11-04:
+ * "Replace the tabs in the app with this one", `organisms/masked-tab-bar`,
+ * MIT, read from its source). One implementation: every in-page tab row is
+ * this.
  *
- * - **A pill track with a thumb that slides along it.** The track is
- *   translucent (`segmentTrack`), the thumb solid (`segmentThumb`) with the
- *   reference's small shadow; on a game's page both come from its M3 scheme.
- *   The chosen label is the bright ink, the others the quiet one, so the
- *   choice survives without colour.
- * - **The thumb springs** on reacticx's overdamped spring to the chosen
- *   segment, and **a tap swells it** to 1.3 and lets it wobble back.
- * - **Drag along it to scrub** — the thumb grows, and the tab under the
- *   finger is chosen as it passes. Only when the row fits: a row that
- *   scrolls gives a sideways drag to the scroll.
- * - **Hairlines between segments**, faded out beside the thumb.
+ * **The row is drawn twice.** Once on the track, in the quiet ink; and again
+ * inside the pill, in the pill's own ink, shifted back by exactly as far as
+ * the pill has moved — so the pill is a window that shows the words in their
+ * chosen colour wherever it is, and as it slides from one tab to the next
+ * the words change colour *under its edge*, letter by letter, rather than all
+ * at once. Both copies are laid out by the same row at the same width, so
+ * they line up to the pixel.
  *
- * Two departures, each forced by this app rather than chosen:
+ * - **A tap** glides the pill to that tab (`PILL_SPRING`), and **a press
+ *   swells it** a little either side while the finger is down.
+ * - **Drag the pill** and it follows the finger on a spring, narrowing or
+ *   widening to whichever tab it is over, and settles on the nearest when
+ *   let go. Only along a row that fits: one wider than the phone scrolls,
+ *   and a sideways drag is the scroll's.
+ * - The pill is white with near-black words (`segmentPill`, the demo's), on
+ *   the translucent track; on a game's page, its Material 3 `primary` and
+ *   `onPrimary`, so the chosen tab is the game's colour.
  *
- * - **Segments are as wide as their words, sharing the slack.** reacticx's
- *   are equal, which needs every label to fit a sixth of a phone; Search has
- *   six scopes and "Collections" does not. When the row is wider than the
- *   screen it scrolls, the track with it, and the chosen tab is kept in view.
- * - **No blur flash on a tap.** reacticx sweeps an `expo-blur` view over the
- *   control; on Android a blur needs the page as its target, which a control
- *   inside the page cannot have (CLAUDE.md, gotchas), and would be a grey slab.
+ * Two departures, as with the control before it: tabs are as wide as their
+ * words, sharing the slack (Search's six scopes do not fit equal sixths), and
+ * a vertical drag over the row is always the page's — the drag is horizontal
+ * only (`activeOffsetX`, `failOffsetY`), where reacticx's starts on touch.
  *
- * It replaced SimpMusic's outlined chips with a poured `primary` fill
- * (2026-10-15 to 2026-11-02), so `<TabBar>` no longer pours (`<PaintFill>`).
+ * It replaced reacticx's segmented control (2026-11-02 to 2026-11-04).
  */
 export function TabBar<T extends string>({
   tabs,
@@ -132,8 +124,8 @@ export function TabBar<T extends string>({
 
   const { m3, tonal } = accent;
   const track = tonal ? withAlpha(m3.onSurface, 0.08) : theme.segmentTrack;
-  const thumb = tonal ? m3.secondaryContainer : theme.segmentThumb;
-  const onInk = tonal ? m3.onSecondaryContainer : theme.text;
+  const pill = tonal ? m3.primary : theme.segmentPill;
+  const onInk = tonal ? m3.onPrimary : theme.segmentPillInk;
   const offInk = tonal ? m3.onSurfaceVariant : theme.textSecondary;
 
   const spread = align === 'spread' && !iconOnly;
@@ -143,64 +135,82 @@ export function TabBar<T extends string>({
     tabs.findIndex((tab) => tab.key === value)
   );
 
-  /* Where each segment is, measured — the thumb goes to the chosen one. */
-  const [segments, setSegments] = useState<Record<number, Segment>>({});
+  /* Where each tab is in the row, measured — the pill goes to the chosen one. */
+  const [boxes, setBoxes] = useState<Record<number, Box>>({});
+  const [rowWidth, setRowWidth] = useState(0);
   const [viewport, setViewport] = useState(0);
   const [content, setContent] = useState(0);
   const overflows = content > viewport + 1;
 
-  const segmentsUi = useSharedValue<Segment[]>([]);
-  const thumbX = useSharedValue(0);
-  const thumbW = useSharedValue(0);
-  const thumbScale = useSharedValue(1);
+  const boxesUi = useSharedValue<Box[]>([]);
+  const rowWidthUi = useSharedValue(0);
+  const pillX = useSharedValue(0);
+  const pillW = useSharedValue(0);
+  const press = useSharedValue(0);
+  const grabbed = useSharedValue(false);
+  const grabOffset = useSharedValue(0);
+  const hovered = useSharedValue(-1);
   const placed = useSharedValue(false);
-  const scrubbing = useSharedValue(false);
 
-  const target = segments[selected];
+  const target = boxes[selected];
 
   useEffect(() => {
     if (!target) return;
+    if (grabbed.get()) return;
     if (!placed.get() || reduceMotion) {
-      thumbX.set(target.x);
-      thumbW.set(target.width);
+      pillX.set(target.x);
+      pillW.set(target.width);
       placed.set(true);
     } else {
-      thumbX.set(withSpring(target.x, THUMB_SPRING));
-      thumbW.set(withSpring(target.width, THUMB_SPRING));
+      pillX.set(withSpring(target.x, PILL_SPRING));
+      pillW.set(withSpring(target.width, PILL_SPRING));
     }
     /* Keep the chosen tab in view on a row that scrolls. */
     if (overflows) {
       scroller.current?.scrollTo({ x: Math.max(0, target.x - margin), animated: !reduceMotion });
     }
-  }, [target, reduceMotion, overflows, margin, placed, thumbX, thumbW]);
+  }, [target, reduceMotion, overflows, margin, placed, grabbed, pillX, pillW]);
 
-  const thumbStyle = useAnimatedStyle(() => {
+  /* The window: the pill, swelling while pressed. */
+  const clipStyle = useAnimatedStyle(() => {
     /* Read so a render re-applies the settled pose (`usePulse`). */
     pulse.get();
+    const grow = press.get() * PRESS_GROW;
     return {
       opacity: placed.get() ? 1 : 0,
-      width: thumbW.get(),
-      transform: [{ translateX: thumbX.get() }, { scale: thumbScale.get() }],
+      width: pillW.get() + grow * 2,
+      transform: [{ translateX: pillX.get() - grow }],
     };
+  });
+  /* The row inside it, shifted back so its words stand where the track's do. */
+  const innerStyle = useAnimatedStyle(() => {
+    pulse.get();
+    const grow = press.get() * PRESS_GROW;
+    return { transform: [{ translateX: -(pillX.get() - grow) }] };
   });
 
   /*
    * The measurements are kept in a ref as they arrive and copied into state
    * and the UI thread from the layout event itself. Never inside a `setState`
    * updater: React runs updaters while it renders, and writing a shared value
-   * there is Reanimated's "Writing to `value` during component render" — what
-   * the first build logged on every tab press.
+   * there is Reanimated's "Writing to `value` during component render".
    */
-  const measured = useRef<Record<number, Segment>>({});
+  const measured = useRef<Record<number, Box>>({});
 
   function measure(index: number, event: LayoutChangeEvent) {
     const { x, width } = event.nativeEvent.layout;
     const was = measured.current[index];
-    if (was && was.x === x && was.width === width) return;
+    if (was && Math.abs(was.x - x) < 0.5 && Math.abs(was.width - width) < 0.5) return;
     const next = { ...measured.current, [index]: { x, width } };
     measured.current = next;
-    segmentsUi.set(tabs.map((_, i) => next[i] ?? { x: 0, width: 0 }));
-    setSegments(next);
+    boxesUi.set(tabs.map((_, i) => next[i] ?? { x: 0, width: 0 }));
+    setBoxes(next);
+  }
+
+  function measureRow(event: LayoutChangeEvent) {
+    const width = event.nativeEvent.layout.width;
+    rowWidthUi.set(width);
+    setRowWidth(width);
   }
 
   function tick(style: Haptics.ImpactFeedbackStyle) {
@@ -208,129 +218,175 @@ export function TabBar<T extends string>({
     if (Platform.OS === 'ios') Haptics.impactAsync(style).catch(() => {});
   }
 
-  function press(index: number) {
+  function choose(index: number) {
     const tab = tabs[index];
     if (!tab) return;
-    if (tab.key !== value) onChange(tab.key);
-    if (!reduceMotion) {
-      thumbScale.set(
-        withSequence(withTiming(POP_SCALE, { duration: POP_MS }), withSpring(1, POP_RETURN))
-      );
+    if (tab.key !== value) {
+      onChange(tab.key);
+      tick(Haptics.ImpactFeedbackStyle.Light);
     }
-    tick(Haptics.ImpactFeedbackStyle.Medium);
   }
 
-  function scrubTo(index: number) {
-    const tab = tabs[index];
-    if (!tab || tab.key === value) return;
-    onChange(tab.key);
-    tick(Haptics.ImpactFeedbackStyle.Rigid);
+  /** Let go of a drag: the pill settles on the tab it is nearest. */
+  function settle(index: number) {
+    const box = boxes[index];
+    if (box) {
+      pillX.set(reduceMotion ? box.x : withSpring(box.x, PILL_SPRING));
+      pillW.set(reduceMotion ? box.width : withSpring(box.width, PILL_SPRING));
+    }
+    choose(index);
   }
 
   /*
-   * reacticx's scrub. Horizontal only (`activeOffsetX` and `failOffsetY`, not
-   * its `minDistance`): the row usually sits in a page that scrolls
-   * vertically, and a drag down the page must stay the page's.
+   * A tap: the pill swells while the finger is down, and glides to the tab
+   * under it. `onBegin` swells it, so a press answers at once.
    */
-  const scrub = Gesture.Pan()
-    .enabled(!overflows && tabs.length > 1)
-    .activeOffsetX([-10, 10])
-    .failOffsetY([-10, 10])
-    .onStart(() => {
+  const tap = Gesture.Tap()
+    .maxDistance(12)
+    .onBegin(() => {
       'worklet';
-      scrubbing.set(true);
-      if (!reduceMotion) thumbScale.set(withSpring(SCRUB_SCALE, { stiffness: 300, damping: 15 }));
+      if (!reduceMotion) press.set(withSpring(1, PRESS_SPRING));
     })
-    .onUpdate((event) => {
+    .onEnd((event) => {
       'worklet';
-      const list = segmentsUi.get();
-      /* Segments are measured in the track's own box, as the finger is. */
-      const x = event.x;
-      let index = list.length - 1;
+      const list = boxesUi.get();
       for (let i = 0; i < list.length; i++) {
-        if (x < list[i].x + list[i].width) {
-          index = i;
+        if (event.x >= list[i].x && event.x <= list[i].x + list[i].width) {
+          runOnJS(choose)(i);
           break;
         }
       }
-      if (index !== selected) runOnJS(scrubTo)(Math.max(0, index));
     })
     .onFinalize(() => {
       'worklet';
-      scrubbing.set(false);
-      thumbScale.set(withSpring(1, { stiffness: 200, damping: 20 }));
+      press.set(withSpring(0, PRESS_SPRING));
     });
 
-  const items = tabs.map((tab, index) => {
+  /* A drag of the pill: horizontal only, so a drag down the page stays the page's. */
+  const drag = Gesture.Pan()
+    .enabled(!overflows && tabs.length > 1)
+    .activeOffsetX([-8, 8])
+    .failOffsetY([-10, 10])
+    .onStart((event) => {
+      'worklet';
+      grabbed.set(true);
+      hovered.set(-1);
+      if (!reduceMotion) press.set(withSpring(1, PRESS_SPRING));
+      /* Grabbed where the finger is: on the pill, by its own offset; off it,
+         by its middle, so it jumps under the finger and carries on. */
+      const x = event.x - event.translationX;
+      const inside = x >= pillX.get() && x <= pillX.get() + pillW.get();
+      grabOffset.set(inside ? pillX.get() - x : -pillW.get() / 2);
+    })
+    .onUpdate((event) => {
+      'worklet';
+      const list = boxesUi.get();
+      const span = Math.max(0, rowWidthUi.get() - pillW.get());
+      const to = Math.min(span, Math.max(0, event.x + grabOffset.get()));
+      pillX.set(reduceMotion ? to : withSpring(to, FOLLOW_SPRING));
+      /* Narrow or widen to whichever tab the pill's middle is over. */
+      const middle = to + pillW.get() / 2;
+      let nearest = -1;
+      let best = Number.MAX_VALUE;
+      for (let i = 0; i < list.length; i++) {
+        const distance = Math.abs(list[i].x + list[i].width / 2 - middle);
+        if (distance < best) {
+          best = distance;
+          nearest = i;
+        }
+      }
+      if (nearest >= 0 && nearest !== hovered.get()) {
+        hovered.set(nearest);
+        pillW.set(
+          reduceMotion ? list[nearest].width : withSpring(list[nearest].width, PILL_SPRING)
+        );
+      }
+    })
+    .onFinalize(() => {
+      'worklet';
+      press.set(withSpring(0, PRESS_SPRING));
+      if (!grabbed.get()) return;
+      grabbed.set(false);
+      const list = boxesUi.get();
+      const middle = pillX.get() + pillW.get() / 2;
+      let nearest = -1;
+      let best = Number.MAX_VALUE;
+      for (let i = 0; i < list.length; i++) {
+        const distance = Math.abs(list[i].x + list[i].width / 2 - middle);
+        if (distance < best) {
+          best = distance;
+          nearest = i;
+        }
+      }
+      if (nearest >= 0) runOnJS(settle)(nearest);
+    });
+
+  const gesture = Gesture.Race(drag, tap);
+
+  /** One tab's words: the same in both copies, only the ink differs. */
+  function cell(tab: TabItem<T>, ink: string): ReactNode {
+    const showCount = tab.count != null && tab.count > 0;
+    return (
+      <>
+        {tab.icon && <Ionicons name={tab.icon} size={iconOnly ? 22 : 15} color={ink} />}
+        {!iconOnly && (
+          <Text style={[Type.tab, spread && styles.labelSpread, { color: ink }]} numberOfLines={1}>
+            {tab.label}
+          </Text>
+        )}
+        {!iconOnly &&
+          showCount &&
+          (tab.alert ? (
+            <View style={[styles.badge, { backgroundColor: theme.danger }]}>
+              {/* Dark on the red, 5.74:1; white is 3.36:1. */}
+              <Text variant="caption" style={{ color: readableInk(theme.danger) }}>
+                {tab.count! > 99 ? '99+' : tab.count}
+              </Text>
+            </View>
+          ) : (
+            <Text variant="caption" style={[styles.count, { color: withAlpha(ink, 0.72) }]}>
+              {tab.count}
+            </Text>
+          ))}
+      </>
+    );
+  }
+
+  const cellStyle = StyleSheet.flatten([
+    styles.cell,
+    spread && styles.cellSpread,
+    iconOnly && styles.cellIcon,
+  ]);
+
+  /* The track's copy: measured, and what a screen reader reads. */
+  const base = tabs.map((tab, index) => {
     const active = index === selected;
     const showCount = tab.count != null && tab.count > 0;
-    const ink = active ? onInk : offInk;
-    /* A hairline after this segment, gone beside the thumb (reacticx's `AnimatedDivider`). */
-    const divider = index < tabs.length - 1;
-    const dividerOn = index !== selected && index !== selected - 1;
-
     return (
-      <View key={tab.key} style={styles.cell} onLayout={(event) => measure(index, event)}>
-        <PressableScale
-          accessibilityRole="tab"
-          accessibilityState={{ selected: active }}
-          accessibilityLabel={showCount ? `${tab.label}, ${tab.count}` : tab.label}
-          accessibilityHint={`${index + 1} of ${tabs.length}`}
-          onPress={() => press(index)}
-          scaleTo={0.96}
-          focusRing={accent.ring}
-          style={StyleSheet.flatten([
-            styles.segment,
-            spread && styles.segmentSpread,
-            iconOnly && styles.segmentIcon,
-          ])}>
-          {tab.icon && <PaintGlyph name={tab.icon} size={iconOnly ? 22 : 15} color={ink} />}
-
-          {!iconOnly && (
-            <Animated.Text
-              style={[
-                Type.tab,
-                spread && styles.labelSpread,
-                { color: ink },
-                inkTransition(reduceMotion),
-              ]}
-              numberOfLines={1}>
-              {tab.label}
-            </Animated.Text>
-          )}
-
-          {!iconOnly &&
-            showCount &&
-            (tab.alert ? (
-              <View style={[styles.badge, { backgroundColor: theme.danger }]}>
-                {/* Dark on the red, 5.74:1; white is 3.36:1. */}
-                <Text variant="caption" style={{ color: readableInk(theme.danger) }}>
-                  {tab.count! > 99 ? '99+' : tab.count}
-                </Text>
-              </View>
-            ) : (
-              <Text variant="caption" style={[styles.count, { color: withAlpha(ink, 0.72) }]}>
-                {tab.count}
-              </Text>
-            ))}
-        </PressableScale>
-        {divider && (
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.divider,
-              {
-                backgroundColor: withAlpha(offInk, 0.28),
-                opacity: dividerOn ? 1 : 0,
-                transitionProperty: 'opacity',
-                transitionDuration: reduceMotion ? 0 : 200,
-              },
-            ]}
-          />
-        )}
+      <View
+        key={tab.key}
+        style={cellStyle}
+        onLayout={(event) => measure(index, event)}
+        accessible
+        accessibilityRole="tab"
+        accessibilityState={{ selected: active }}
+        accessibilityLabel={showCount ? `${tab.label}, ${tab.count}` : tab.label}
+        accessibilityHint={`${index + 1} of ${tabs.length}`}
+        accessibilityActions={[{ name: 'activate' }]}
+        onAccessibilityAction={() => choose(index)}>
+        {cell(tab, offInk)}
       </View>
     );
   });
+
+  /* The pill's copy: the same row, in the chosen ink, never touched or read. */
+  const lit = tabs.map((tab) => (
+    <View key={tab.key} style={cellStyle}>
+      {cell(tab, onInk)}
+    </View>
+  ));
+
+  const radius = Radius.pill;
 
   return (
     <ScrollView
@@ -348,30 +404,27 @@ export function TabBar<T extends string>({
       onLayout={(event) => setViewport(event.nativeEvent.layout.width)}
       onContentSizeChange={(width) => setContent(width)}
       contentContainerStyle={[styles.content, { paddingHorizontal: margin }]}>
-      <GestureDetector gesture={scrub}>
-        <View
-          style={[
-            styles.track,
-            { backgroundColor: track, borderRadius: Radius.pill, padding: TRACK_PAD },
-          ]}>
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.thumb,
-              {
-                top: TRACK_PAD,
-                bottom: TRACK_PAD,
-                /* A segment's x is measured from the track's edge, padding included. */
-                left: 0,
-                backgroundColor: thumb,
-                borderRadius: Radius.pill,
-              },
-              thumbStyle,
-            ]}
-          />
-          {items}
-        </View>
-      </GestureDetector>
+      <View
+        style={[
+          styles.track,
+          { backgroundColor: track, borderRadius: radius, padding: TRACK_PAD },
+        ]}>
+        <GestureDetector gesture={gesture}>
+          <View style={styles.list} onLayout={measureRow}>
+            <View style={styles.row}>{base}</View>
+
+            <Animated.View
+              pointerEvents="none"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={[styles.clip, { backgroundColor: pill, borderRadius: radius }, clipStyle]}>
+              <Animated.View style={[styles.row, { width: rowWidth }, innerStyle]}>
+                {lit}
+              </Animated.View>
+            </Animated.View>
+          </View>
+        </GestureDetector>
+      </View>
     </ScrollView>
   );
 }
@@ -380,38 +433,24 @@ const styles = StyleSheet.create({
   scroller: { flexGrow: 0 },
   /* At least the viewport, so a row that fits spans it and one that does not scrolls. */
   content: { flexGrow: 1, paddingVertical: Spacing.x8 },
-  track: { flexGrow: 1, flexDirection: 'row', alignItems: 'stretch' },
-  /* reacticx's `SHADOW` (0 2 2.62, black 23%) as a box shadow: elevation would
-     lift the thumb over the labels on Android. */
-  thumb: {
-    position: 'absolute',
-    boxShadow: '0px 2px 2.62px rgba(0, 0, 0, 0.23)',
-  },
-  /* Every cell grows by the same share of the slack, from its own word's width. */
-  cell: { flexGrow: 1, justifyContent: 'center' },
-  segment: {
+  track: { flexGrow: 1, overflow: 'hidden' },
+  list: { flexGrow: 1, justifyContent: 'center' },
+  row: { flexDirection: 'row', alignItems: 'stretch' },
+  /* The pill: as tall as the row, moved and sized on the UI thread. */
+  clip: { position: 'absolute', left: 0, top: 0, bottom: 0, overflow: 'hidden' },
+  /* Every tab grows by the same share of the slack, from its own words' width. */
+  cell: {
     flexGrow: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.x8,
-    /* reacticx's demo: 8.5 above and below, 5 at the sides — wider here,
-       because these segments are as wide as their words. */
-    paddingVertical: 8.5,
-    paddingHorizontal: Spacing.x12,
-    minHeight: 36,
+    paddingHorizontal: 14,
+    minHeight: 34,
   },
-  segmentSpread: { minHeight: 40, paddingVertical: Spacing.x8 },
-  segmentIcon: { minHeight: TapTarget - TRACK_PAD * 2, paddingHorizontal: Spacing.x8 },
+  cellSpread: { minHeight: 38 },
+  cellIcon: { minHeight: TapTarget - TRACK_PAD * 2, paddingHorizontal: Spacing.x8 },
   labelSpread: { fontSize: 15, lineHeight: 20 },
-  /* On the cell's trailing edge, out of the layout, so a cell is its segment. */
-  divider: {
-    position: 'absolute',
-    right: 0,
-    top: '25%',
-    bottom: '25%',
-    width: StyleSheet.hairlineWidth * 2,
-  },
   count: { letterSpacing: 0.3 },
   badge: {
     minWidth: 18,

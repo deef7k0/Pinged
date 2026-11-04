@@ -25,6 +25,7 @@ import {
 } from '@/lib/api';
 import { displayNameFor, timeAgo } from '@/lib/format';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 /** A top-level comment with its replies nested one level deep. */
 type Thread = { comment: CommentWithAuthor; replies: CommentWithAuthor[] };
@@ -104,7 +105,10 @@ export default function CommentsScreen() {
       if (!userId) throw new Error('You must be signed in.');
       await deleteComment(userId, commentId);
     },
-    onSuccess: invalidate,
+    onSuccess: () => {
+      toast.success('Comment deleted');
+      return invalidate();
+    },
   });
 
   if (comments.isLoading) {

@@ -33,6 +33,7 @@ import {
   PING_REFERENCE_MAX,
 } from '@/lib/pings';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 /**
  * Ask the community for a game — or edit what you asked (`?edit=<id>`).
@@ -147,6 +148,7 @@ function PingForm({ existing }: { existing: PingFeedRow | null }) {
       return createPing(userId, draft);
     },
     onSuccess: (id) => {
+      toast.success('Your request is posted');
       void queryClient.invalidateQueries({ queryKey: ['pings'] });
       void queryClient.invalidateQueries({ queryKey: ['ping', id] });
       if (existing) {

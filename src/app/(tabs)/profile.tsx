@@ -8,12 +8,13 @@ import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanim
 
 import { ProfileActionRow, ProfileButton, ProfileKey } from '@/components/profile-actions';
 import { ProfileView } from '@/components/profile-view';
+import { GlassSurface, useLiquidGlass } from '@/components/ui/liquid-glass';
 import { HeaderFade } from '@/components/ui/frosted-top-bar';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
 import { PROFILE_MARGIN } from '@/constants/profile-layout';
-import { Elevation, Motion, Radius, Spacing, TapTarget } from '@/constants/theme';
+import { Elevation, Motion, Radius, Spacing, TapTarget, withAlpha } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
 import { getProfile } from '@/lib/api';
@@ -45,6 +46,7 @@ import type { QuickLogMode } from '@/app/quick-log';
 export default function MyProfileScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const liquid = useLiquidGlass();
   const accent = useAccent();
   const reduceMotion = useReducedMotion();
   const userId = useAuth((state) => state.session?.user.id);
@@ -95,37 +97,50 @@ export default function MyProfileScreen() {
         onLayout={(event) =>
           setBarBottom(event.nativeEvent.layout.y + event.nativeEvent.layout.height)
         }>
-        <PressableScale
-          accessibilityRole="button"
-          accessibilityLabel="Log or review a game"
-          accessibilityState={{ expanded: menuOpen }}
-          onPress={() => setMenuOpen((open) => !open)}
-          scaleTo={0.92}
-          pressedColor={theme.controlPressed}
-          focusRing={accent.ring}
-          style={StyleSheet.flatten([
-            styles.key,
-            { backgroundColor: menuOpen ? theme.controlPressed : theme.controlFill },
-          ])}>
-          <Ionicons name="add" size={24} color={theme.text} />
-        </PressableScale>
+        {/* The tab's name, large at the top left — Apple TV's (the owner's
+            references, 2026-11-03) — with your handle under it, where the
+            bar carried it, so the head below gives its line to your name
+            alone. The keys at the right: + and Settings. */}
+        <View style={styles.title}>
+          <Text variant="largeTitle" accessibilityRole="header">
+            Profile
+          </Text>
+          {!!handle && (
+            <Text variant="body" color="textSecondary" numberOfLines={1}>
+              {profile.data?.username ? `@${handle}` : handle}
+            </Text>
+          )}
+        </View>
+        {/* + and Settings in one capsule — a connected bar, as every page's
+            right-hand controls are (the owner's, 2026-11-03). */}
+        <View style={[styles.keys, { backgroundColor: liquid ? undefined : theme.controlFill }]}>
+          {liquid && <GlassSurface radius={TapTarget / 2 + 2} />}
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel="Log or review a game"
+            accessibilityState={{ expanded: menuOpen }}
+            onPress={() => setMenuOpen((open) => !open)}
+            scaleTo={0.92}
+            pressedColor={theme.controlPressed}
+            focusRing={accent.ring}
+            style={StyleSheet.flatten([
+              styles.key,
+              { backgroundColor: menuOpen ? theme.controlPressed : withAlpha(theme.text, 0) },
+            ])}>
+            <Ionicons name="add" size={24} color={theme.text} />
+          </PressableScale>
 
-        {/* The handle, as Instagram's bar carries it — so the header below can
-            give its line to your name alone. */}
-        <Text variant="h3" numberOfLines={1} style={styles.title} accessibilityRole="header">
-          {handle}
-        </Text>
-
-        <PressableScale
-          accessibilityRole="button"
-          accessibilityLabel="Settings"
-          onPress={() => router.push('/settings')}
-          scaleTo={0.92}
-          pressedColor={theme.controlPressed}
-          focusRing={accent.ring}
-          style={StyleSheet.flatten([styles.key, { backgroundColor: theme.controlFill }])}>
-          <Ionicons name="settings-outline" size={20} color={theme.text} />
-        </PressableScale>
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+            onPress={() => router.push('/settings')}
+            scaleTo={0.92}
+            pressedColor={theme.controlPressed}
+            focusRing={accent.ring}
+            style={StyleSheet.flatten([styles.key, { backgroundColor: withAlpha(theme.text, 0) }])}>
+            <Ionicons name="settings-outline" size={20} color={theme.text} />
+          </PressableScale>
+        </View>
       </View>
 
       {/* The profile under its row, dissolving into it as it scrolls —
@@ -242,6 +257,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: PROFILE_MARGIN,
     paddingTop: Spacing.x8,
   },
+  keys: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 2,
+    borderRadius: TapTarget / 2 + 2,
+  },
   key: {
     width: TapTarget,
     height: TapTarget,
@@ -249,10 +270,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { flex: 1, textAlign: 'center' },
+  title: { flex: 1 },
   menu: {
     position: 'absolute',
-    left: PROFILE_MARGIN,
+    right: PROFILE_MARGIN,
     minWidth: 240,
     paddingVertical: Spacing.x8,
     borderRadius: Radius.card,

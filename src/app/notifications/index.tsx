@@ -32,6 +32,7 @@ import { displayNameFor, timeAgo } from '@/lib/format';
 import { DIRECT_PING_VERB, directPingRoute } from '@/lib/pings';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 type InboxTab = 'pings' | 'notifications';
 
@@ -163,7 +164,10 @@ function PingsList({
 
   const markAll = useMutation({
     mutationFn: () => markAllPingsRead(userId!),
-    onSuccess: refresh,
+    onSuccess: () => {
+      toast.success('All marked as read');
+      return refresh();
+    },
   });
 
   const open = useCallback(

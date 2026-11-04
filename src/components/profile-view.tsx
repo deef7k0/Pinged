@@ -61,6 +61,7 @@ import { hasWriting } from '@/lib/review-quote';
 import { useGamingSync, useLinkedAccount } from '@/hooks/use-gaming';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 type ProfileTab = 'reviews' | 'lists' | 'wall' | 'steam';
 
@@ -300,7 +301,14 @@ export function ProfileView({ profileId, headerAction }: ProfileViewProps) {
       else if (action === 'accept') await acceptFriendRequest(viewerId, profileId);
       else await removeFriendship(viewerId, profileId);
     },
-    onSuccess: () => {
+    onSuccess: (_result, action) => {
+      toast.success(
+        action === 'request'
+          ? 'Friend request sent'
+          : action === 'accept'
+            ? 'You’re friends now'
+            : 'Friend removed'
+      );
       queryClient.invalidateQueries({ queryKey: ['friend-state', viewerId, profileId] });
       queryClient.invalidateQueries({ queryKey: ['wall', profileId] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
@@ -628,7 +636,12 @@ export function ProfileView({ profileId, headerAction }: ProfileViewProps) {
       </View>
 
       {/* The four they chose — under a hairline, not in a card. */}
-      <FavoritesWidget items={favoriteItems} listId={favorites.data?.id} isSelf={isSelf} />
+      <FavoritesWidget
+        items={favoriteItems}
+        listId={favorites.data?.id}
+        isSelf={isSelf}
+        profileId={profileId}
+      />
 
       {/* One shelf for both sources — their logs and their Steam games — as
           four covers, drawn as the favourites are. */}

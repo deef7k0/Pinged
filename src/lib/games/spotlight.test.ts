@@ -9,6 +9,8 @@ import {
   monthLabel,
   pickAwaited,
   pickFresh,
+  pickPortraits,
+  PORTRAITS,
   releaseDaysOf,
   usableArt,
   type SpotlightCandidate,
@@ -191,5 +193,53 @@ describe('the days the calendar slide lights', () => {
       NOW
     );
     assert.deepEqual(days, [6, 23]);
+  });
+});
+
+describe('Explore’s portraits', () => {
+  it('take the biggest just out, with or without landscape art, then the most awaited', () => {
+    const window = [
+      game('small', utc(2026, 10, 2), { hypes: 1, artAspect: null }),
+      game('big', utc(2026, 10, 3), { hypes: 90, artAspect: 2 / 3 }),
+      game('last-month', utc(2026, 9, 20), { hypes: 200 }),
+      game('later-this-month', utc(2026, 10, 20), { hypes: 500 }),
+    ];
+    const ahead = [
+      game('gta', utc(2026, 11, 19), { hypes: 900 }),
+      game('later-this-month', utc(2026, 10, 20), { hypes: 500 }),
+      game('quiet', utc(2027, 2, 1), { hypes: 2 }),
+    ];
+    const { fresh, awaited } = pickPortraits(window, ahead, NOW);
+    assert.deepEqual(
+      fresh.map((entry) => entry.id),
+      ['big', 'small', 'last-month']
+    );
+    assert.deepEqual(
+      awaited.map((entry) => entry.id),
+      ['gta', 'later-this-month', 'quiet']
+    );
+  });
+
+  it('never repeat a game, and stop at their counts', () => {
+    const many = Array.from({ length: 12 }, (_, index) =>
+      game(`g${index}`, utc(2026, 10, 1 + (index % 8)), { hypes: index })
+    );
+    const ahead = Array.from({ length: 6 }, (_, index) =>
+      game(`a${index}`, utc(2027, 1, 1 + index), { hypes: 100 - index })
+    );
+    const { fresh, awaited } = pickPortraits(many, ahead, NOW);
+    assert.equal(fresh.length, PORTRAITS.fresh);
+    assert.equal(awaited.length, PORTRAITS.awaited);
+    const ids = [...fresh, ...awaited].map((entry) => entry.id);
+    assert.equal(new Set(ids).size, ids.length);
+  });
+
+  it('leave out a date known only to the month', () => {
+    const { fresh } = pickPortraits(
+      [game('vague', utc(2026, 10, 1), { precision: 'month' })],
+      [],
+      NOW
+    );
+    assert.equal(fresh.length, 0);
   });
 });

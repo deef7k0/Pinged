@@ -1,9 +1,11 @@
 import { Image } from 'expo-image';
 import { memo, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { runOnJS, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 
 import { MustPlayCorner } from '@/components/must-play-badge';
+import { openCoverZoom, useCoverZoomed } from '@/components/ui/cover-zoom';
 import { Text } from '@/components/ui/text';
 import { editionLabel, type EditionKind } from '@/constants/game-editions';
 import { Elevation, PosterAspectRatio, Radius, Spacing, withAlpha } from '@/constants/theme';
@@ -141,7 +143,18 @@ export type PosterProps = {
    * studio grid, below its banner. Omitted, it is expo-image's own `normal`.
    */
   priority?: 'low' | 'normal' | 'high';
+  /**
+   * Whether holding the cover lifts it to the middle of the screen
+   * (`<CoverZoomHost>`, reacticx's matched geometry — the owner's,
+   * 2026-11-04). On by default: every cover in the app. Off where a hold
+   * already means something else — choosing games to remove from a
+   * collection, taking a Must Play label off.
+   */
+  zoomable?: boolean;
 };
+
+/** How long a cover is held before it lifts — under a Pressable's own 500. */
+const LIFT_HOLD_MS = 380;
 
 /**
  * Portrait game artwork at a fixed 2:3 ratio.
@@ -176,8 +189,14 @@ export const Poster = memo(function Poster({
   steamAppId = null,
   parallax = null,
   priority,
+  zoomable = true,
 }: PosterProps) {
   const theme = useTheme();
+  /* The frame, held in state rather than a ref: the hold's gesture is built
+     while rendering, and the React Compiler refuses a ref read there. */
+  const [frame, setFrame] = useState<View | null>(null);
+  const [token] = useState(() => ({}));
+  const lifted = useCoverZoomed(token);
   const steam = useSteamArtwork(steamAppId);
   const mustPlay = useGameLabel(gameId, 'must_play') && width >= MUST_PLAY_MIN_WIDTH;
   const [steamFailed, setSteamFailed] = useState(false);
@@ -200,6 +219,25 @@ export const Poster = memo(function Poster({
    */
   const steamSource = steam && !steamFailed ? steam.library : null;
   const source = steamSource ?? coverUrl ?? heroUrl ?? null;
+  const cacheKey = `poster-${steamAppId ?? title ?? source}`;
+
+  /* Held, the cover lifts out of its place (`<CoverZoomHost>`): measured in
+     the window, and hidden here until it lands back. A hold that lifts it
+     cancels the press of whatever it is in, so it does not also open. */
+  const lift = () => {
+    if (!source) return;
+    frame?.measureInWindow((x, y, w, h) => {
+      if (!(w > 0 && h > 0)) return;
+      openCoverZoom({ token, uri: source, cacheKey, x, y, width: w, height: h, radius, title });
+    });
+  };
+  const hold = Gesture.LongPress()
+    .enabled(zoomable && !!source)
+    .minDuration(LIFT_HOLD_MS)
+    .onStart(() => {
+      'worklet';
+      runOnJS(lift)();
+    });
 
   const art = source ? (
     <Image
@@ -209,7 +247,7 @@ export const Poster = memo(function Poster({
          `recyclingKey` tells expo-image to drop the previous bitmap when
          a recycled row shows a different game, which is what stops the
          wrong cover flashing in a fast scroll. */
-      source={{ uri: source, cacheKey: `poster-${steamAppId ?? title ?? source}` }}
+      source={{ uri: source, cacheKey }}
       recyclingKey={steamAppId ?? coverUrl ?? title ?? undefined}
       style={styles.image}
       cachePolicy="memory-disk"
@@ -245,31 +283,36 @@ export const Poster = memo(function Poster({
    * one tile in a rail.
    */
   return (
-    <View
-      style={[
-        { width, borderRadius: radius, backgroundColor: theme.surfaceElevated },
-        // `flex: 1` rather than a computed height — the parent row's stretch
-        // supplies it. See `fillHeight`.
-        fillHeight ? styles.fill : { height },
-        elevated ? Elevation.raised : Elevation.card,
-      ]}>
-      <View style={[styles.clip, { borderRadius: radius }]}>
-        {/* The badge below is a *sibling* of this, not a child, which is the
+    <GestureDetector gesture={hold}>
+      <View
+        ref={setFrame}
+        collapsable={false}
+        style={[
+          { width, borderRadius: radius, backgroundColor: theme.surfaceElevated },
+          // `flex: 1` rather than a computed height — the parent row's stretch
+          // supplies it. See `fillHeight`.
+          fillHeight ? styles.fill : { height },
+          elevated ? Elevation.raised : Elevation.card,
+          /* Lifted: its copy is in the middle of the screen. */
+          lifted && styles.lifted,
+        ]}>
+        <View style={[styles.clip, { borderRadius: radius }]}>
+          {/* The badge below is a *sibling* of this, not a child, which is the
             whole reason the parallax lives here rather than on the frame: the
             artwork slides and the label pinned to the corner does not. Move
             the badge inside and it drifts off the corner it is anchored to. */}
-        {parallax && source ? (
-          <DriftingArtwork drift={parallax} overscan={overscan}>
-            {art}
-          </DriftingArtwork>
-        ) : (
-          /* `source &&`, because the fallback is a centred letter on a flat
+          {parallax && source ? (
+            <DriftingArtwork drift={parallax} overscan={overscan}>
+              {art}
+            </DriftingArtwork>
+          ) : (
+            /* `source &&`, because the fallback is a centred letter on a flat
              fill: there is nothing behind the window to see a different part
              of, and sliding it would read as a layout bug rather than depth. */
-          art
-        )}
+            art
+          )}
 
-        {/*
+          {/*
           Inside the clip, so the badge's corner follows the artwork's.
 
           Near-black at 82%, with white type — not a hue. Two rules meet here
@@ -280,17 +323,17 @@ export const Poster = memo(function Poster({
           where the word is already the answer. Ink this dark reads over a white
           cover and a black one alike, which no tint does.
         */}
-        {badge && (
-          <View
-            style={[styles.badge, { backgroundColor: withAlpha(theme.shadowInk, 0.82) }]}
-            pointerEvents="none">
-            <Text variant="label" style={{ color: theme.white }} numberOfLines={1}>
-              {badge}
-            </Text>
-          </View>
-        )}
+          {badge && (
+            <View
+              style={[styles.badge, { backgroundColor: withAlpha(theme.shadowInk, 0.82) }]}
+              pointerEvents="none">
+              <Text variant="label" style={{ color: theme.white }} numberOfLines={1}>
+                {badge}
+              </Text>
+            </View>
+          )}
 
-        {/*
+          {/*
           The Must Play wedge, filling the corner the edition word is not in.
 
           A sibling of the artwork like the word above, so it stays put while a
@@ -300,22 +343,23 @@ export const Poster = memo(function Poster({
           moderator's label is data about the game, drawn as a mark in a corner
           rather than as a tint on the art.
         */}
-        {mustPlay && (
-          <View style={styles.mustPlay} pointerEvents="none">
-            <MustPlayCorner
-              size={Math.round(
-                Math.min(MUST_PLAY_MAX, Math.max(MUST_PLAY_MIN, width * MUST_PLAY_RATIO))
-              )}
-            />
-          </View>
-        )}
+          {mustPlay && (
+            <View style={styles.mustPlay} pointerEvents="none">
+              <MustPlayCorner
+                size={Math.round(
+                  Math.min(MUST_PLAY_MAX, Math.max(MUST_PLAY_MIN, width * MUST_PLAY_RATIO))
+                )}
+              />
+            </View>
+          )}
 
-        {/* No edge over the art. Every portrait wore a hairline of cool white
+          {/* No edge over the art. Every portrait wore a hairline of cool white
             inside its corner for a while (`coverEdge`); the owner had it
             removed (2026-10-14). Do not draw one again, here or round a
             `<Poster>`. */}
+        </View>
       </View>
-    </View>
+    </GestureDetector>
   );
 });
 
@@ -362,6 +406,7 @@ function DriftingArtwork({
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  lifted: { opacity: 0 },
   /* Absolute rather than laid out, so widening it by the overscan cannot push
      the badge or change the frame's own size — the frame's dimensions are set
      by `width` and the aspect ratio, and this hangs off both edges of it. */

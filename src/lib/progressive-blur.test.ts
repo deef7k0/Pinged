@@ -3,12 +3,20 @@ import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
 
 import {
+  blurStart,
+  COVER_FRONT_KNEE,
+  coverFrontDrop,
+  droppedRow,
+  heroExtension,
+  kneeDrop,
+  TITLELESS_KNEE,
   PROGRESSIVE_BLUR,
   TAIL,
   blurShader,
   blurSourceUri,
   coverRect,
   footBlurPt,
+  footFade,
   heroBlurPt,
   heroWash,
   washStops,
@@ -68,9 +76,9 @@ describe('the shader', () => {
       const names = Array.from({ length: effect.getUniformCount() }, (_, i) =>
         effect.getUniformName(i)
       );
-      assert.deepEqual(names, ['size', 'side', 'pxPerPt', 'progress']);
+      assert.deepEqual(names, ['size', 'side', 'pxPerPt', 'progress', 'drop', 'slide']);
       /* One child, which an image filter feeds with the layer under it. */
-      assert.equal(effect.getUniformFloatCount(), 5);
+      assert.equal(effect.getUniformFloatCount(), 7);
       effect.delete();
     }
   });
@@ -105,13 +113,13 @@ describe('the art it is drawn over', () => {
 });
 
 describe('the mirrored tail and the wash — Convx’s artist page', () => {
-  const { artworkExtent, heroExtent, knee, washFrom, washTo, fadeIn } = PROGRESSIVE_BLUR;
+  const { artworkExtent, heroExtent, knee, washFrom, washTo } = PROGRESSIVE_BLUR;
 
-  it('is Convx’s geometry: the artwork 405/393 of a side, the hero 495/393', () => {
+  it('is Convx’s artwork, 405/393 of a side, and the owner’s longer hero, 585/393', () => {
     assert.ok(Math.abs(artworkExtent * 393 - 405) < 1e-9);
-    assert.ok(Math.abs(heroExtent * 393 - 495) < 1e-9);
-    /* So the tail is 90/405 of the art: about a fifth. */
-    assert.ok(Math.abs(TAIL - 90 / 405) < 1e-12);
+    assert.ok(Math.abs(heroExtent * 393 - 585) < 1e-9);
+    /* So the tail is 180/405 of the art: twice Convx's fifth. */
+    assert.ok(Math.abs(TAIL - 180 / 405) < 1e-12);
   });
 
   it('begins the wash where the blur begins, to the thousandth, as Convx’s does', () => {
@@ -124,9 +132,9 @@ describe('the mirrored tail and the wash — Convx’s artist page', () => {
     assert.equal(heroWash(knee - 0.01), 0, 'the art is untouched above the blur');
   });
 
-  it('leaves about two fifths of the art at its own foot, for the tail to carry on', () => {
+  it('leaves most of the art at its own foot, for the longer tail to carry on', () => {
     const left = 1 - heroWash(artworkExtent);
-    assert.ok(left > 0.3 && left < 0.45, `${left}`);
+    assert.ok(left > 0.55 && left < 0.75, `${left}`);
   });
 
   /* Convx's own test (ArtistFootBlurTest.kt): no jump, no break in slope. */
@@ -158,9 +166,117 @@ describe('the mirrored tail and the wash — Convx’s artist page', () => {
   it('is never seen sharp: the blur is whole before the art’s foot, and heavy in the tail', () => {
     /* The row where the blurred copy has fully faded in. */
     let whole = knee;
-    while (footBlurPt(whole) < fadeIn) whole += 0.0005;
+    while (footFade(whole) < 1) whole += 0.0005;
     assert.ok(whole < artworkExtent, `whole at ${whole}, the foot at ${artworkExtent}`);
     assert.ok(footBlurPt(artworkExtent) > 15, 'at the reflection’s first row');
     assert.equal(footBlurPt(heroExtent), 48, 'and at its last');
+  });
+});
+
+describe('the blur’s top edge — a gradient, not a line', () => {
+  const { knee, longKnee, fadeSpan } = PROGRESSIVE_BLUR;
+
+  it('starts at the knee and ends a fadeSpan under it, for both heroes', () => {
+    for (const k of [knee, longKnee]) {
+      assert.equal(footFade(k, k), 0);
+      assert.equal(footFade(k - 0.05, k), 0, 'nothing above the knee');
+      assert.ok(footFade(k + fadeSpan + 1e-9, k) === 1);
+    }
+  });
+
+  it('has no slope at either end and no jump between', () => {
+    const step = 0.0005;
+    assert.ok(footFade(knee + step) < 1e-6, 'eases out of nothing');
+    assert.ok(1 - footFade(knee + fadeSpan - step) < 1e-6, 'eases into whole');
+    for (let f = knee; f <= knee + fadeSpan; f += step) {
+      assert.ok(footFade(f + step) - footFade(f) < 0.006, `jump at ${f}`);
+    }
+  });
+
+  it('is longer than the old radius-led fade, which was whole at 7.5pt', () => {
+    let old = knee;
+    while (footBlurPt(old) < 7.5) old += 0.0005;
+    assert.ok(knee + fadeSpan > old + 0.04, `${knee + fadeSpan} against ${old}`);
+  });
+});
+
+describe('where the blur begins', () => {
+  it('is Convx’s knee, in sides of the art', () => {
+    assert.ok(Math.abs(blurStart(405) - 0.78 * 393) < 1e-9);
+    assert.ok(Math.abs(blurStart(540) - 408.7) < 0.1);
+  });
+});
+
+describe('the long hero — the game page’s and a studio’s', () => {
+  const { knee, longKnee, longWashFrom, washTo } = PROGRESSIVE_BLUR;
+
+  it('is already well blurred where the title stands, Convx’s knee', () => {
+    assert.ok(footBlurPt(knee, longKnee) > 10, `${footBlurPt(knee, longKnee)}`);
+    assert.equal(footBlurPt(knee), 0, 'where the short hero has only begun');
+  });
+
+  it('starts its wash a little under its blur, and is page colour by its foot', () => {
+    assert.ok(longWashFrom > longKnee && longWashFrom < knee);
+    assert.equal(heroWash(longWashFrom - 0.01, longWashFrom), 0);
+    assert.ok(heroWash(knee, longWashFrom) > 0.1, 'rising behind the title');
+    assert.equal(heroWash(washTo, longWashFrom), 1);
+  });
+
+  it('drops to just above the cover’s foot when the cover is in front', () => {
+    const drop = coverFrontDrop(longKnee);
+    assert.ok(longKnee + drop > 0.9 && longKnee + drop < PROGRESSIVE_BLUR.artworkExtent);
+    assert.equal(coverFrontDrop(2), 0);
+  });
+
+  it('stands near the cover’s foot with the title off — under the cover in front', () => {
+    const at = longKnee + kneeDrop(longKnee, TITLELESS_KNEE);
+    assert.ok(at > 0.84 && at < COVER_FRONT_KNEE, `${at}`);
+    assert.equal(kneeDrop(1, 0.5), 0);
+  });
+
+  it('moves the foot, never the climb, when it drops', () => {
+    assert.match(blurShader('vertical'), /climbPt\(c\.y \/ side\)/);
+  });
+
+  it('starts lower when dropped, and is as heavy as ever at the cover’s foot and in its tail', () => {
+    const drop = kneeDrop(longKnee, TITLELESS_KNEE);
+    const foot = PROGRESSIVE_BLUR.artworkExtent;
+    /* Nothing above the new start… */
+    assert.equal(footBlurPt(droppedRow(TITLELESS_KNEE - 0.01, longKnee, drop), longKnee), 0);
+    /* …the full weight at the foot, and the tail untouched. */
+    assert.ok(Math.abs(droppedRow(foot, longKnee, drop) - foot) < 1e-9);
+    assert.equal(droppedRow(1.2, longKnee, drop), 1.2);
+    assert.ok(footBlurPt(droppedRow(foot - 0.001, longKnee, drop), longKnee) > 40);
+    assert.ok(footFade(droppedRow(foot - 0.001, longKnee, drop), longKnee) > 0.999);
+    /* With no drop it is the plain curve. */
+    assert.ok(Math.abs(droppedRow(0.9, longKnee, 0) - 0.9) < 1e-9);
+    /* Never backwards. */
+    let previous = -Infinity;
+    for (let f = 0; f <= 1.4; f += 0.001) {
+      const row = droppedRow(f, longKnee, drop);
+      assert.ok(row >= previous);
+      previous = row;
+    }
+  });
+
+  it('compiles with its own knee', () => {
+    assert.ok(blurShader('vertical', longKnee).includes(`${longKnee}`));
+  });
+});
+
+describe('the tail running on under low words', () => {
+  it('is nothing while the words end above the whole wash, and reaches them when they do not', () => {
+    const art = 480;
+    const side = art / PROGRESSIVE_BLUR.artworkExtent;
+    assert.equal(heroExtension(art, side * 1.2), 0);
+    const extend = heroExtension(art, side * 1.6);
+    assert.ok(Math.abs(PROGRESSIVE_BLUR.washTo + extend - 1.6) < 1e-9);
+    assert.equal(heroExtension(0, 500), 0);
+  });
+
+  it('keeps the wash whole by the tail’s end, however far it runs', () => {
+    const stops = washStops(PROGRESSIVE_BLUR.longWashFrom, 0.3);
+    assert.equal(stops.alphas[stops.alphas.length - 1], 1);
+    assert.equal(stops.alphas[0], 0);
   });
 });

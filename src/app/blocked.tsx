@@ -14,6 +14,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { getBlockedProfiles, unblockUser, type BlockedProfile } from '@/lib/api';
 import { displayNameFor, timeAgo } from '@/lib/format';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 /**
  * The people you blocked (0045), from Settings, each with Unblock. Blocking
@@ -64,7 +65,10 @@ function BlockedRow({ person }: { person: BlockedProfile }) {
   const name = displayNameFor(person);
   const unblock = useMutation({
     mutationFn: () => unblockUser(person.id),
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => {
+      toast.success('Unblocked');
+      return queryClient.invalidateQueries();
+    },
   });
 
   return (

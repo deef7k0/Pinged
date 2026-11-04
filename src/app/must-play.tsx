@@ -19,6 +19,7 @@ import { useHeaderHeight } from '@/hooks/use-header-height';
 import { getLabelledGames, isModerator, removeGameLabel, type LabelledGame } from '@/lib/api';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 const LABEL: GameLabel = 'must_play';
 
@@ -72,6 +73,7 @@ export default function MustPlayScreen() {
   const remove = useMutation({
     mutationFn: (gameId: string) => removeGameLabel(gameId, LABEL),
     onSuccess: (_result, gameId) => {
+      toast.success('Must Play label removed');
       setGameLabelLocally(gameId, LABEL, false);
       queryClient.invalidateQueries({ queryKey: ['labelled-games', LABEL] });
     },

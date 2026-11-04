@@ -24,6 +24,7 @@ import { getPairWithMyVote, suggestSimilarGame } from '@/lib/api';
 import type { GameSimilarityVoteRow, SimilarityReason } from '@/lib/database.types';
 import { getGameById, type Game } from '@/lib/games';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 const MAX_COMMENT = 280;
 
@@ -166,6 +167,7 @@ function SuggestForm({
   const submit = useMutation({
     mutationFn: () => suggestSimilarGame(game, other, reasons, comment),
     onSuccess: () => {
+      toast.success('Suggestion added');
       queryClient.invalidateQueries({ queryKey: ['community-similar', game.id] });
       queryClient.invalidateQueries({ queryKey: ['community-similar', other.id] });
       queryClient.invalidateQueries({ queryKey: ['similarity-pair', userId] });

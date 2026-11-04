@@ -6,6 +6,7 @@ import type { AttendanceMode } from '@/lib/database.types';
 import type { GameEvent } from '@/lib/news';
 import { REMINDER_LEAD_MINUTES, cancelEventReminder, scheduleEventReminder } from '@/lib/reminders';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 /** Why a reminder could not be set, in words the reader can act on. */
 const REMINDER_FAILURE: Record<'denied' | 'past' | 'unavailable', string> = {
@@ -60,7 +61,10 @@ export function useEventAttendance(event: GameEvent) {
 
       await setAttendance(userId, event, mode, attendance.data?.mine?.reminder_at ?? null);
     },
-    onSuccess: invalidate,
+    onSuccess: (_result, mode) => {
+      toast.success(mode ? 'Saved — see you there' : 'No longer going');
+      return invalidate();
+    },
   });
 
   const reminder = useMutation({

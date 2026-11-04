@@ -14,6 +14,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { createAwardsList, createList, type ListKind } from '@/lib/api';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 type Shape = { kind: ListKind; label: string; hint: string; ranked: boolean };
 
@@ -73,6 +74,7 @@ export default function NewListScreen() {
       });
     },
     onSuccess: (listId) => {
+      toast.success('Collection created');
       queryClient.invalidateQueries({ queryKey: ['lists'] });
       router.replace({ pathname: '/list/[id]', params: { id: listId } });
     },

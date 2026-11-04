@@ -51,6 +51,7 @@ import type {
 import { getGameById, type Game } from '@/lib/games';
 import { platformOptionsFor } from '@/lib/platform-options';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 const MAX_NOTES = 500;
 
@@ -267,6 +268,7 @@ function CopyForm({
       return addCopy(userId, game, input);
     },
     onSuccess: (copyId) => {
+      toast.success('Saved to your physical collection');
       invalidate(copyId);
       /* Its back cover and disc label, looked up as it is added (the owner's,
          2026-10-22) — from the release's platform and region when one was

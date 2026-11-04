@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
@@ -9,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { PANEL_GAP, Panel } from '@/components/ui/panel';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Section, useSectionInset } from '@/components/ui/section';
-import { StatsStrip, StatsStripSkeleton, type StatsCell } from '@/components/ui/stats-strip';
+import { Skeleton } from '@/components/ui/surface';
 import { Text } from '@/components/ui/text';
 import { clampScore, ratingVerdict, scoreColor } from '@/constants/score';
 import { STATUS_LABEL } from '@/constants/status';
@@ -123,9 +124,9 @@ export function RatingsCard({
  * counts); IGDB has figures with the same names, and they are shares of its
  * traffic, not people.
  *
- * A strip of three in a titled card, as the Ratings card above it is: the
- * strip is the masthead's, a figure over a quiet line with rules between, so
- * the page has one way of setting a number. **A zero is printed** — it is a
+ * Three centred rows (the owner's, 2026-11-03): each a glyph — a bookmark,
+ * a controller, a tick — and under it the number with what it counts, "25
+ * playing now". It was a strip of three in a titled card. **A zero is printed** — it is a
  * number the app knows, as the masthead's "0 Collections" is — so the card is
  * there for every game, once its answer is in. Its shape is held while it
  * loads so nothing under it moves; a failed request says so in the card and
@@ -137,6 +138,7 @@ export function RatingsCard({
  * action row's Wishlist key.
  */
 export function GameAudienceCard({ gameId, title }: { gameId: string; title: string }) {
+  const accent = useAccent();
   const audience = useQuery({
     queryKey: ['game-audience', gameId],
     queryFn: () => getGameAudience(gameId),
@@ -167,24 +169,26 @@ export function GameAudienceCard({ gameId, title }: { gameId: string; title: str
   const count = (n: number, one: string, many: string) =>
     `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
-  const cells: StatsCell[] = data
+  /* One row a figure, centred: its glyph, then the number and what it counts
+     (the owner's, 2026-11-03). */
+  const rows: AudienceRow[] = data
     ? [
         {
           key: 'wishlisted',
-          value: data.wishlisted.toLocaleString(),
-          label: 'Wishlisted',
+          icon: 'bookmark',
+          line: `${data.wishlisted.toLocaleString()} wishlisted`,
           a11y: `${count(data.wishlisted, 'person has', 'people have')} ${title} on their wishlist`,
         },
         {
           key: 'playing',
-          value: data.playing.toLocaleString(),
-          label: 'Playing now',
+          icon: 'game-controller',
+          line: `${data.playing.toLocaleString()} playing now`,
           a11y: `${count(data.playing, 'person is', 'people are')} playing it now`,
         },
         {
           key: 'played',
-          value: data.played.toLocaleString(),
-          label: 'Played',
+          icon: 'checkmark-circle',
+          line: `${data.played.toLocaleString()} played`,
           a11y: `${count(data.played, 'person has', 'people have')} played it`,
         },
       ]
@@ -192,10 +196,37 @@ export function GameAudienceCard({ gameId, title }: { gameId: string; title: str
 
   return (
     <Panel title="On Pinged">
-      {data ? <StatsStrip cells={cells} /> : <StatsStripSkeleton count={3} />}
+      {data ? (
+        <View style={styles.audience}>
+          {rows.map((row) => (
+            <View key={row.key} style={styles.audienceRow} accessible accessibilityLabel={row.a11y}>
+              <Ionicons name={row.icon} size={26} color={accent.onSurface} />
+              <Text variant="h4" style={styles.audienceLine}>
+                {row.line}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <View style={styles.audience}>
+          {[0, 1, 2].map((index) => (
+            <View key={index} style={styles.audienceRow}>
+              <Skeleton width={26} height={26} radius={13} />
+              <Skeleton width={120} height={16} />
+            </View>
+          ))}
+        </View>
+      )}
     </Panel>
   );
 }
+
+type AudienceRow = {
+  key: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  line: string;
+  a11y: string;
+};
 
 // ---------------------------------------------------------------------------
 // Played by — and by the people you follow
@@ -432,6 +463,9 @@ export function TopReview({
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
+  audience: { gap: Spacing.x20, paddingVertical: Spacing.x8 },
+  audienceRow: { alignItems: 'center', gap: Spacing.x8 },
+  audienceLine: { textAlign: 'center' },
   /* A failed card: the sentence, then its way out. */
   failed: { gap: Spacing.x12, alignItems: 'flex-start' },
   /* Two equal squares, a panel's gap apart; `stretch` (the default) keeps them

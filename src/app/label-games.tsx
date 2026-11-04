@@ -15,6 +15,7 @@ import { setGameLabelLocally } from '@/hooks/use-game-labels';
 import { getLabelledGameIds, isModerator, setGameLabel } from '@/lib/api';
 import { getGameById, type GameSearchResult } from '@/lib/games';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 /**
  * Put a label on games, one tap each. Moderators only (0034).
@@ -63,6 +64,7 @@ export default function LabelGamesScreen() {
       return game.id;
     },
     onSuccess: (gameId) => {
+      toast.success('Labelled Must Play');
       setGameLabelLocally(gameId, label, true);
       queryClient.setQueryData<string[]>(['labelled-game-ids', label], (ids) => [
         ...(ids ?? []),

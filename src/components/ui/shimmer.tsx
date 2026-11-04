@@ -10,53 +10,38 @@ import {
 import Animated, { css, useReducedMotion } from 'react-native-reanimated';
 
 import { useTheme } from '@/hooks/use-theme';
+import { mix } from '@/lib/color';
 
 /**
- * SimpMusic's shimmer, as a surface — `Modifier.shimmer()` in its `UIExt.kt`,
- * which every block of its `Shimmer.kt` placeholders wears.
+ * reacticx's shimmer (the owner's, 2026-11-03 — `molecules/Shimmer`, MIT):
+ * the block in its flat fill, and a band of light **half the block's width**
+ * crossing it left to right on a linear loop — a five-stop gradient, fill →
+ * a step lighter → the line → a step lighter → fill, so the band has a soft
+ * body and no edge. It enters from just off the left and leaves just off the
+ * right, so there is no pause between passes, only the travel.
  *
- * The reference is one brush: the block is filled with its `shimmerBackground`
- * and a linear gradient `[background, line, background]` is swept across it,
- * its start running from `-2 × width` to `+2 × width` on
- * `infiniteRepeatable(tween(1000))`. Outside that span Compose clamps the
- * brush to its end colour, which is the background again — so what you see is
- * a flat block with one soft light passing over it, and no seam where the
- * gradient begins or ends.
+ * It replaced SimpMusic's `Modifier.shimmer()` (a corner-to-corner sweep the
+ * block's own width, a third of each pass off the block). Every placeholder
+ * in the app is `<Skeleton>`, which is this, so all of them changed at once.
  *
- * Restated here as a flat fill with a gradient of exactly the block's width
- * translating over it. The two are the same picture: the gradient's own ends
- * *are* the fill, so its edges are invisible, and everywhere it is not is the
- * fill — which is what Compose's clamp draws.
+ * ## Why it runs on the UI thread
  *
- * ## Why this is affordable now, when it was refused before
+ * reacticx animates with React Native's `Animated` and the native driver.
+ * This is a **Reanimated CSS animation** — `animationName` on a React prop —
+ * declared once and run on the UI thread, so a scrolling or fetching screen
+ * neither slows it nor is slowed by it, and it has no end value to lose
+ * (§ Gotchas): it never ends, and the pose React holds is the plain fill. The
+ * travel is dp from a measured width, for the reason a percentage transform
+ * was refused before: a number is a number on both platforms.
  *
- * `<Skeleton>` was deliberately static, and the reason given was the right one
- * at the time: "a shimmer across a whole search list costs more in dropped
- * frames than it gains in perceived speed." That cost was the JS thread. This
- * is a **Reanimated CSS animation** — `animationName` on a React prop — so it
- * is declared once, runs entirely on the UI thread, and a screen that is
- * scrolling or fetching does not slow it or get slowed by it. It also cannot
- * lose its end value (§ Gotchas): there is no end value, the animation is
- * infinite, and the resting state React holds is the plain fill.
- *
- * The travel is in dp, from a measured width, rather than the `'200%'` a CSS
- * transform would allow: a percentage transform is interpolated natively and
- * nothing here can be run on a phone to confirm it, while a number is a
- * number on both platforms. The measurement costs one extra render per block
- * on mount and nothing after.
- *
- * Still under Reduce Motion, where the block is the flat fill — which is what
- * it was before any of this.
+ * Still under Reduce Motion, where the block is the flat fill.
  */
 
-/** `infiniteRepeatable(animation = tween(1000))`. */
-export const SHIMMER_MS = 1000;
+/** reacticx's `duration` default. */
+export const SHIMMER_MS = 1500;
 
-/**
- * `-2 * size.width` to `2 * size.width`: the light spends two thirds of each
- * pass off the block, which is the pause between sweeps.
- */
-export const SHIMMER_TRAVEL = 2;
+/** The band's width, as a share of the block's (`waveWidth = width * 0.5`). */
+export const SHIMMER_BAND = 0.5;
 
 export type ShimmerProps = {
   /** Rounded with the block it stands in for. */
@@ -78,6 +63,7 @@ export function Shimmer({ radius = 0, color, style }: ShimmerProps) {
   const [width, setWidth] = useState(0);
 
   const fill = color ?? theme.skeleton;
+  const shoulder = mix(fill, theme.skeletonSweep, 0.45);
   const sweep = useMemo(() => (width > 0 ? travel(width) : null), [width]);
 
   const onLayout = (event: LayoutChangeEvent) => {
@@ -97,7 +83,7 @@ export function Shimmer({ radius = 0, color, style }: ShimmerProps) {
         <Animated.View
           style={[
             styles.sweep,
-            { width },
+            { width: width * SHIMMER_BAND },
             {
               animationName: sweep,
               animationDuration: SHIMMER_MS,
@@ -106,13 +92,12 @@ export function Shimmer({ radius = 0, color, style }: ShimmerProps) {
             },
           ]}>
           <LinearGradient
-            /* `[background, line, background]` — the ends are the fill, so the
-               light has no edge. */
-            colors={[fill, theme.skeletonSweep, fill]}
-            /* `start = Offset(x, 0)`, `end = Offset(x + width, height)`: the
-               reference's brush runs corner to corner, not straight across. */
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+            /* reacticx's dark preset's shape — fill, a step up, the line, a
+               step up, fill — in this app's two skeleton tones. The ends are
+               the fill, so the band has no edge. */
+            colors={[fill, shoulder, theme.skeletonSweep, shoulder, fill]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
             style={StyleSheet.absoluteFill}
           />
         </Animated.View>
@@ -126,9 +111,10 @@ export function Shimmer({ radius = 0, color, style }: ShimmerProps) {
  * equal-width placeholders declares one animation and not one each.
  */
 function travel(width: number) {
+  const band = width * SHIMMER_BAND;
   return css.keyframes({
-    from: { transform: [{ translateX: -SHIMMER_TRAVEL * width }] },
-    to: { transform: [{ translateX: SHIMMER_TRAVEL * width }] },
+    from: { transform: [{ translateX: -band }] },
+    to: { transform: [{ translateX: width + band }] },
   });
 }
 

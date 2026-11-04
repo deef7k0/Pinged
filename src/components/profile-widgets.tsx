@@ -10,10 +10,11 @@ import { Poster } from '@/components/ui/poster';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import { FAVOURITES, favouriteCoverWidth } from '@/constants/profile-layout';
-import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { FontFamily, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { removeFromList, type ListItem } from '@/lib/api';
 import type { ProfileAchievementStats } from '@/lib/database.types';
+import { toast } from '@/lib/toast';
 
 /** Four across the page: a set of four, not a grid that happens to have four columns. */
 const FAVORITE_COLUMNS = FAVOURITES.columns;
@@ -32,10 +33,13 @@ export const FavoritesWidget = memo(function FavoritesWidget({
   items,
   listId,
   isSelf,
+  profileId,
 }: {
   items: ListItem[];
   listId?: string;
   isSelf: boolean;
+  /** Whose favourites: where Top 10 opens. */
+  profileId?: string;
 }) {
   const theme = useTheme();
   const router = useRouter();
@@ -69,6 +73,7 @@ export const FavoritesWidget = memo(function FavoritesWidget({
   const remove = useMutation({
     mutationFn: (gameId: string) => removeFromList(listId!, gameId),
     onSuccess: () => {
+      toast.success('Removed from your favourites');
       setSelectedId(null);
       queryClient.invalidateQueries({ queryKey: ['favorites'] });
       queryClient.invalidateQueries({ queryKey: ['list', listId] });
@@ -105,22 +110,40 @@ export const FavoritesWidget = memo(function FavoritesWidget({
       title="Favourites"
       icon="star"
       action={
-        canEdit && (
-          /* `hitSlop` rather than padding so the word stays small while the
+        <View style={styles.actions}>
+          {/* Their Top 10: every favourite, full screen (the owner's,
+              2026-11-03). Anyone's, once there is one to show. */}
+          {items.length > 0 && !editing && profileId && (
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={isSelf ? 'Your Top 10' : 'Their Top 10'}
+              onPress={() => router.push({ pathname: '/top-ten/[id]', params: { id: profileId } })}
+              scaleTo={0.92}
+              hitSlop={Spacing.x12}
+              style={StyleSheet.flatten([styles.topTen, { backgroundColor: theme.controlFill }])}>
+              <Ionicons name="trophy-outline" size={13} color={theme.text} />
+              <Text variant="bodySmall" style={styles.topTenLabel}>
+                Top 10
+              </Text>
+            </PressableScale>
+          )}
+          {canEdit && (
+            /* `hitSlop` rather than padding so the word stays small while the
              target clears the floor. */
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel={editing ? 'Done editing favourites' : 'Edit favourites'}
-            accessibilityState={{ expanded: editing }}
-            onPress={toggleEditing}
-            scaleTo={0.9}
-            hitSlop={Spacing.x16}
-            style={styles.editLink}>
-            <Text variant="bodySmall" color="primaryText">
-              {editing ? 'Done' : 'Edit'}
-            </Text>
-          </PressableScale>
-        )
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={editing ? 'Done editing favourites' : 'Edit favourites'}
+              accessibilityState={{ expanded: editing }}
+              onPress={toggleEditing}
+              scaleTo={0.9}
+              hitSlop={Spacing.x16}
+              style={styles.editLink}>
+              <Text variant="bodySmall" color="primaryText">
+                {editing ? 'Done' : 'Edit'}
+              </Text>
+            </PressableScale>
+          )}
+        </View>
       }>
       {shown.length > 0 || editing ? (
         <View style={styles.posters}>
@@ -222,7 +245,9 @@ export const FavoritesWidget = memo(function FavoritesWidget({
         </View>
       ) : (
         <Text variant="caption" color="textMuted">
-          {isSelf ? 'Star up to four games to pin them here.' : 'No favourites yet.'}
+          {isSelf
+            ? 'Star up to ten games: your Top 10, the first four pinned here.'
+            : 'No favourites yet.'}
         </Text>
       )}
 
@@ -349,6 +374,16 @@ const styles = StyleSheet.create({
      vertical: the heading row's height is set by the title beside it, and
      `hitSlop` is what reaches the tap floor. */
   editLink: { paddingStart: Spacing.x8 },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8 },
+  topTen: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.x8 + 2,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  topTenLabel: { fontFamily: FontFamily.semibold },
   /* `space-between`, with eight as the least they may stand apart: the covers
      are whole dp, so a display that does not divide evenly has a dp or two left
      over, and it goes between them rather than after the last one. */

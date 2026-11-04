@@ -1,10 +1,27 @@
-import { useMemo } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { Elevation, Palette, Radius, Spacing, type AccentRoles } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
 import { mix } from '@/lib/color';
+
+/**
+ * Whether the cards under it are drawn at all — the Apple TV game page's rule
+ * (the owner's, 2026-11-03): "YOU WILL NO LONGER USE CARDS, DISPLAY THE
+ * INFORMATION LIKE IN THOSE IMAGES". Apple TV's page puts its information on
+ * the page under bold headings, so under this provider every card the game
+ * page's sections are made of (`<SectionCard>`, `<InfoCard>`, `<Panel>`,
+ * the member's review card) keeps its contents and loses its fill, edge,
+ * shadow and inset, and its headings take the page's own size. A context
+ * rather than a prop on each, because the same sections are drawn as cards
+ * everywhere else — the reviews sheet is outside it, and keeps its cards.
+ */
+export const CardlessContext = createContext(false);
+
+export function useCardless(): boolean {
+  return useContext(CardlessContext);
+}
 
 /**
  * The review card's material, which every card in the app is made of.
@@ -42,8 +59,14 @@ export type CardMaterial = {
 export function useCardMaterial(): CardMaterial {
   const theme = useTheme();
   const accent = useAccent();
-  return useMemo(() => cardMaterialFor(accent, theme), [accent, theme]);
+  const cardless = useCardless();
+  return useMemo(
+    () => (cardless ? NO_CARD : cardMaterialFor(accent, theme)),
+    [accent, theme, cardless]
+  );
 }
+
+const NO_CARD: CardMaterial = { fill: 'transparent', edge: 'transparent' };
 
 /**
  * The same, from an accent in hand — for the screen that renders a game's

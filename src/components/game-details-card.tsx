@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition, useReducedMotion } from 'react-native-reanimated';
 
+import { useCardless } from '@/components/ui/card-material';
+import { INFO_BOX } from '@/components/game-information';
 import { InfoCard } from '@/components/ui/info-card';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
@@ -58,16 +60,23 @@ export function GameDetailsCard({
   gameId,
   title,
   year,
+  released = null,
 }: {
   gameId: string;
   /** The game's name and year, which RAWG's tags are looked up by. */
   title?: string;
   year?: number | null;
+  /** The release date as words — the first fact on Apple TV's sheet. */
+  released?: string | null;
 }) {
   const accent = useAccent();
   const router = useRouter();
   const reduceMotion = useReducedMotion();
   const [expanded, setExpanded] = useState(false);
+  /* Apple TV's "Ficha técnica" on the game page: the label is the bright,
+     heavier line and the value the quiet one under it — the other way round
+     from the card this was. */
+  const cardless = useCardless();
 
   const parsed = parseGameId(gameId);
   const igdbId = parsed?.source === 'igdb' ? parsed.sourceId : null;
@@ -102,13 +111,18 @@ export function GameDetailsCard({
   const open = (facet: Facet) =>
     router.navigate({ pathname: '/search', params: facetParams(facet) });
 
-  const { head, rest } = rowsOf(details.data, rawgTags.data ?? []);
+  const rows = rowsOf(details.data, rawgTags.data ?? []);
+  const head: Row[] = released
+    ? [{ label: 'Released', kind: 'genre', values: [{ name: released, id: null }] }, ...rows.head]
+    : rows.head;
+  const rest = rows.rest;
   if (head.length === 0 && rest.length === 0) return null;
   /* With nothing behind the button, the card is just its first rows. */
   const shown = expanded || head.length === 0 ? [...head, ...rest] : head;
 
   return (
-    <InfoCard title="Details">
+    /* On the Overview, Information's box: the one filled block there. */
+    <InfoCard title="Details" style={cardless ? INFO_BOX : undefined}>
       <Animated.View
         style={styles.rows}
         layout={reduceMotion ? undefined : LinearTransition.duration(250)}>
@@ -117,14 +131,16 @@ export function GameDetailsCard({
             key={row.label}
             entering={reduceMotion || index < head.length ? undefined : FadeIn.duration(220)}
             style={styles.row}>
-            <Text variant="label" style={{ color: accent.quietInk }}>
+            <Text
+              variant={cardless ? 'itemTitle' : 'label'}
+              style={cardless ? undefined : { color: accent.quietInk }}>
               {row.label}
             </Text>
             <View style={styles.values}>
               {row.values.map((value, place) => {
                 const last = place === row.values.length - 1;
                 const words = (
-                  <Text variant="body" style={styles.value}>
+                  <Text variant="body" style={cardless ? { color: accent.quietInk } : styles.value}>
                     {value.name}
                     {last ? '' : ','}
                   </Text>

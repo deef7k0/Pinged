@@ -23,6 +23,7 @@ import {
 } from '@/lib/api';
 import { getGameById, isSteamAchievementSyncAvailable, parseGameId } from '@/lib/games';
 import { useAuth } from '@/store/auth';
+import { toast } from '@/lib/toast';
 
 export default function AchievementsScreen() {
   const theme = useTheme();
@@ -81,7 +82,10 @@ export default function AchievementsScreen() {
       if (!game.data) throw new Error('Game details are still loading.');
       return syncSteamAchievements(userId, steamId, game.data);
     },
-    onSuccess: invalidate,
+    onSuccess: () => {
+      toast.success('Achievements synced');
+      return invalidate();
+    },
   });
 
   if (game.isLoading || achievements.isLoading) {

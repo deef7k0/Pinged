@@ -1,8 +1,19 @@
 import { Image, type ImageContentPosition } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { lazy, memo, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
+import {
+  lazy,
+  memo,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { StyleSheet, TurboModuleRegistry, View, useWindowDimensions } from 'react-native';
 import Animated, {
+  Easing,
+  withTiming,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
@@ -14,7 +25,13 @@ import { Palette, withAlpha } from '@/constants/theme';
 import { usePulse } from '@/hooks/use-pulse';
 import { useScreenChrome } from '@/hooks/use-screen-chrome';
 import { useSteamArtwork } from '@/hooks/use-steam-artwork';
-import { TAIL, washStops } from '@/lib/progressive-blur';
+import {
+  COVER_FRONT_KNEE,
+  PROGRESSIVE_BLUR,
+  TAIL,
+  kneeDrop,
+  washStops,
+} from '@/lib/progressive-blur';
 import {
   PINNED_HERO,
   pinnedBlur,
@@ -22,7 +39,7 @@ import {
   pinnedDrift,
   pinnedStretch,
 } from '@/lib/scroll-motion';
-import type { FootFade } from '@/lib/scrim';
+import { footFade, type FootFade } from '@/lib/scrim';
 
 /*
  * Convx's row-by-row blur (`<ProgressiveBlur>`, `lib/progressive-blur`), where
@@ -34,6 +51,27 @@ import type { FootFade } from '@/lib/scrim';
 const ProgressiveBlur = TurboModuleRegistry.get('RNSkiaModule')
   ? lazy(() => import('@/components/ui/progressive-blur'))
   : null;
+/**
+ * Whether this build can draw an animated cover into the hero's blur — and
+ * so whether a caller should hand it `animation` rather than drawing the
+ * animation itself over the art. An APNG is still the caller's to draw
+ * (`skiaAnimates`).
+ */
+export const HERO_ANIMATES = !!ProgressiveBlur;
+
+/**
+ * How much of a pinned hero's mirrored tail a page leaves showing under the
+ * art before its solid part begins — half of it, by when Convx's wash is
+ * five sixths of the way to the page's colour and the page's lip takes it
+ * the rest of the way. A studio's and a collection's (the owner's,
+ * 2026-11-04: "Apply the convx's blur to the studio screen, review screen and
+ * collection screen. The blur that act's as the fade for the header and
+ * background"): their solid part began at the art's foot and covered the
+ * tail. Nothing where the build cannot draw the tail.
+ */
+export function shownTail(height: number): number {
+  return ProgressiveBlur ? Math.round(height * TAIL * 0.5) : 0;
+}
 
 /** expo-image's `contentPosition`, as the 0–1 anchors the blur's canvas draws by. */
 function anchorsOf(position: ImageContentPosition | undefined): { x: number; y: number } {
@@ -48,7 +86,14 @@ function anchorsOf(position: ImageContentPosition | undefined): { x: number; y: 
  * Convx's wash (`artistWashStops`), over the art and its mirrored tail: the
  * hero's foot fade wherever the row-by-row blur is drawn.
  */
-const HERO_WASH: FootFade = washStops();
+const HERO_WASH: FootFade = washStops(PROGRESSIVE_BLUR.longWashFrom);
+
+/**
+ * While a review's blur (`<HeroFoot>`) is on its way, a solid fade stands in
+ * for it: the page's colour over the art's bottom third, whole at its foot.
+ * The pinned hero has none (2026-11-04: its blur is as it was).
+ */
+const WAITING_FADE: FootFade = footFade(0.34);
 
 /** A gradient's colours and stops, which its types insist are at least two. */
 type Colours = readonly [string, string, ...string[]];
@@ -68,6 +113,12 @@ export const MASTHEAD_FADE: FootFade = {
   locations: DISSOLVE_STOPS.map((stop) => stop.at),
   alphas: DISSOLVE_STOPS.map((stop) => 1 - stop.alpha),
 };
+
+/**
+ * The trailer's foot (`blur={false}`): the page's colour rising over the
+ * bottom of the video only, so the video is seen whole above it.
+ */
+export const TRAILER_FADE: FootFade = footFade(0.28);
 
 export type PinnedHeroProps = {
   /** The art. IGDB's, unless a Steam hero takes its place (`steamAppId`). */
@@ -113,6 +164,40 @@ export type PinnedHeroProps = {
    * a tail nobody sees (measured: `scripts/progressive-blur-render.mjs`).
    */
   tail?: boolean;
+  /**
+   * Whether the art blurs at all. Off, it is drawn sharp, its foot simply
+   * fading into the page by `fade` — the game page's trailer (the owner's,
+   * 2026-11-03: "whenever it plays, remove the blur and simply add a solid
+   * fade"), where a blur over the video's lower half hid half of it.
+   */
+  blur?: boolean;
+  /**
+   * The animated cover, played in the hero itself — sharp over the art and
+   * moving under the blur too. An animated WebP or GIF, or a video
+   * (`skiaAnimates`), and only where `HERO_ANIMATES`; null for the still.
+   * **The blur is the same one either way**: switching between the still and
+   * the animation changes what it draws, never the blur itself.
+   */
+  animation?: string | null;
+  /** The animation would not play in the hero: the caller draws it over the art instead. */
+  onAnimationFail?: (error?: unknown) => void;
+  /**
+   * Where the foot's blur begins at rest, in sides — higher than its own
+   * knee never. The game page with Settings → Game title off stands it near
+   * the cover's foot (`TITLELESS_KNEE`), so the logo on the box is seen.
+   */
+  knee?: number;
+  /**
+   * The cover in front (the game page's): the blur and the wash ease down to
+   * the art's foot, so the picture is seen whole (`COVER_FRONT_KNEE`).
+   */
+  lowered?: boolean;
+  /**
+   * How many sides further than Convx's the tail and its wash run, so words
+   * laid low on the art stand wholly on the blur (`heroExtension`) — the
+   * game page with its title off.
+   */
+  extend?: number;
 };
 
 /**
@@ -187,6 +272,12 @@ export const PinnedHero = memo(function PinnedHero({
   veil = 0,
   onLoad,
   tail: withTail = false,
+  blur = true,
+  animation = null,
+  onAnimationFail,
+  knee,
+  lowered = false,
+  extend = 0,
 }: PinnedHeroProps) {
   const chrome = useScreenChrome();
   const still = useSharedValue(0);
@@ -204,7 +295,7 @@ export const PinnedHero = memo(function PinnedHero({
   /* Convx's blur when Skia can draw it; the one blurred copy when it cannot. */
   const { width } = useWindowDimensions();
   const [skiaFailed, setSkiaFailed] = useState(false);
-  const progressive = !!ProgressiveBlur && !skiaFailed;
+  const progressive = blur && !!ProgressiveBlur && !skiaFailed;
 
   /*
    * On the game page, with Convx's blur, Convx's foot: the art runs on into
@@ -214,16 +305,58 @@ export const PinnedHero = memo(function PinnedHero({
    * their `fade`, over the art alone, exactly as before. One fade either way,
    * over every copy.
    */
-  const tail = withTail && progressive && source ? Math.round(height * TAIL) : 0;
+  const tailed = withTail && progressive && !!source;
+  const reach0 = tailed ? (extend > 0 ? extend : 0) : 0;
+  const tail = tailed ? Math.round(height * (TAIL + reach0 / PROGRESSIVE_BLUR.artworkExtent)) : 0;
   const reach = height + tail;
-  const foot = tail > 0 ? HERO_WASH : fade;
-  const footColours = useMemo(() => colours(foot, page), [foot, page]);
   const onSkiaFailed = useCallback(() => setSkiaFailed(true), []);
   const anchors = anchorsOf(contentPosition);
   /* How far the blur has climbed: the old copy's opacity, as the climb's progress. */
   const climb = useDerivedValue(() =>
     pinnedBlur(scrollY.get(), solidAt, PINNED_HERO.blurFrom, PINNED_HERO.blurUntil)
   );
+
+  /*
+   * Where the blur begins, two ways, and each moves eased (a shared value
+   * written in an effect is not a state sync, CLAUDE.md):
+   *
+   * - **At rest**, its own knee or a lower one the page chose (`knee` — the
+   *   game page with its title off). The curve is squeezed into what is left
+   *   above the art's foot (`drop`, `droppedRow`), and the wash with it, so
+   *   the foot and the tail are as heavy as ever.
+   * - **The cover in front** slides the whole blur and wash down to the
+   *   cover's edge (`slide`) — the clear view, as it always was.
+   */
+  const ownKnee = withTail ? PROGRESSIVE_BLUR.longKnee : PROGRESSIVE_BLUR.knee;
+  const restKnee = Math.max(ownKnee, knee ?? ownKnee);
+  const targetDrop = kneeDrop(ownKnee, restKnee);
+  const targetSlide = lowered ? kneeDrop(restKnee, COVER_FRONT_KNEE) : 0;
+  const drop = useSharedValue(targetDrop);
+  const slide = useSharedValue(targetSlide);
+  useEffect(() => {
+    const motion = { duration: LOWER_MS, easing: Easing.inOut(Easing.cubic) };
+    /* At once: the wash is drawn for it, and a setting changing is not a motion. */
+    drop.set(targetDrop);
+    slide.set(withTiming(targetSlide, motion));
+  }, [targetDrop, targetSlide, drop, slide]);
+  /* Convx's wash over the art and its tail: from where the (squeezed) blur
+     begins to just short of the tail's foot, however far the tail runs. */
+  const foot = useMemo(
+    () =>
+      tail > 0
+        ? targetDrop === 0 && reach0 === 0
+          ? HERO_WASH
+          : washStops(PROGRESSIVE_BLUR.longWashFrom + targetDrop, reach0)
+        : fade,
+    [tail, targetDrop, reach0, fade]
+  );
+  const footColours = useMemo(() => colours(foot, page), [foot, page]);
+  const washStyle = useAnimatedStyle(() => {
+    pulse.get();
+    return {
+      transform: [{ translateY: (slide.get() * height) / PROGRESSIVE_BLUR.artworkExtent }],
+    };
+  });
 
   const frameStyle = useAnimatedStyle(() => {
     pulse.get();
@@ -320,6 +453,8 @@ export const PinnedHero = memo(function PinnedHero({
                   },
                 ]}>
                 <Suspense fallback={null}>
+                  {/* One blur, always: the still and the animation are what
+                      it draws, never two components swapped. */}
                   <ProgressiveBlur
                     uri={source}
                     width={width}
@@ -328,12 +463,18 @@ export const PinnedHero = memo(function PinnedHero({
                     anchorY={anchors.y}
                     progress={climb}
                     onFail={onSkiaFailed}
+                    animatedUri={animation}
+                    onAnimationFail={onAnimationFail}
+                    long={withTail}
+                    drop={drop}
+                    slide={slide}
+                    extend={reach0}
                   />
                 </Suspense>
               </Animated.View>
             )}
             {/* Where it cannot: one blurred copy, its opacity following the scroll. */}
-            {!progressive && blurReady && (
+            {blur && !progressive && blurReady && (
               <Animated.View style={[styles.fill, blurStyle]}>
                 <Image
                   source={{ uri: source }}
@@ -359,11 +500,13 @@ export const PinnedHero = memo(function PinnedHero({
                 ]}
               />
             )}
-            <LinearGradient
-              colors={footColours}
-              locations={locations(foot)}
-              style={[styles.art, { height: reach }]}
-            />
+            <Animated.View style={[styles.art, { height: reach }, washStyle]}>
+              <LinearGradient
+                colors={footColours}
+                locations={locations(foot)}
+                style={StyleSheet.absoluteFill}
+              />
+            </Animated.View>
           </View>
           <View
             style={[
@@ -385,6 +528,86 @@ export const PinnedHero = memo(function PinnedHero({
     </Animated.View>
   );
 });
+
+/**
+ * Convx's foot for a hero that is not pinned — a review's square art, which
+ * scrolls with its page: the long row-by-row blur over the art and its
+ * mirrored tail, and Convx's wash over both, the solid fade standing in until
+ * the blur has drawn. Laid from the art's top, as tall as the art and its
+ * tail, so the tail lies behind whatever the page draws under the art.
+ *
+ * Only where the build has Skia (`HERO_ANIMATES`); the caller keeps its own
+ * fade where it has not.
+ */
+export function HeroFoot({ uri, height, page }: { uri: string; height: number; page: string }) {
+  const { width } = useWindowDimensions();
+  const rest = useSharedValue(0);
+  const [failed, setFailed] = useState(false);
+  const [drawnFor, setDrawnFor] = useState<string | null>(null);
+  const drawn = drawnFor === uri && !failed;
+  const onReady = useCallback(() => setDrawnFor(uri), [uri]);
+  const onFail = useCallback(() => setFailed(true), []);
+  const washColours = useMemo(() => colours(HERO_WASH, page), [page]);
+  const waitingColours = useMemo(() => colours(WAITING_FADE, page), [page]);
+  const reach = height + Math.round(height * TAIL);
+  if (!ProgressiveBlur) return null;
+
+  return (
+    <View pointerEvents="none" style={[styles.art, { height: reach }]}>
+      {!failed && (
+        <Animated.View
+          style={[
+            styles.fill,
+            { opacity: drawn ? 1 : 0, transitionProperty: 'opacity', transitionDuration: 280 },
+          ]}>
+          <Suspense fallback={null}>
+            <ProgressiveBlur
+              uri={uri}
+              width={width}
+              height={height}
+              anchorX={0.5}
+              anchorY={0.5}
+              progress={rest}
+              onFail={onFail}
+              onReady={onReady}
+              long
+            />
+          </Suspense>
+        </Animated.View>
+      )}
+      <Animated.View
+        style={[
+          styles.fill,
+          { opacity: drawn ? 1 : 0, transitionProperty: 'opacity', transitionDuration: 280 },
+        ]}>
+        <LinearGradient
+          colors={washColours}
+          locations={locations(HERO_WASH)}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.art,
+          {
+            height,
+            opacity: drawn ? 0 : 1,
+            transitionProperty: 'opacity',
+            transitionDuration: 280,
+          },
+        ]}>
+        <LinearGradient
+          colors={waitingColours}
+          locations={locations(WAITING_FADE)}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+/** How long the blur takes to settle at the cover's edge, and to come back. */
+const LOWER_MS = 650;
 
 const styles = StyleSheet.create({
   layer: { position: 'absolute', top: 0, left: 0, right: 0 },

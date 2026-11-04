@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { CARD_INSET, cardShape, useCardMaterial } from '@/components/ui/card-material';
+import Ionicons from '@expo/vector-icons/Ionicons';
+
+import { CARD_INSET, cardShape, useCardMaterial, useCardless } from '@/components/ui/card-material';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Reveal, useRevealing } from '@/components/ui/reveal';
 import { useSectionInset } from '@/components/ui/section';
@@ -65,20 +67,40 @@ export function Panel({
   const material = useCardMaterial();
   const sectionInset = useSectionInset();
   const revealing = useRevealing();
+  /* On the Apple TV game page (`CardlessContext`) there is no card: the
+     contents stand on the page under the page's own heading — "Ratings ›". */
+  const cardless = useCardless();
 
-  const shell = StyleSheet.flatten([
-    cardShape,
-    {
-      marginHorizontal: margin ?? sectionInset,
-      backgroundColor: material.fill,
-      borderColor: material.edge,
-      paddingHorizontal: CARD_INSET,
-    },
-    styles.shell,
-    style,
-  ]);
+  const shell = StyleSheet.flatten(
+    cardless
+      ? [{ marginHorizontal: margin ?? sectionInset, gap: Spacing.x8 }, style]
+      : [
+          cardShape,
+          {
+            marginHorizontal: margin ?? sectionInset,
+            backgroundColor: material.fill,
+            borderColor: material.edge,
+            paddingHorizontal: CARD_INSET,
+          },
+          styles.shell,
+          style,
+        ]
+  );
 
-  const body = (
+  const body = cardless ? (
+    <>
+      <View style={styles.head}>
+        <View style={styles.tvTitle}>
+          <Text variant="h2" numberOfLines={1} accessibilityRole="header" style={styles.tvWords}>
+            {title}
+          </Text>
+          {onPress && <Ionicons name="chevron-forward" size={20} color={accent.quietInk} />}
+        </View>
+        {trailing}
+      </View>
+      {children}
+    </>
+  ) : (
     <>
       <View style={styles.head}>
         <Text
@@ -128,5 +150,7 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8, minHeight: 24 },
   /* Takes the line, so whatever follows it sits at the far end. */
   title: { flex: 1 },
+  tvTitle: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  tvWords: { flexShrink: 1 },
   rule: { height: StyleSheet.hairlineWidth, marginTop: Spacing.x8, marginBottom: Spacing.x12 },
 });

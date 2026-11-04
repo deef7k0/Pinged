@@ -45,6 +45,7 @@ import { getGameById, type Game } from '@/lib/games';
 import { platformOptionsFor } from '@/lib/platform-options';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 /** The database accepts eight per submission (0024); so does the form. */
 const MAX_PHOTOS = 8;
@@ -264,6 +265,7 @@ function ReleaseForm({
         : submitReleaseContribution(userId, { ...input, barcode: code }, photos);
     },
     onSuccess: (outcome) => {
+      toast.success('Release submitted');
       invalidate();
       setResult(outcome);
     },
@@ -272,6 +274,7 @@ function ReleaseForm({
   const withdraw = useMutation({
     mutationFn: () => withdrawReleaseContribution(existing!.id),
     onSuccess: () => {
+      toast.success('Claim withdrawn');
       invalidate();
       router.back();
     },

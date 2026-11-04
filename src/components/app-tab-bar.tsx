@@ -1,8 +1,12 @@
 import type { Tabs } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import {
   createContext,
+  isValidElement,
+  lazy,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -11,7 +15,15 @@ import {
   type ComponentProps,
   type ReactNode,
 } from 'react';
-import { Keyboard, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import {
+  Keyboard,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TurboModuleRegistry,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Extrapolation,
@@ -26,10 +38,30 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GlassSurface, useLiquidGlass } from '@/components/ui/liquid-glass';
+import type { LensTab } from '@/components/ui/liquid-lens';
 import { MINI_PLAYER_FOOTPRINT } from '@/constants/player';
 import { FontFamily, MaxContentWidth, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useMiniPlayerActive } from '@/store/player';
+
+/*
+ * expo-liquid-lens's lens over the tabs (`<LiquidLens>`), with Liquid glass
+ * on and Skia in the build — asked of the module registry before Skia is
+ * imported, as the hero's blur is.
+ */
+const LiquidLens = TurboModuleRegistry.get('RNSkiaModule')
+  ? lazy(() => import('@/components/ui/liquid-lens'))
+  : null;
+
+/** A tab's Ionicons glyph, as its character in the font — what Skia draws. */
+function glyphOf(icon: ReactNode): string | null {
+  if (!isValidElement<{ name?: unknown }>(icon)) return null;
+  const name = icon.props.name;
+  const code =
+    typeof name === 'string' ? (Ionicons.glyphMap as Record<string, number>)[name] : undefined;
+  return typeof code === 'number' ? String.fromCodePoint(code) : null;
+}
 
 export type AppTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
@@ -59,6 +91,14 @@ const SLIDE_SPRING = { duration: 420, dampingRatio: 0.82 } as const;
 const MINIMIZE_SPRING = { duration: 380, dampingRatio: 1 } as const;
 /** The space between the bar's top and what rests over it. */
 const ABOVE = 8;
+/*
+ * Search is not in the pill: it is a round key of the same glass beside it —
+ * Apple TV's own bar (the owner's references, 2026-11-03), where the search
+ * key stands apart at the right. As tall as the pill, and as small as the
+ * pill when it is minimized.
+ */
+const SEARCH_ROUTE = 'search';
+const SEARCH_GAP = 10;
 
 /** Where the bar sits over the system inset: the package's `bottomOffset`. */
 function barOffset(insetBottom: number): number {
@@ -182,6 +222,7 @@ export function useKeyboardShown(): boolean {
  * selection colour since it was a capsule.
  */
 export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
+  const liquid = useLiquidGlass();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
@@ -191,11 +232,22 @@ export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
   const progress = minimize?.progress ?? fallbackProgress;
 
   const routes = state.routes;
-  const tabCount = Math.max(routes.length, 1);
+  const pillRoutes = routes.filter((route) => route.name !== SEARCH_ROUTE);
+  const searchRoute = routes.find((route) => route.name === SEARCH_ROUTE) ?? null;
+  const focusedKey = routes[state.index]?.key;
+  const searchFocused = !!searchRoute && focusedKey === searchRoute.key;
+  /* The focused tab's place in the pill; the last one there while Search is
+     in front, its highlight put out. */
+  const pillIndex = pillRoutes.findIndex((route) => route.key === focusedKey);
+  const tabCount = Math.max(pillRoutes.length, 1);
   const width = Math.min(windowWidth, MaxContentWidth);
-  const slideIndex = useSharedValue(state.index);
+  const pillWidth = width - BAR_MARGIN * 2 - (searchRoute ? EXPANDED_HEIGHT + SEARCH_GAP : 0);
+  const slideIndex = useSharedValue(Math.max(pillIndex, 0));
+  const pillOn = useSharedValue(searchFocused ? 0 : 1);
   const isDragging = useSharedValue(false);
   const lastTicked = useSharedValue(-1);
+  /* A finger on the bar: the lens swells and bends harder. */
+  const press = useSharedValue(0);
 
   const tints = useMemo(
     () => ({
@@ -203,6 +255,7 @@ export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
       inactive: theme.textSecondary,
       highlight: withAlpha(theme.white, 0.14),
       glass: withAlpha(theme.surface, 0.94),
+      lit: withAlpha(theme.surfaceSelected, 0.97),
     }),
     [theme]
   );
@@ -210,15 +263,30 @@ export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
   /* The tab in front moved — a tap, a back gesture, a deep link: the
      highlight follows and the bar opens. Never while a finger is scrubbing. */
   useEffect(() => {
-    if (!isDragging.get()) slideIndex.set(withSpring(state.index, SLIDE_SPRING));
+    if (pillIndex >= 0 && !isDragging.get()) slideIndex.set(withSpring(pillIndex, SLIDE_SPRING));
+    pillOn.set(withSpring(searchFocused ? 0 : 1, SLIDE_SPRING));
     if (minimize) setMinimized(minimize, 0);
-  }, [state.index, slideIndex, isDragging, minimize]);
+  }, [pillIndex, searchFocused, slideIndex, pillOn, isDragging, minimize]);
+
+  const openRoute = useCallback(
+    (route: (typeof routes)[number] | undefined) => {
+      if (!route) return;
+      const focused = route.key === focusedKey;
+      const event = navigation.emit({
+        type: 'tabPress',
+        target: route.key,
+        canPreventDefault: true,
+      });
+      if (!focused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+    },
+    [focusedKey, navigation]
+  );
 
   const select = useCallback(
     (index: number) => {
-      const route = routes[index];
+      const route = pillRoutes[index];
       if (!route) return;
-      const focused = index === state.index;
+      const focused = route.key === focusedKey;
       const event = navigation.emit({
         type: 'tabPress',
         target: route.key,
@@ -227,7 +295,7 @@ export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
       if (!focused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
       if (focused) slideIndex.set(withSpring(index, SLIDE_SPRING));
     },
-    [routes, state.index, navigation, slideIndex]
+    [pillRoutes, focusedKey, navigation, slideIndex]
   );
 
   const tick = useCallback(() => {
@@ -237,7 +305,7 @@ export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
   const indexAtX = (x: number, minimized: number) => {
     'worklet';
     const side = interpolate(minimized, [0, 1], [0, MINIMIZED_INSET], Extrapolation.CLAMP);
-    const barWidth = width - BAR_MARGIN * 2 - side * 2;
+    const barWidth = pillWidth - side * 2;
     const itemWidth = (barWidth - ROW_PAD_H * 2) / tabCount;
     const raw = (x - ROW_PAD_H) / itemWidth - 0.5;
     return Math.min(Math.max(raw, 0), tabCount - 1);
@@ -249,6 +317,7 @@ export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
     .onStart(() => {
       'worklet';
       isDragging.set(true);
+      press.set(withSpring(1, LENS_PRESS));
       lastTicked.set(Math.round(slideIndex.get()));
       if (minimize) setMinimized(minimize, 0);
     })
@@ -268,12 +337,21 @@ export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
       const rounded = Math.round(slideIndex.get());
       slideIndex.set(withSpring(rounded, SLIDE_SPRING));
       isDragging.set(false);
+      press.set(withSpring(0, LENS_PRESS));
       runOnJS(select)(rounded);
     });
 
   const tap = Gesture.Tap()
     .maxDistance(16)
     .maxDuration(400)
+    .onBegin(() => {
+      'worklet';
+      press.set(withSpring(1, LENS_PRESS));
+    })
+    .onFinalize(() => {
+      'worklet';
+      press.set(withSpring(0, LENS_PRESS));
+    })
     .onEnd((event, success) => {
       'worklet';
       if (!success) return;
@@ -324,9 +402,10 @@ export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
       Extrapolation.CLAMP
     );
     const side = interpolate(progress.get(), [0, 1], [0, MINIMIZED_INSET], Extrapolation.CLAMP);
-    const barWidth = width - BAR_MARGIN * 2 - side * 2;
+    const barWidth = pillWidth - side * 2;
     const itemWidth = (barWidth - ROW_PAD_H * 2) / tabCount;
     return {
+      opacity: pillOn.get(),
       height,
       width: itemWidth,
       borderRadius: height / 2,
@@ -335,9 +414,39 @@ export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
     };
   });
 
+  /* The search key: the pill's glass, a circle, shrinking with it. */
+  const searchStyle = useAnimatedStyle(() => {
+    const size = interpolate(
+      progress.get(),
+      [0, 1],
+      [EXPANDED_HEIGHT, MINIMIZED_HEIGHT],
+      Extrapolation.CLAMP
+    );
+    return {
+      width: size,
+      height: size,
+      borderRadius: size / 2,
+      backgroundColor: liquid
+        ? 'transparent'
+        : interpolateColor(1 - pillOn.get(), [0, 1], [tints.glass, tints.lit]),
+    };
+  }, [liquid]);
+
   if (keyboardShown) return null;
 
   const bottom = barOffset(insets.bottom);
+
+  /* The lens's tabs: each glyph as Skia draws it, resting and chosen. Only
+     when every tab's glyph could be read off its icon. */
+  const lensTabs: LensTab[] = pillRoutes.map((route) => {
+    const { options } = descriptors[route.key];
+    const label =
+      typeof options.tabBarLabel === 'string' ? options.tabBarLabel : (options.title ?? route.name);
+    const draw = (focused: boolean) =>
+      glyphOf(options.tabBarIcon?.({ focused, color: tints.inactive, size: ICON_SIZE }));
+    return { glyph: draw(false) ?? '', activeGlyph: draw(true) ?? '', label };
+  });
+  const lens = liquid && !!LiquidLens && lensTabs.every((tab) => tab.glyph && tab.activeGlyph);
 
   return (
     <View pointerEvents="box-none" style={styles.layer} accessibilityRole="tablist">
@@ -365,59 +474,120 @@ export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
           marginBottom: bottom,
           alignSelf: 'center',
           width: width - BAR_MARGIN * 2,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: SEARCH_GAP,
         }}>
-        <GestureDetector gesture={gesture}>
-          <Animated.View style={barStyle}>
+        <View style={{ width: pillWidth }}>
+          <GestureDetector gesture={gesture}>
+            <Animated.View style={barStyle}>
+              <Animated.View
+                style={[
+                  StyleSheet.absoluteFill,
+                  liquid
+                    ? { borderCurve: 'continuous' }
+                    : {
+                        backgroundColor: tints.glass,
+                        borderColor: withAlpha(theme.white, 0.08),
+                        borderWidth: StyleSheet.hairlineWidth,
+                        borderCurve: 'continuous',
+                      },
+                  shapeStyle,
+                ]}>
+                {/* Settings → Liquid glass: the pill is glass, its corner
+                    following the pill's as it shrinks. */}
+                {liquid && <GlassSurface radius={999} />}
+              </Animated.View>
+              {!lens && (
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    styles.highlight,
+                    { backgroundColor: tints.highlight, borderCurve: 'continuous' },
+                    highlightStyle,
+                  ]}
+                />
+              )}
+              {/* With the lens, its glyphs and words are Skia's; the row
+                  under it stays for the touches and a screen reader. */}
+              {lens && LiquidLens && (
+                <Suspense fallback={null}>
+                  <LiquidLens
+                    geometry={LENS_GEOMETRY(pillWidth)}
+                    tabs={lensTabs}
+                    focused={pillIndex}
+                    slide={slideIndex}
+                    progress={progress}
+                    visible={pillOn}
+                    press={press}
+                    active={tints.active}
+                    inactive={tints.inactive}
+                  />
+                </Suspense>
+              )}
+              <View style={[styles.row, lens && styles.unseen]}>
+                {pillRoutes.map((route, index) => {
+                  const { options } = descriptors[route.key];
+                  const label =
+                    typeof options.tabBarLabel === 'string'
+                      ? options.tabBarLabel
+                      : (options.title ?? route.name);
+                  return (
+                    <GlassTab
+                      key={route.key}
+                      index={index}
+                      focused={route.key === focusedKey}
+                      label={label}
+                      accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
+                      renderIcon={(focused, color) =>
+                        options.tabBarIcon?.({ focused, color, size: ICON_SIZE })
+                      }
+                      slideIndex={slideIndex}
+                      pillOn={pillOn}
+                      progress={progress}
+                      tints={tints}
+                      onPress={() => {
+                        if (minimize) setMinimized(minimize, 0);
+                        select(index);
+                      }}
+                    />
+                  );
+                })}
+              </View>
+            </Animated.View>
+          </GestureDetector>
+        </View>
+
+        {searchRoute && (
+          <Pressable
+            accessibilityRole="tab"
+            accessibilityState={{ selected: searchFocused }}
+            accessibilityLabel={
+              descriptors[searchRoute.key].options.tabBarAccessibilityLabel ?? 'Search'
+            }
+            onPress={() => {
+              if (minimize) setMinimized(minimize, 0);
+              openRoute(searchRoute);
+            }}>
             <Animated.View
               style={[
-                StyleSheet.absoluteFill,
+                styles.search,
                 {
-                  backgroundColor: tints.glass,
                   borderColor: withAlpha(theme.white, 0.08),
-                  borderWidth: StyleSheet.hairlineWidth,
+                  borderWidth: liquid ? 0 : StyleSheet.hairlineWidth,
                   borderCurve: 'continuous',
                 },
-                shapeStyle,
-              ]}
-            />
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.highlight,
-                { backgroundColor: tints.highlight, borderCurve: 'continuous' },
-                highlightStyle,
-              ]}
-            />
-            <View style={styles.row}>
-              {routes.map((route, index) => {
-                const { options } = descriptors[route.key];
-                const label =
-                  typeof options.tabBarLabel === 'string'
-                    ? options.tabBarLabel
-                    : (options.title ?? route.name);
-                return (
-                  <GlassTab
-                    key={route.key}
-                    index={index}
-                    focused={index === state.index}
-                    label={label}
-                    accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
-                    renderIcon={(focused, color) =>
-                      options.tabBarIcon?.({ focused, color, size: ICON_SIZE })
-                    }
-                    slideIndex={slideIndex}
-                    progress={progress}
-                    tints={tints}
-                    onPress={() => {
-                      if (minimize) setMinimized(minimize, 0);
-                      select(index);
-                    }}
-                  />
-                );
+                searchStyle,
+              ]}>
+              {liquid && <GlassSurface radius={999} />}
+              {descriptors[searchRoute.key].options.tabBarIcon?.({
+                focused: searchFocused,
+                color: searchFocused ? tints.active : tints.inactive,
+                size: ICON_SIZE + 3,
               })}
-            </View>
-          </Animated.View>
-        </GestureDetector>
+            </Animated.View>
+          </Pressable>
+        )}
       </View>
     </View>
   );
@@ -447,6 +617,7 @@ function GlassTab({
   accessibilityLabel,
   renderIcon,
   slideIndex,
+  pillOn,
   progress,
   tints,
   onPress,
@@ -457,19 +628,20 @@ function GlassTab({
   accessibilityLabel: string;
   renderIcon: (focused: boolean, color: string) => ReactNode;
   slideIndex: SharedValue<number>;
+  pillOn: SharedValue<number>;
   progress: SharedValue<number>;
   tints: { active: string; inactive: string };
   onPress: () => void;
 }) {
   /* What the highlight is over lights up — live while scrubbing, travelling on a tap. */
   const activeStyle = useAnimatedStyle(() => ({
-    opacity: 1 - Math.min(Math.abs(slideIndex.get() - index), 1),
+    opacity: (1 - Math.min(Math.abs(slideIndex.get() - index), 1)) * pillOn.get(),
   }));
 
   const labelStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.get(), [0, 0.4], [1, 0], Extrapolation.CLAMP),
     color: interpolateColor(
-      Math.min(Math.abs(slideIndex.get() - index), 1),
+      1 - (1 - Math.min(Math.abs(slideIndex.get() - index), 1)) * pillOn.get(),
       [0, 1],
       [tints.active, tints.inactive]
     ),
@@ -509,10 +681,34 @@ function GlassTab({
   );
 }
 
+/** The bar's measurements, as the lens lays its glyphs and words out by them. */
+function LENS_GEOMETRY(width: number) {
+  return {
+    width,
+    expanded: EXPANDED_HEIGHT,
+    minimized: MINIMIZED_HEIGHT,
+    inset: MINIMIZED_INSET,
+    rowPad: ROW_PAD_H,
+    lensExpanded: HIGHLIGHT_EXPANDED,
+    lensMinimized: HIGHLIGHT_MINIMIZED,
+    icon: ICON_SIZE,
+    gap: ITEM_GAP,
+    labelLine: LABEL_HEIGHT,
+    labelSize: 9.5,
+    padTop: ITEM_PAD_V,
+  };
+}
+
+/** expo-liquid-lens's press spring, 320 / 30. */
+const LENS_PRESS = { stiffness: 320, damping: 30, mass: 1 } as const;
+
 const styles = StyleSheet.create({
+  /* Drawn by the lens instead, and still there to be touched and read. */
+  unseen: { opacity: 0 },
   layer: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   fade: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   highlight: { position: 'absolute', left: 0 },
+  search: { alignItems: 'center', justifyContent: 'center' },
   row: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: ROW_PAD_H },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   box: { alignSelf: 'stretch', alignItems: 'center', paddingTop: ITEM_PAD_V, overflow: 'hidden' },

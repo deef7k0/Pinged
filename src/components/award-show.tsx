@@ -12,6 +12,7 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { deleteAward, getAwards, reorderAwards, swapAwards, type AwardSlot } from '@/lib/api';
 import { showAlert } from '@/components/ui/dialog';
+import { toast } from '@/lib/toast';
 
 export type AwardShowProps = {
   listId: string;
@@ -69,7 +70,10 @@ export function AwardShow({ listId, isOwner, header }: AwardShowProps) {
 
   const destroy = useMutation({
     mutationFn: (awardId: string) => deleteAward(awardId),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      toast.success('Award deleted');
+      return invalidate();
+    },
   });
 
   function confirmDelete(award: AwardSlot) {

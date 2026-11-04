@@ -103,6 +103,7 @@ const NEVER_PERSIST: ReadonlySet<string> = new Set([
   'copy-mesh',
   'game-colours',
   'animated-artwork',
+  'game-title',
   'copy-stage-3d',
   'trailers',
   'album-art-color',

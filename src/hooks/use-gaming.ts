@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { getLinkedAccount, getSyncState } from '@/lib/api';
 import type { GamingProvider } from '@/lib/database.types';
 import { requireProvider, SteamProvider, type SyncOutcome, type SyncSection } from '@/lib/gaming';
+import { toast } from '@/lib/toast';
 
 /**
  * Hooks for a linked gaming account.
@@ -208,7 +209,10 @@ export function useAccountLink(userId: string | null, provider: GamingProvider =
       if (!outcome.ok && outcome.reason !== 'cancelled') throw new Error(outcome.message);
       return outcome;
     },
-    onSuccess: invalidateAll,
+    onSuccess: () => {
+      toast.success('Account linked');
+      return invalidateAll();
+    },
   });
 
   const unlink = useMutation({
@@ -216,7 +220,10 @@ export function useAccountLink(userId: string | null, provider: GamingProvider =
       if (!userId) throw new Error('You must be signed in.');
       await requireProvider(provider).unlink({ userId });
     },
-    onSuccess: invalidateAll,
+    onSuccess: () => {
+      toast.success('Account disconnected');
+      return invalidateAll();
+    },
   });
 
   return { link, unlink };

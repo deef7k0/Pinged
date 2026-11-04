@@ -11,6 +11,7 @@ import { Text } from '@/components/ui/text';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { addAwardCategory, getAwards, renameAward, setAwardNote } from '@/lib/api';
+import { toast } from '@/lib/toast';
 
 /** Matches `list_awards.label`'s CHECK. */
 const MAX_LABEL = 60;
@@ -65,6 +66,7 @@ export default function AwardEditScreen() {
       return renameAward(id!, value);
     },
     onSuccess: () => {
+      toast.success('Saved');
       queryClient.invalidateQueries({ queryKey: ['awards', list] });
       queryClient.invalidateQueries({ queryKey: ['lists'] });
       router.back();

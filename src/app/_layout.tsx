@@ -36,7 +36,10 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { MiniPlayer } from '@/components/player/mini-player';
+import { CoverZoomHost } from '@/components/ui/cover-zoom';
 import { DialogHost } from '@/components/ui/dialog';
+import { LiquidGlassWarmup } from '@/components/ui/liquid-glass';
+import { Toaster } from '@/components/ui/toast';
 import { PlayerHost } from '@/components/player/player-host';
 import { GameColoursWarmup } from '@/hooks/use-game-colours';
 import { primeSteamArtwork } from '@/hooks/use-steam-artwork';
@@ -353,10 +356,15 @@ export default function RootLayout() {
             <MiniPlayer />
             {/* Every alert in the app (`showAlert`), over everything. */}
             <DialogHost />
+            <CoverZoomHost />
+            {/* Every toast in the app (`toast` in lib/toast), over the screens. */}
+            <Toaster />
             <AfterOnboarding />
             {/* Settings → Game colours, read once there is an account, so the
                 first game's page never opens in colour and then turns grey. */}
             <GameColoursWarmup />
+            {/* Settings → Liquid glass, read once there is an account. */}
+            <LiquidGlassWarmup />
           </ThemeProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

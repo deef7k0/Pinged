@@ -338,22 +338,54 @@ export async function getAnimatedGrids(
   aspect: CoverAspect,
   signal?: AbortSignal
 ): Promise<SgdbGrid[]> {
-  if (!KEY) return [];
+  /* No key is not "no grids": a build without one must not remember that. */
+  if (!KEY) throw new SgdbUnavailable('No SteamGridDB key in this build');
 
   const query =
     `types=animated&dimensions=${SGDB_DIMENSIONS[aspect]}` +
     `&nsfw=false&epilepsy=false&humor=false&limit=${SGDB_CANDIDATES}`;
 
   const ask = async (scope: string) =>
-    (await sgdb<AnimatedGridResponse>(`/grids/${scope}?${query}`, signal))?.data ?? [];
+    (await sgdbStrict<AnimatedGridResponse>(`/grids/${scope}?${query}`, signal))?.data ?? [];
 
   if (steamAppId) {
     const direct = await ask(`steam/${steamAppId}`);
     if (direct.length > 0) return direct;
   }
   if (title) {
-    const found = await resolveGame(title, signal);
-    if (found) return ask(`game/${found.id}`);
+    const search = await sgdbStrict<SearchResponse>(
+      `/search/autocomplete/${encodeURIComponent(title.trim())}`,
+      signal
+    );
+    const id = search?.data?.[0]?.id;
+    if (id) return ask(`game/${id}`);
   }
   return [];
+}
+
+/** SteamGridDB could not be asked: a rate limit, a bad key, no network. */
+export class SgdbUnavailable extends Error {}
+
+/**
+ * `sgdb`, for answers that are *remembered*: a 404 is SteamGridDB saying it
+ * has nothing (`null`), and every other failure throws `SgdbUnavailable`.
+ * The animated covers are kept on the device for a month, "none" included,
+ * and a 429 or a dropped connection stored as "none" was every game reading
+ * "no animated cover" until the month ran out.
+ */
+async function sgdbStrict<T>(path: string, signal?: AbortSignal): Promise<T | null> {
+  return limited(async () => {
+    let response: Response;
+    try {
+      response = await fetch(`${API}${path}`, {
+        headers: { Authorization: `Bearer ${KEY}` },
+        ...(signal ? { signal } : {}),
+      });
+    } catch (error) {
+      throw new SgdbUnavailable(String(error));
+    }
+    if (response.status === 404) return null;
+    if (!response.ok) throw new SgdbUnavailable(`SteamGridDB answered ${response.status}`);
+    return (await response.json()) as T;
+  });
 }
