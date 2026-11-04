@@ -6192,6 +6192,62 @@ The owner's message of 2026-11-04, eight requests at once. Types, lint and
   app does not ship. The plain highlight stays everywhere else. The rim is
   at 7% — the reference's is 7% of its 6% fill, which is not seen.
 
+### The band: the game page's and a review's blur (2026-11-04, later)
+
+The owner, with an album page for reference ("eternal sunshine"): "Make the
+blur length and strength like this image… A thin row of blur, that sits on
+a) the title logo png, if the title is on, or b) the genre and buttons, if
+the title is off. On a) everything from the buttons to below is sitting on
+the solid color background. On b) everything from the about row… if the
+title is kept on, it has to cover more of the artwork, so you shouldn't
+move it lower, just the blur. The blur should have the same fading effect as
+the solid color fade… or add the blur and then the fade on top of it, only
+that a little lower from the blur."
+
+- **It replaces Convx's foot on the game page** (`<PinnedHero band>`,
+  `bandShader`, `BAND` in `lib/progressive-blur`, tested and compiled in
+  CanvasKit): from `BAND.lead` (28dp) above the first words — the title, or
+  the genres with the title off — the blur comes in, its strength and its
+  opacity on one smoothstep, to 30pt by 60% of the band; the page's colour
+  comes in on the same curve 22% lower, whole at the band's end: the Log
+  pill's row (title on) or the synopsis (title off). The rows are measured
+  (`<GameHeaderWords onRows>`), estimated until they are. The words did not
+  move: the title still stands at Convx's knee, the title-less words at
+  0.98. The hero's tail runs only as far as the band needs
+  (`BAND_FOOT` under it); `knee` and `extend` are no longer passed by the
+  game page. Scrolling still climbs the blur and drains the art; the cover
+  in front slides the band down to the cover's edge with the mesh under it.
+- **A review is the album page**: the game's art (the square, else its art
+  or cover) pinned at the top, square and full width, the same band and
+  animated blur; on its foot, centred, the game's name (at Convx's knee, as
+  the game page's title), the writer's face and name, a facts line (date ·
+  score and word in the score's colour · platform) and the buttons (like
+  and its count, ping, share, report); the band is the page's colour by the
+  buttons, and the quote, the review, how it was played and the replies are
+  on the page. It replaced the owner's 2026-10-17 screenshot layout, so
+  `constants/review-page.ts` now only gives the type sizes of what is under
+  the buttons. `<HeroFoot>` and its solid fade are gone with it.
+- **Not seen on a phone.** To judge: the band's strength and length against
+  the reference, where it lands on a game with no logo, and the review head.
+- **Second pass, the same day** (the owner, after seeing it):
+  - **Stronger where it starts, and higher**: an ease *out* (heavy just past
+    its start), 34pt by half the band, from 56dp above the first words.
+  - **Never a reflection**: under the cover's foot the band's tail is the
+    cover's last 3% stretched down (`TAIL_STRIP`), not Convx's mirror, so
+    the blur there is the cover's colours fading. Convx's tail stays on the
+    studio and the collection.
+  - **APNGs move under the blur too** (`lib/apng`, tested against Node's
+    zlib): split into plain PNGs and composited onto a CPU Skia surface on
+    the UI thread, one decode a frame (`nextApngFrame`). Before, an APNG was
+    expo-image's over the art and the scroll blurred the still.
+  - **The trailer is seen whole**: with it playing, the words start 16dp
+    above its foot instead of on it, the scrim is 18%, and its fade a tenth.
+  - **A review's head is left-aligned**: glass tags (score and word, the
+    platform, how far) over the game's name, the writer; the band ends at
+    the facts line, so the facts, the keys (round glass at the left, a big
+    filled like at the right with its count) and a rule are on the page;
+    the quote and the review under the rule.
+
 ## Store-release compliance (audited 2026-10-29)
 
 Against a security / Play Store checklist the owner pasted. **Done in

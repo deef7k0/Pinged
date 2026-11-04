@@ -29,6 +29,7 @@ import {
   COVER_FRONT_KNEE,
   PROGRESSIVE_BLUR,
   TAIL,
+  bandWashStops,
   kneeDrop,
   washStops,
 } from '@/lib/progressive-blur';
@@ -88,13 +89,6 @@ function anchorsOf(position: ImageContentPosition | undefined): { x: number; y: 
  */
 const HERO_WASH: FootFade = washStops(PROGRESSIVE_BLUR.longWashFrom);
 
-/**
- * While a review's blur (`<HeroFoot>`) is on its way, a solid fade stands in
- * for it: the page's colour over the art's bottom third, whole at its foot.
- * The pinned hero has none (2026-11-04: its blur is as it was).
- */
-const WAITING_FADE: FootFade = footFade(0.34);
-
 /** A gradient's colours and stops, which its types insist are at least two. */
 type Colours = readonly [string, string, ...string[]];
 type Stops = readonly [number, number, ...number[]];
@@ -118,7 +112,10 @@ export const MASTHEAD_FADE: FootFade = {
  * The trailer's foot (`blur={false}`): the page's colour rising over the
  * bottom of the video only, so the video is seen whole above it.
  */
-export const TRAILER_FADE: FootFade = footFade(0.28);
+/* A tenth, down from 0.28 (2026-11-04: the fade hid the trailer): the
+   video is seen whole, melting into the page only at its very foot, where
+   the words begin. */
+export const TRAILER_FADE: FootFade = footFade(0.1);
 
 export type PinnedHeroProps = {
   /** The art. IGDB's, unless a Steam hero takes its place (`steamAppId`). */
@@ -198,6 +195,14 @@ export type PinnedHeroProps = {
    * game page with its title off.
    */
   extend?: number;
+  /**
+   * The game page's band, in dp from the art's top: a thin row of blur from
+   * `from` that is heavy well before `to`, and the page's colour whole at
+   * `to` (`BAND`, the owner's reference of 2026-11-04). In place of Convx's
+   * foot, its tail running only as far as the band needs. Where Skia cannot
+   * draw it, the page's own `fade`.
+   */
+  band?: { from: number; to: number } | null;
 };
 
 /**
@@ -278,6 +283,7 @@ export const PinnedHero = memo(function PinnedHero({
   knee,
   lowered = false,
   extend = 0,
+  band = null,
 }: PinnedHeroProps) {
   const chrome = useScreenChrome();
   const still = useSharedValue(0);
@@ -306,8 +312,21 @@ export const PinnedHero = memo(function PinnedHero({
    * over every copy.
    */
   const tailed = withTail && progressive && !!source;
-  const reach0 = tailed ? (extend > 0 ? extend : 0) : 0;
-  const tail = tailed ? Math.round(height * (TAIL + reach0 / PROGRESSIVE_BLUR.artworkExtent)) : 0;
+  /* A side, Convx's unit, in dp of this art. */
+  const sideDp = height / PROGRESSIVE_BLUR.artworkExtent;
+  /* The band, in sides; the hero runs on only as far as the band needs. */
+  const bandSides = tailed && band ? { from: band.from / sideDp, to: band.to / sideDp } : null;
+  const bandReach = band ? Math.max(height, Math.round(band.to + BAND_FOOT)) : 0;
+  const reach0 = bandSides
+    ? bandReach / sideDp - PROGRESSIVE_BLUR.heroExtent
+    : tailed
+      ? Math.max(0, extend)
+      : 0;
+  const tail = bandSides
+    ? bandReach - height
+    : tailed
+      ? Math.round(height * (TAIL + reach0 / PROGRESSIVE_BLUR.artworkExtent))
+      : 0;
   const reach = height + tail;
   const onSkiaFailed = useCallback(() => setSkiaFailed(true), []);
   const anchors = anchorsOf(contentPosition);
@@ -330,7 +349,9 @@ export const PinnedHero = memo(function PinnedHero({
   const ownKnee = withTail ? PROGRESSIVE_BLUR.longKnee : PROGRESSIVE_BLUR.knee;
   const restKnee = Math.max(ownKnee, knee ?? ownKnee);
   const targetDrop = kneeDrop(ownKnee, restKnee);
-  const targetSlide = lowered ? kneeDrop(restKnee, COVER_FRONT_KNEE) : 0;
+  const targetSlide = lowered
+    ? kneeDrop(bandSides ? bandSides.from : restKnee, COVER_FRONT_KNEE)
+    : 0;
   const drop = useSharedValue(targetDrop);
   const slide = useSharedValue(targetSlide);
   useEffect(() => {
@@ -341,14 +362,19 @@ export const PinnedHero = memo(function PinnedHero({
   }, [targetDrop, targetSlide, drop, slide]);
   /* Convx's wash over the art and its tail: from where the (squeezed) blur
      begins to just short of the tail's foot, however far the tail runs. */
+  const bandFromS = bandSides?.from ?? 0;
+  const bandToS = bandSides?.to ?? 0;
+  const hasBand = !!bandSides;
   const foot = useMemo(
     () =>
-      tail > 0
-        ? targetDrop === 0 && reach0 === 0
-          ? HERO_WASH
-          : washStops(PROGRESSIVE_BLUR.longWashFrom + targetDrop, reach0)
-        : fade,
-    [tail, targetDrop, reach0, fade]
+      hasBand
+        ? bandWashStops(bandFromS, bandToS, reach / sideDp)
+        : tail > 0
+          ? targetDrop === 0 && reach0 === 0
+            ? HERO_WASH
+            : washStops(PROGRESSIVE_BLUR.longWashFrom + targetDrop, reach0)
+          : fade,
+    [hasBand, bandFromS, bandToS, reach, sideDp, tail, targetDrop, reach0, fade]
   );
   const footColours = useMemo(() => colours(foot, page), [foot, page]);
   const washStyle = useAnimatedStyle(() => {
@@ -469,6 +495,7 @@ export const PinnedHero = memo(function PinnedHero({
                     drop={drop}
                     slide={slide}
                     extend={reach0}
+                    band={bandSides}
                   />
                 </Suspense>
               </Animated.View>
@@ -529,82 +556,8 @@ export const PinnedHero = memo(function PinnedHero({
   );
 });
 
-/**
- * Convx's foot for a hero that is not pinned — a review's square art, which
- * scrolls with its page: the long row-by-row blur over the art and its
- * mirrored tail, and Convx's wash over both, the solid fade standing in until
- * the blur has drawn. Laid from the art's top, as tall as the art and its
- * tail, so the tail lies behind whatever the page draws under the art.
- *
- * Only where the build has Skia (`HERO_ANIMATES`); the caller keeps its own
- * fade where it has not.
- */
-export function HeroFoot({ uri, height, page }: { uri: string; height: number; page: string }) {
-  const { width } = useWindowDimensions();
-  const rest = useSharedValue(0);
-  const [failed, setFailed] = useState(false);
-  const [drawnFor, setDrawnFor] = useState<string | null>(null);
-  const drawn = drawnFor === uri && !failed;
-  const onReady = useCallback(() => setDrawnFor(uri), [uri]);
-  const onFail = useCallback(() => setFailed(true), []);
-  const washColours = useMemo(() => colours(HERO_WASH, page), [page]);
-  const waitingColours = useMemo(() => colours(WAITING_FADE, page), [page]);
-  const reach = height + Math.round(height * TAIL);
-  if (!ProgressiveBlur) return null;
-
-  return (
-    <View pointerEvents="none" style={[styles.art, { height: reach }]}>
-      {!failed && (
-        <Animated.View
-          style={[
-            styles.fill,
-            { opacity: drawn ? 1 : 0, transitionProperty: 'opacity', transitionDuration: 280 },
-          ]}>
-          <Suspense fallback={null}>
-            <ProgressiveBlur
-              uri={uri}
-              width={width}
-              height={height}
-              anchorX={0.5}
-              anchorY={0.5}
-              progress={rest}
-              onFail={onFail}
-              onReady={onReady}
-              long
-            />
-          </Suspense>
-        </Animated.View>
-      )}
-      <Animated.View
-        style={[
-          styles.fill,
-          { opacity: drawn ? 1 : 0, transitionProperty: 'opacity', transitionDuration: 280 },
-        ]}>
-        <LinearGradient
-          colors={washColours}
-          locations={locations(HERO_WASH)}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
-      <Animated.View
-        style={[
-          styles.art,
-          {
-            height,
-            opacity: drawn ? 0 : 1,
-            transitionProperty: 'opacity',
-            transitionDuration: 280,
-          },
-        ]}>
-        <LinearGradient
-          colors={waitingColours}
-          locations={locations(WAITING_FADE)}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
-    </View>
-  );
-}
+/** How far under the band's end the hero runs, so its foot is page colour already. */
+const BAND_FOOT = 24;
 
 /** How long the blur takes to settle at the cover's edge, and to come back. */
 const LOWER_MS = 650;

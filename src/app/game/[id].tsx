@@ -78,7 +78,7 @@ import { useHeaderHeight, useTopBarInset } from '@/hooks/use-header-height';
 import { getAchievementsForGame, getCopies, getMyLog } from '@/lib/api';
 import type { GameLog } from '@/lib/database.types';
 import { skiaAnimates } from '@/lib/animated-cover';
-import { TITLELESS_KNEE, heroExtension } from '@/lib/progressive-blur';
+import { BAND } from '@/lib/progressive-blur';
 import { getGameById, getSimilarTo, parseGameId, type Game } from '@/lib/games';
 import { getCollectionGames, getFranchiseGames, getGameExtras } from '@/lib/games/igdb';
 import { formatReleaseDate } from '@/lib/games/release';
@@ -105,6 +105,9 @@ type HeaderMode = 'portrait' | 'landscape';
  */
 const CASE_WIDTH_RATIO = 0.33;
 const CASE_MAX_WIDTH = 200;
+
+/** How far the words rise into the trailer's foot — its last few dp, where it fades. */
+const TRAILER_OVERLAP = 16;
 
 /** "At the top": within this of it, the cover can be brought to the front. */
 const TOP_SLACK = 4;
@@ -321,8 +324,11 @@ export default function GameDetailScreen() {
   const [coverFront, setCoverFront] = useState(false);
   const [atTop, setAtTop] = useState(true);
   const mesh = useArtworkMesh(game.data?.coverUrl ?? game.data?.heroUrl);
-  /* How tall the words are: the blur runs on under all of them. */
-  const [wordsHeight, setWordsHeight] = useState(0);
+  /* Where the words' rows stand in them: the blur's band is set by them. */
+  const [rows, setRows] = useState<{ genres?: number; keys?: number; about?: number }>({});
+  const onRows = useCallback((row: 'genres' | 'keys' | 'about', y: number) => {
+    setRows((was) => (was[row] === y ? was : { ...was, [row]: y }));
+  }, []);
   /* Android's back puts the page back first. A listener, not a state sync. */
   useEffect(() => {
     if (!coverFront) return;
@@ -390,16 +396,39 @@ export default function GameDetailScreen() {
     ? heroHeightFor(width, windowHeight)
     : coverHeight(width, coverAspect);
   const [titleBox, setTitleBox] = useState<LayoutRectangle | null>(null);
-  const contentTop = wordsTop(
-    artHeight,
-    titleBox?.y ?? 0,
-    topInset + TOP_BAR_ROW,
-    gameTitle.shown || landscape ? undefined : TITLELESS_WORDS_KNEE
-  );
+  /* With the trailer playing the words start under the video, on its
+     faded foot, not over it (the owner's, 2026-11-04: "the fade effects get
+     in the way of the trailer… you can barely see it"). */
+  const contentTop = landscape
+    ? Math.round(artHeight - TRAILER_OVERLAP)
+    : wordsTop(
+        artHeight,
+        titleBox?.y ?? 0,
+        topInset + TOP_BAR_ROW,
+        gameTitle.shown ? undefined : TITLELESS_WORDS_KNEE
+      );
   const titleTop = contentTop + (titleBox?.y ?? 0);
   const titleFoot = titleTop + (titleBox?.height ?? 36);
   const handoff = handoffBand(titleTop, titleFoot, topInset + TOP_BAR_ROW);
   const solidAt = Math.max(1, revealOffset(titleFoot, topInset + TOP_BAR_ROW));
+  /*
+   * The band, in dp from the top of the display at rest: the blur from a
+   * little above the first words — the title, or with it off the genres — to
+   * where the page is solid: the Log pill's row (its own top margin in), or
+   * with the title off the synopsis. Estimated until the rows are measured.
+   */
+  const KEYS_MARGIN = 12;
+  const bandStart = (gameTitle.shown ? titleTop : contentTop + (rows.genres ?? 0)) - BAND.lead;
+  const bandEnd = gameTitle.shown
+    ? rows.keys !== undefined
+      ? contentTop + rows.keys + KEYS_MARGIN
+      : titleFoot + 40
+    : rows.about !== undefined
+      ? contentTop + rows.about
+      : rows.keys !== undefined
+        ? contentTop + rows.keys + 70
+        : contentTop + 120;
+  const blurBand = { from: bandStart, to: Math.max(bandStart + 40, bandEnd) };
   const tabsAt = solidPartAt !== null && tabsY !== null ? solidPartAt + tabsY : null;
 
   const availablePlatforms = platformKeysFor(game.data?.platforms);
@@ -718,18 +747,13 @@ export default function GameDetailScreen() {
                 blur={!landscape}
                 animation={landscape ? null : heroAnimation}
                 onAnimationFail={() => setSkiaRefused(animated?.animatedUrl ?? null)}
-                /* Title off: the blur begins a little above the cover's foot,
-                   so the logo on the box is seen. */
-                knee={gameTitle.shown || landscape ? undefined : TITLELESS_KNEE}
+                /* The blur as a band under the words (the owner's reference,
+                   2026-11-04): from just above the title — or the genres,
+                   with the title off — to the Log pill's row, or the
+                   synopsis, where the page is its own colour. */
+                band={landscape ? null : blurBand}
                 /* The cover in front: its blur eases down to its edge. */
                 lowered={coverFront}
-                /* The blur and its wash run on under the words, so all of
-                   them stand on it (the title off sets them low). */
-                extend={
-                  landscape || gameTitle.shown
-                    ? 0
-                    : heroExtension(artHeight, contentTop + wordsHeight)
-                }
                 onLoad={
                   landscape || data.coverAspect
                     ? undefined
@@ -738,7 +762,8 @@ export default function GameDetailScreen() {
                       }
                 }
                 solidAt={solidAt}
-                scrim={0.4}
+                /* Only the status bar's band darkened over the trailer. */
+                scrim={landscape ? 0.18 : 0.4}
                 ready={!swapping}
                 media={(art) =>
                   landscape ? (
@@ -895,7 +920,6 @@ export default function GameDetailScreen() {
                 </Animated.View>
                 <Animated.View
                   layout={reduceMotion ? undefined : LinearTransition.duration(GAME_HEADER.swapMs)}
-                  onLayout={(event) => setWordsHeight(event.nativeEvent.layout.height)}
                   style={styles.words}>
                   <GameHeaderWords
                     game={data}
@@ -903,6 +927,7 @@ export default function GameDetailScreen() {
                     companies={extras.data?.companies ?? []}
                     band={handoff}
                     onTitleBox={setTitleBox}
+                    onRows={onRows}
                     showTitle={gameTitle.shown}
                     onOpenProgress={openProgress}
                     onOpenLists={openLists}

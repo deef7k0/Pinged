@@ -3,6 +3,11 @@ import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
 
 import {
+  BAND,
+  bandBlurPt,
+  bandShader,
+  bandWash,
+  bandWashStops,
   blurStart,
   COVER_FRONT_KNEE,
   coverFrontDrop,
@@ -278,5 +283,50 @@ describe('the tail running on under low words', () => {
     const stops = washStops(PROGRESSIVE_BLUR.longWashFrom, 0.3);
     assert.equal(stops.alphas[stops.alphas.length - 1], 1);
     assert.equal(stops.alphas[0], 0);
+  });
+});
+
+describe('the game page’s band — the owner’s album-page reference', () => {
+  it('compiles in Skia, both passes, with the band’s uniforms', async () => {
+    const require = createRequire(import.meta.url);
+    const init = require('canvaskit-wasm/bin/full/canvaskit.js');
+    const CanvasKit = await init({
+      locateFile: (file: string) => require.resolve(`canvaskit-wasm/bin/full/${file}`),
+    });
+    for (const axis of ['horizontal', 'vertical'] as const) {
+      let error = '';
+      const effect = CanvasKit.RuntimeEffect.Make(bandShader(axis), (message: string) => {
+        error = message;
+      });
+      assert.ok(effect, `${axis}: ${error}`);
+      const names = Array.from({ length: effect.getUniformCount() }, (_, i) =>
+        effect.getUniformName(i)
+      );
+      assert.deepEqual(names, ['size', 'side', 'pxPerPt', 'progress', 'from', 'to', 'slide']);
+      effect.delete();
+    }
+  });
+
+  it('is nothing above the band, heavy before its end, the page’s colour at its end', () => {
+    assert.equal(bandBlurPt(0.79, 0.8, 1.0), 0);
+    assert.equal(bandBlurPt(0.8 + 0.2 * BAND.blurShare, 0.8, 1.0), BAND.maxPt);
+    assert.equal(bandWash(0.8 + 0.2 * BAND.washLag, 0.8, 1.0), 0);
+    assert.equal(bandWash(1.0, 0.8, 1.0), 1);
+    /* The blur comes in ahead of the colour, on the same curve. */
+    for (let f = 0.8; f <= 1.0; f += 0.01) {
+      assert.ok(bandBlurPt(f, 0.8, 1.0) / BAND.maxPt + 1e-9 >= bandWash(f, 0.8, 1.0));
+    }
+  });
+
+  it('is strong soon after it begins — an ease out, the owner’s', () => {
+    const early = 0.8 + 0.2 * BAND.blurShare * 0.25;
+    assert.ok(bandBlurPt(early, 0.8, 1.0) > BAND.maxPt * 0.4, `${bandBlurPt(early, 0.8, 1.0)}`);
+    assert.ok(bandShader('vertical').includes('easeOut(from'));
+  });
+
+  it('draws its wash as stops over the hero', () => {
+    const stops = bandWashStops(0.8, 1.0, 1.2);
+    assert.equal(stops.alphas[0], 0);
+    assert.equal(stops.alphas[stops.alphas.length - 1], 1);
   });
 });

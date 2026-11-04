@@ -205,14 +205,15 @@ describe('lightEnough', () => {
 });
 
 describe('which animations the hero’s blur can draw', () => {
-  it('is an animated WebP or GIF, or a video — never an APNG', async () => {
+  it('is an animated WebP, GIF or APNG, or a video', async () => {
     const { skiaAnimates } = await import('./animated-cover.ts');
     assert.equal(skiaAnimates('https://cdn2.steamgriddb.com/grid/a.webp'), true);
     assert.equal(skiaAnimates('https://images.igdb.com/x/t_720p/co4a6r.webp?x=1'), true);
     assert.equal(skiaAnimates('https://x/y.GIF'), true);
-    assert.equal(skiaAnimates('https://cdn2.steamgriddb.com/grid/a.png'), false);
+    assert.equal(skiaAnimates('https://cdn2.steamgriddb.com/grid/a.png'), true);
     assert.equal(skiaAnimates('https://cdn2.steamgriddb.com/thumb/a.webm'), true);
-    assert.equal(skiaAnimates('https://x/a.APNG'), false);
+    assert.equal(skiaAnimates('https://x/a.APNG'), true);
+    assert.equal(skiaAnimates('https://x/a.jpg'), false);
     assert.equal(skiaAnimates(null), false);
   });
 });

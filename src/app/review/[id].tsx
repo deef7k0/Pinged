@@ -26,10 +26,11 @@ import { PageScrollView } from '@/components/ui/page-scroll';
 import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
-import { HERO_ANIMATES, HeroFoot } from '@/components/ui/pinned-hero';
+import { HandoffTitle } from '@/components/ui/handoff-title';
+import { HERO_ANIMATES, MASTHEAD_FADE, PageFill, PinnedHero } from '@/components/ui/pinned-hero';
 import { Text } from '@/components/ui/text';
 import { PLATFORMS } from '@/constants/platform-cases';
-import { familyForStored, platformKeyForStored } from '@/constants/platform-family';
+import { platformKeyForStored } from '@/constants/platform-family';
 import { PROGRESS_META, progressChoiceFor } from '@/constants/progress';
 import { orderedMetrics, parseReviewMetrics } from '@/constants/review-metrics';
 import {
@@ -38,23 +39,22 @@ import {
   DATE_TOP,
   DETAILS_ICON,
   DETAILS_TOP,
-  HERO_FADE,
   LIKE_ROW,
   PLATFORM_ICON,
   PLATFORM_TOP,
   QUOTE_GAP,
   REPLIES_TOP,
-  REVIEW_HERO,
   REVIEW_MARGIN,
   REVIEW_MAX_COLUMN,
   REVIEW_ROW,
   REVIEW_TYPE,
   TITLE_LINES,
   TITLE_TRACKING,
-  reviewHeroHeight,
   type ReviewLine,
 } from '@/constants/review-page';
+import { wordsTop } from '@/constants/game-header';
 import { labelFor, scoreColor } from '@/constants/score';
+import { TOP_BAR_ROW, handoffBand, revealOffset } from '@/constants/top-bar';
 import { FontFamily, Palette, Spacing, withAlpha } from '@/constants/theme';
 import { AccentProvider, useAccent } from '@/hooks/use-accent';
 import { useLikeToggle } from '@/hooks/use-like-toggle';
@@ -62,13 +62,17 @@ import { useAnimatedCover } from '@/hooks/use-animated-cover';
 import { useGameColours } from '@/hooks/use-game-colours';
 import { useReviewColour } from '@/hooks/use-review-colour';
 import { useSquareCover } from '@/hooks/use-square-cover';
+import { useTopBarInset } from '@/hooks/use-header-height';
 import { useTheme } from '@/hooks/use-theme';
 import { getEngagement, getLogById } from '@/lib/api';
 import { recallLog } from '@/lib/api/seen-logs';
 import type { CachedGame, LogWithRelations } from '@/lib/database.types';
+import { skiaAnimates } from '@/lib/animated-cover';
 import { displayNameFor } from '@/lib/format';
+import { BAND } from '@/lib/progressive-blur';
 import { ordinalDate, playedDetails } from '@/lib/review-details';
 import { normaliseQuote } from '@/lib/review-quote';
+import { smoothScrimStops } from '@/lib/scrim';
 import { useAuth } from '@/store/auth';
 
 /**
@@ -194,8 +198,9 @@ function ReviewPage({
 }) {
   const theme = useTheme();
   const accent = useAccent();
-  const { width, height: windowHeight } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const viewerId = useAuth((state) => state.session?.user.id) ?? null;
+  const topInset = useTopBarInset();
 
   const engagement = useQuery({
     queryKey: ['engagement', 'log', review.id, viewerId],
@@ -234,7 +239,6 @@ function ReviewPage({
      typed, under a controller. So the sentence about the run leaves it out. */
   const platformKey = platformKeyForStored(review.played_on);
   const platform = platformKey ? PLATFORMS[platformKey].label : review.played_on?.trim() || null;
-  const platformIcon = familyForStored(review.played_on)?.icon ?? 'game-controller';
   const metrics = parseReviewMetrics(review.review_metrics);
   const details = playedDetails(
     review,
@@ -249,25 +253,105 @@ function ReviewPage({
   });
   const detailsIcon = progress ? PROGRESS_META[progress].outline : 'game-controller-outline';
 
-  const heroHeight = reviewHeroHeight(windowHeight);
   const column = Math.min(width, REVIEW_MAX_COLUMN) - REVIEW_MARGIN * 2;
 
-  /* What stands between the date and the platform. */
+  /* What stands under the buttons. */
   const articleShown = hasProse || !quote;
   const reviewInk = withAlpha(theme.text, REVIEW_INK);
+  const page = accent.page;
+  /* The reference's keys: glass at the left, the like filled in the page's
+     own light — the scheme's primary on a game's colours, white without. */
+  const glassKeyColours = {
+    backgroundColor: withAlpha(Palette.white, 0.1),
+    borderColor: withAlpha(Palette.white, 0.22),
+  };
+  const keyInk = Palette.white;
+  const likeFill = accent.tonal ? accent.m3.primary : theme.white;
+  const likeInk = accent.tonal ? accent.m3.onPrimary : Palette.shadowInk;
+
+  /*
+   * The album page (the owner's reference, 2026-11-04): the game's art pinned
+   * at the top, square and full width; on its foot the game's name, the
+   * writer, the facts and the buttons, on a band of blur that is the page's
+   * own colour by the buttons; the review and everything after on the page.
+   * The words are set as the game page's are — the name where the blur's
+   * knee is — and the band runs from just above the name to the buttons.
+   */
+  const art = useReviewArt(game);
+  const artHeight = width;
+  /* The name's box in the words (under the tags), and where the facts start:
+     the band is the tags, the name and the writer; the page is solid from
+     the facts down (the owner's, 2026-11-04). */
+  const [titleBox, setTitleBox] = useState({ y: 0, height: 36 });
+  const [factsY, setFactsY] = useState<number | null>(null);
+  const contentTop = wordsTop(artHeight, titleBox.y, topInset + TOP_BAR_ROW);
+  const titleTop = contentTop + titleBox.y;
+  const titleFoot = titleTop + titleBox.height;
+  const handoff = handoffBand(titleTop, titleFoot, topInset + TOP_BAR_ROW);
+  const solidAt = Math.max(1, revealOffset(titleFoot, topInset + TOP_BAR_ROW));
+  const bandStart = contentTop - BAND.lead;
+  const bandEnd = factsY !== null ? contentTop + factsY : titleFoot + 44;
+  const band = { from: bandStart, to: Math.max(bandStart + 40, bandEnd) };
+  /* The tags over the name: what the reference's "Album" and "Pop" are. */
+  const tags = [
+    rating !== null ? `${rating} · ${labelFor(rating)}` : null,
+    platform,
+    progress ? PROGRESS_META[progress].label : null,
+  ].filter((part): part is string => !!part);
+  const facts = [
+    ordinalDate(review.created_at),
+    game?.developer ? `by ${game.developer}` : null,
+  ].filter((part): part is string => !!part);
 
   return (
     <>
       <Screen
         edges={['bottom']}
-        background={accent.page}
-        /* The disc leaves with the art; the bar that follows names the game the
-           review is of, once the row has gone under it. */
+        background={page}
+        /* Behind the page: its colour, then the art pinned at the top — the
+           game page's hero and blur. */
+        backdrop={
+          <>
+            <PageFill color={page} />
+            {art.uri && (
+              <PinnedHero
+                uri={art.uri}
+                height={artHeight}
+                page={page}
+                fade={MASTHEAD_FADE}
+                solidAt={solidAt}
+                scrim={0.4}
+                tail
+                band={band}
+                animation={art.skia}
+                onAnimationFail={art.refuse}
+                media={(still) => (
+                  <>
+                    {still}
+                    {art.overlay && (
+                      <AnimatedCoverImage
+                        staticUrl={null}
+                        animatedUrl={art.overlay.animatedUrl}
+                        format={art.overlay.format}
+                        status={art.overlay.status}
+                        aspect="square"
+                        backdrop="transparent"
+                        style={StyleSheet.absoluteFill}
+                        onFailed={art.overlay.reportFailure}
+                      />
+                    )}
+                  </>
+                )}
+              />
+            )}
+          </>
+        }
         topBar={
           <FrostedTopBar
             back
             title={game?.title ?? 'Review'}
-            header={heroHeight + REVIEW_ROW.top + REVIEW_ROW.avatar}
+            header={titleFoot}
+            handoff={handoff}
             right={
               /* The game's colours on and off — the owner's (2026-10-16). */
               onColourful ? (
@@ -291,231 +375,230 @@ function ReviewPage({
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <PageScrollView
             style={styles.flex}
+            settle={handoff}
             contentContainerStyle={styles.scroll}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
-            <ReviewHero game={game} width={width} height={heroHeight} page={accent.page} />
+            {/* Where the art shows through, the words on its foot. */}
+            <View style={styles.masthead}>
+              <View pointerEvents="none" style={styles.lip}>
+                <LinearGradient
+                  colors={lipColours(page)}
+                  locations={
+                    LIP_STOPS.locations as unknown as readonly [number, number, ...number[]]
+                  }
+                  style={StyleSheet.absoluteFill}
+                />
+              </View>
+              <View style={{ height: contentTop }} />
+              <View style={[styles.words, { width: column }]}>
+                {/* The tags, glass capsules: the score, the platform, how far. */}
+                {tags.length > 0 && (
+                  <View style={styles.tags}>
+                    {tags.map((tag, index) => (
+                      <View
+                        key={tag}
+                        style={styles.tag}
+                        accessible
+                        accessibilityLabel={index === 0 && rating !== null ? `Scored ${tag}` : tag}>
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.tagText,
+                            index === 0 && rating !== null
+                              ? { color: scoreColor(rating, theme) }
+                              : undefined,
+                          ]}>
+                          {tag}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
 
-            <View style={{ width: column }}>
-              {/*
-                The row: the writer's face, and beside it — centred on it — their
-                name with the score at the far end, the game's name, its
-                developer.
-              */}
-              <View style={styles.row}>
+                {/* The game's name, a link to it. */}
+                <View onLayout={(event) => setTitleBox(event.nativeEvent.layout)}>
+                  <HandoffTitle band={handoff}>
+                    <GameName game={game} gameId={review.game_id} />
+                  </HandoffTitle>
+                </View>
+
+                {/* The writer, where the reference has its artist. */}
                 {author ? (
                   <Link href={{ pathname: '/profile/[id]', params: { id: author.id } }} asChild>
                     <PressableScale
                       accessibilityRole="link"
-                      accessibilityLabel={`${authorName}’s profile`}
-                      scaleTo={0.96}>
-                      <Avatar uri={author.avatar_url} name={authorName} size={REVIEW_ROW.avatar} />
+                      accessibilityLabel={`Review by ${authorName}. Opens their profile.`}
+                      hitSlop={NAME_SLOP}
+                      scaleTo={0.97}
+                      style={styles.bylineLink}>
+                      <Avatar uri={author.avatar_url} name={authorName} size={BYLINE_FACE} />
+                      <Text numberOfLines={1} style={[styles.name, { color: Palette.white }]}>
+                        {authorName}
+                      </Text>
                     </PressableScale>
                   </Link>
                 ) : (
-                  <Avatar uri={null} name={authorName} size={REVIEW_ROW.avatar} />
+                  <View style={styles.bylineLink}>
+                    <Avatar uri={null} name={authorName} size={BYLINE_FACE} />
+                    <Text numberOfLines={1} style={[styles.name, { color: Palette.white }]}>
+                      {authorName}
+                    </Text>
+                  </View>
                 )}
 
-                <View style={styles.billing}>
-                  <View style={styles.nameLine}>
-                    {author ? (
-                      <Link href={{ pathname: '/profile/[id]', params: { id: author.id } }} asChild>
-                        <PressableScale
-                          accessibilityRole="link"
-                          accessibilityLabel={`Review by ${authorName}. Opens their profile.`}
-                          hitSlop={NAME_SLOP}
-                          scaleTo={0.97}
-                          style={styles.nameLink}>
-                          <Text
-                            numberOfLines={1}
-                            style={[styles.name, { color: withAlpha(theme.text, NAME_INK) }]}>
-                            {authorName}
-                          </Text>
-                        </PressableScale>
-                      </Link>
-                    ) : (
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          styles.name,
-                          styles.nameLink,
-                          { color: withAlpha(theme.text, NAME_INK) },
-                        ]}>
-                        {authorName}
-                      </Text>
-                    )}
+                {/* On the page's colour from here: when, and whose game. */}
+                <Text
+                  numberOfLines={2}
+                  onLayout={(event) => setFactsY(event.nativeEvent.layout.y)}
+                  style={[styles.facts, { color: theme.textMuted }]}>
+                  {facts.join(' · ')}
+                </Text>
 
-                    {/* The score and its word, where the screenshot has its
-                        stars, in the score's own colour. */}
-                    {rating !== null && (
-                      <Text
-                        accessibilityLabel={`Scored ${rating} out of 100, ${labelFor(rating)}`}
-                        style={[styles.score, { color: scoreColor(rating, theme) }]}>
-                        {`${rating} ${labelFor(rating).toUpperCase()}`}
-                      </Text>
+                {/* The buttons, as the reference's: round glass keys at the
+                    left, and the one big filled key — the like — at the
+                    right, its count beside it. */}
+                <View style={styles.keys}>
+                  <View style={styles.keysStart}>
+                    <PressableScale
+                      accessibilityRole="button"
+                      accessibilityLabel="Share this review as an image"
+                      onPress={() => setSharing(true)}
+                      scaleTo={0.92}
+                      style={[styles.glassKey, glassKeyColours]}>
+                      <Ionicons name="share-outline" size={19} color={keyInk} />
+                    </PressableScale>
+                    {pingTo && (
+                      <PressableScale
+                        accessibilityRole="button"
+                        accessibilityLabel="Ping this review to someone"
+                        onPress={() =>
+                          pingTo({
+                            kind: 'review',
+                            targetId: review.id,
+                            title: game
+                              ? `${authorName} on ${game.title}`
+                              : `${authorName}’s review`,
+                            subtitle:
+                              quote ?? (rating !== null ? `${rating} out of 100` : 'A review'),
+                            imageUrl: game?.cover_url ?? null,
+                          })
+                        }
+                        scaleTo={0.92}
+                        style={[styles.glassKey, glassKeyColours]}>
+                        <PressGlyph motion="skip">
+                          <Ionicons name={PING_GLYPH} size={19} color={keyInk} />
+                        </PressGlyph>
+                      </PressableScale>
+                    )}
+                    {canReport && (hasProse || !!quote) && (
+                      <View style={[styles.glassKey, glassKeyColours]}>
+                        <ReportFlag
+                          target={{ kind: 'review', logId: review.id }}
+                          authorId={review.user_id}
+                          label={`Report ${authorName}’s review`}
+                        />
+                      </View>
                     )}
                   </View>
 
-                  <GameName game={game} gameId={review.game_id} />
-
-                  {!!game?.developer && (
-                    <Text numberOfLines={1} style={[styles.credit, { color: theme.textMuted }]}>
-                      by {game.developer}
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              {/* The review in one sentence, between its marks, centred over the
-                  review it heads. Not covered by a spoiler flag: it was the
-                  review's headline, and the headline never was. */}
-              {!!quote && (
-                <QuoteBlock
-                  text={quote}
-                  size="page"
-                  color={theme.text}
-                  typed
-                  style={styles.quote}
-                />
-              )}
-
-              <Text style={[styles.date, { color: theme.textMuted }]}>
-                {ordinalDate(review.created_at)}
-              </Text>
-
-              {/*
-                The review. The one screen where a spoiler notice uncovers rather
-                than navigates: the reader arrived here on purpose, so one
-                deliberate tap and the review appears.
-              */}
-              {articleShown && (
-                <View style={styles.article}>
-                  {hasProse && review.spoilers && !revealed ? (
-                    <SpoilerNotice
-                      onPress={() => setRevealed(true)}
-                      minHeight={140}
-                      hint="Shows the review on this screen"
-                    />
-                  ) : hasProse ? (
-                    <Text style={[styles.body, { color: reviewInk }]}>{review.review}</Text>
-                  ) : (
-                    <Text style={[styles.body, { color: theme.textMuted }]}>
-                      {authorName} scored this game without writing it up.
-                    </Text>
-                  )}
-                </View>
-              )}
-
-              {/* How it was played, where the screenshot offers a translation:
-                  a quiet line under the progress glyph. */}
-              {details && (
-                <View style={styles.details}>
-                  <Ionicons
-                    name={detailsIcon}
-                    size={DETAILS_ICON.size}
-                    color={theme.textMuted}
-                    style={styles.detailsIcon}
-                  />
-                  <Text style={[styles.detailsText, { color: theme.textMuted }]}>{details}</Text>
-                </View>
-              )}
-
-              {/* The platform, where the screenshot has the track the listener
-                  liked: its mark and its name, at the far end. */}
-              {platform && (
-                <View
-                  style={styles.platform}
-                  accessible
-                  accessibilityLabel={`Played on ${platform}`}>
-                  <Ionicons name={platformIcon} size={PLATFORM_ICON.size} color={theme.white} />
-                  <Text numberOfLines={1} style={[styles.platformName, { color: theme.white }]}>
-                    {platform}
-                  </Text>
-                </View>
-              )}
-
-              {/* The like and its count; share, and the flag beside it for anyone
-                  but the writer. */}
-              <View
-                style={[
-                  styles.likeRow,
-                  { marginTop: platform ? LIKE_ROW.top : LIKE_ROW.topAfterText },
-                ]}>
-                <PressableScale
-                  accessibilityRole="button"
-                  accessibilityLabel={liked ? 'Unlike this review' : 'Like this review'}
-                  accessibilityState={{ selected: liked }}
-                  accessibilityValue={
-                    likeCount > 0
-                      ? { text: `${likeCount} ${likeCount === 1 ? 'like' : 'likes'}` }
-                      : undefined
-                  }
-                  onPress={toggle}
-                  scaleTo={0.9}
-                  style={styles.like}>
-                  <PressGlyph pop={liked}>
-                    <Ionicons
-                      name={liked ? 'heart' : 'heart-outline'}
-                      size={LIKE_ROW.heart}
-                      color={liked ? theme.liked : theme.textMuted}
-                    />
-                  </PressGlyph>
-                  {likeCount > 0 && (
-                    <Text style={[styles.count, { color: theme.textMuted }]}>
-                      {likeCount.toLocaleString()}
-                    </Text>
-                  )}
-                </PressableScale>
-
-                <View style={styles.likeEnd}>
-                  {canReport && (hasProse || !!quote) && (
-                    <ReportFlag
-                      target={{ kind: 'review', logId: review.id }}
-                      authorId={review.user_id}
-                      label={`Report ${authorName}’s review`}
-                    />
-                  )}
-                  {pingTo && (
+                  <View style={styles.keysEnd}>
+                    {likeCount > 0 && (
+                      <Text style={[styles.count, { color: theme.textSecondary }]}>
+                        {likeCount.toLocaleString()}
+                      </Text>
+                    )}
                     <PressableScale
                       accessibilityRole="button"
-                      accessibilityLabel="Ping this review to someone"
-                      onPress={() =>
-                        pingTo({
-                          kind: 'review',
-                          targetId: review.id,
-                          title: game ? `${authorName} on ${game.title}` : `${authorName}’s review`,
-                          subtitle:
-                            quote ?? (rating !== null ? `${rating} out of 100` : 'A review'),
-                          imageUrl: game?.cover_url ?? null,
-                        })
+                      accessibilityLabel={liked ? 'Unlike this review' : 'Like this review'}
+                      accessibilityState={{ selected: liked }}
+                      accessibilityValue={
+                        likeCount > 0
+                          ? { text: `${likeCount} ${likeCount === 1 ? 'like' : 'likes'}` }
+                          : undefined
                       }
-                      scaleTo={0.9}
-                      style={styles.share}>
-                      <PressGlyph motion="skip">
-                        <Ionicons name={PING_GLYPH} size={LIKE_ROW.share} color={theme.textMuted} />
+                      onPress={toggle}
+                      scaleTo={0.92}
+                      style={[
+                        styles.likeKey,
+                        { backgroundColor: likeFill, borderColor: withAlpha(likeFill, 0.45) },
+                      ]}>
+                      <PressGlyph pop={liked}>
+                        <Ionicons
+                          name={liked ? 'heart' : 'heart-outline'}
+                          size={26}
+                          color={liked ? theme.liked : likeInk}
+                        />
                       </PressGlyph>
                     </PressableScale>
-                  )}
-                  <PressableScale
-                    accessibilityRole="button"
-                    accessibilityLabel="Share this review as an image"
-                    onPress={() => setSharing(true)}
-                    scaleTo={0.9}
-                    style={styles.share}>
-                    <Ionicons name="share-outline" size={LIKE_ROW.share} color={theme.textMuted} />
-                  </PressableScale>
+                  </View>
                 </View>
-              </View>
 
-              {/* The conversation; its composer is docked under the page. */}
-              <View style={styles.replies}>
-                <CommentSection
-                  targetType="log"
-                  targetId={review.id}
-                  title="Replies"
-                  docked
-                  headingStyle={styles.repliesHeading}
-                />
+                {/* The reference's rule between the head and the words. */}
+                <View style={[styles.divider, { backgroundColor: withAlpha(theme.text, 0.14) }]} />
+              </View>
+            </View>
+
+            {/* The page's solid part: the review and everything after it. */}
+            <View style={[styles.solid, { backgroundColor: page }]}>
+              <View style={{ width: column }}>
+                {/* The review in one sentence, between its marks. Not covered
+                    by a spoiler flag: it was the review's headline. */}
+                {!!quote && (
+                  <QuoteBlock
+                    text={quote}
+                    size="page"
+                    color={theme.text}
+                    typed
+                    style={styles.quote}
+                  />
+                )}
+
+                {/*
+                  The review. The one screen where a spoiler notice uncovers
+                  rather than navigates: the reader arrived here on purpose.
+                */}
+                {articleShown && (
+                  <View style={styles.article}>
+                    {hasProse && review.spoilers && !revealed ? (
+                      <SpoilerNotice
+                        onPress={() => setRevealed(true)}
+                        minHeight={140}
+                        hint="Shows the review on this screen"
+                      />
+                    ) : hasProse ? (
+                      <Text style={[styles.body, { color: reviewInk }]}>{review.review}</Text>
+                    ) : (
+                      <Text style={[styles.body, { color: theme.textMuted }]}>
+                        {authorName} scored this game without writing it up.
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {/* How it was played: a quiet line under the progress glyph. */}
+                {details && (
+                  <View style={styles.details}>
+                    <Ionicons
+                      name={detailsIcon}
+                      size={DETAILS_ICON.size}
+                      color={theme.textMuted}
+                      style={styles.detailsIcon}
+                    />
+                    <Text style={[styles.detailsText, { color: theme.textMuted }]}>{details}</Text>
+                  </View>
+                )}
+
+                {/* The conversation; its composer is docked under the page. */}
+                <View style={styles.replies}>
+                  <CommentSection
+                    targetType="log"
+                    targetId={review.id}
+                    title="Replies"
+                    docked
+                    headingStyle={styles.repliesHeading}
+                  />
+                </View>
               </View>
             </View>
           </PageScrollView>
@@ -541,9 +624,6 @@ function ReviewPage({
   );
 }
 
-/** The writer's name: the screenshot's is a step under white (#E2E2E2). */
-const NAME_INK = 0.92;
-
 /**
  * The review: the screenshot's is a light grey (#CFCFCF at its strokes'
  * cores) — between `text` and `textSecondary`, where there is no token.
@@ -554,34 +634,18 @@ const REVIEW_INK = 0.82;
 const NAME_SLOP = { top: 14, bottom: 6, left: 6, right: 6 };
 
 /**
- * The square art at the top, full width and half the display tall — a
- * collection's header art's size: the game's square from SteamGridDB, else its
- * landscape art, else its cover, each cropped to fill the box. Dimmed, then
- * faded into the page by the screenshot's own ramp (`HERO_FADE`).
+ * The art the page is pinned under: the game's square from SteamGridDB, else
+ * its landscape art, else its cover, cropped to the square. **Nothing until
+ * the square lookup has an answer** — painting one picture and swapping it for
+ * the square a beat later is the flicker `useSquareCover`'s `resolved` exists
+ * to prevent.
  *
- * **Nothing is drawn until the square lookup has an answer** — painting the
- * landscape art and swapping it for the square a beat later is exactly the
- * flicker `useSquareCover`'s `resolved` exists to prevent.
- *
- * **It moves, when the game has an animated square** (2026-10-20): the still
- * first, then a crossfade to the animation once found, and nothing said when
- * there is none. Subdued, so it does not pull the eye from the review: drawn
- * at `ANIMATED_HERO_OPACITY` over the page's colour, under the same veil and
- * fade as the still — about 0.4 of its full strength in all, inside the
- * request's 0.3–0.5.
+ * **It moves, when the game has an animated square**: an animated WebP, GIF
+ * or video in the hero's one blur (`skia`), so the blur moves with it; an
+ * APNG, or a file Skia refuses, over the art (`overlay`) with the still's
+ * blur under it.
  */
-function ReviewHero({
-  game,
-  width,
-  height,
-  page,
-}: {
-  game: CachedGame | null;
-  width: number;
-  height: number;
-  /** The page's colour, which the art fades into. */
-  page: string;
-}) {
+function useReviewArt(game: CachedGame | null) {
   const square = useSquareCover({ gameId: game?.id, title: game?.title, enabled: !!game });
   const uri = square.resolved ? (square.uri ?? game?.hero_url ?? game?.cover_url ?? null) : null;
   const animated = useAnimatedCover({
@@ -590,66 +654,41 @@ function ReviewHero({
     aspect: 'square',
     enabled: !!uri,
   });
-
-  return (
-    <View style={[styles.hero, { height }]} pointerEvents="none">
-      <View style={[styles.heroArt, { height }]}>
-        {uri && (
-          <AnimatedCoverImage
-            staticUrl={uri}
-            staticCacheKey={`review-hero-${uri}`}
-            staticTransition={280}
-            animatedUrl={animated.animatedUrl}
-            format={animated.format}
-            status={animated.status}
-            onFailed={animated.reportFailure}
-            aspect="square"
-            style={{ width, height }}
-            backdrop={page}
-            animatedOpacity={ANIMATED_HERO_OPACITY}
-          />
-        )}
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: withAlpha(Palette.shadowInk, REVIEW_HERO.veil) },
-          ]}
-        />
-        {/* Without Skia, the screenshot's own ramp. */}
-        {!HERO_ANIMATES && (
-          <LinearGradient
-            colors={HERO_COLOURS(page)}
-            locations={HERO_LOCATIONS}
-            style={StyleSheet.absoluteFill}
-          />
-        )}
-      </View>
-      {/* Convx's long blur and its mirrored tail as the fade into the page
-          (the owner's, 2026-11-04), the tail lying behind the row under the
-          art. Out of the hero's clip, on purpose. */}
-      {uri && HERO_ANIMATES && <HeroFoot uri={uri} height={height} page={page} />}
-    </View>
-  );
+  const [refused, setRefused] = useState<string | null>(null);
+  const found = animated.status === 'found' && animated.animatedUrl ? animated : null;
+  const skia =
+    found && HERO_ANIMATES && skiaAnimates(found.animatedUrl) && found.animatedUrl !== refused
+      ? found.animatedUrl
+      : null;
+  return {
+    uri,
+    skia,
+    overlay: found && !skia ? found : null,
+    refuse: () => setRefused(found?.animatedUrl ?? null),
+  };
 }
 
-/**
- * The animated square's strength over the page, under the veil: 0.6 × the
- * veil's 0.68 is about 0.41 — moving, and quieter than the still it replaces.
- */
-const ANIMATED_HERO_OPACITY = 0.6;
+/** The writer's face beside their name, the reference's artist's. */
+const BYLINE_FACE = 24;
 
-const HERO_LOCATIONS = HERO_FADE.map((stop) => stop.at) as [number, number, ...number[]];
-
-/** The ramp in the page's colour: only its alpha moves, ending on the page itself. */
-function HERO_COLOURS(page: string) {
-  return HERO_FADE.map((stop) => withAlpha(page, stop.alpha)) as [string, string, ...string[]];
+/** The lip of the page's solid part, where it meets the art the words float on. */
+const LIP = 40;
+const LIP_STOPS = smoothScrimStops();
+function lipColours(page: string) {
+  return LIP_STOPS.alphas.map((alpha) => withAlpha(page, alpha)) as unknown as readonly [
+    string,
+    string,
+    ...string[],
+  ];
 }
 
 /** The game's name, a link to its page: heavy, white, never cut short of four lines. */
 function GameName({ game, gameId }: { game: CachedGame | null; gameId: string }) {
   const theme = useTheme();
   const name = (
-    <Text numberOfLines={TITLE_LINES} style={[styles.title, { color: theme.white }]}>
+    <Text
+      numberOfLines={TITLE_LINES}
+      style={[styles.title, styles.centred, { color: theme.white }]}>
       {game?.title ?? 'Unknown game'}
     </Text>
   );
@@ -695,7 +734,7 @@ const styles = StyleSheet.create({
   nameLink: { flexShrink: 1 },
   name: lineStyle(REVIEW_TYPE.name),
   score: { ...lineStyle(REVIEW_TYPE.score), flexShrink: 0 },
-  titleBox: { alignSelf: 'flex-start', marginTop: REVIEW_ROW.titleTop },
+  titleBox: { alignSelf: 'flex-start' },
   title: { ...lineStyle(REVIEW_TYPE.title), letterSpacing: TITLE_TRACKING },
   credit: { ...lineStyle(REVIEW_TYPE.credit), marginTop: REVIEW_ROW.creditTop },
   quote: { marginTop: QUOTE_GAP },
@@ -743,4 +782,59 @@ const styles = StyleSheet.create({
   },
   replies: { marginTop: REPLIES_TOP },
   repliesHeading: lineStyle(REVIEW_TYPE.replies),
+  /* The album page's head: the art's room, then the words on its foot. */
+  masthead: { alignSelf: 'stretch', alignItems: 'center' },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.x8 },
+  tag: {
+    height: 24,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: withAlpha(Palette.white, 0.3),
+    backgroundColor: withAlpha(Palette.white, 0.14),
+  },
+  tagText: {
+    fontFamily: FontFamily.semibold,
+    fontSize: 11,
+    lineHeight: 14,
+    color: withAlpha(Palette.white, 0.86),
+  },
+  lip: { position: 'absolute', left: 0, right: 0, bottom: 0, height: LIP },
+  words: { alignItems: 'flex-start', gap: Spacing.x8 },
+  centred: { textAlign: 'left' },
+  bylineLink: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8, maxWidth: '100%' },
+  facts: { ...lineStyle(REVIEW_TYPE.date), marginTop: Spacing.x4 },
+  keys: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.x8,
+  },
+  keysStart: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
+  keysEnd: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
+  glassKey: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  likeKey: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  divider: {
+    alignSelf: 'stretch',
+    height: StyleSheet.hairlineWidth,
+    marginTop: Spacing.x16,
+    marginBottom: Spacing.x4,
+  },
+  solid: { alignSelf: 'stretch', alignItems: 'center', paddingTop: Spacing.x8 },
 });

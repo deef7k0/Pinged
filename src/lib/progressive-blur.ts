@@ -428,3 +428,141 @@ export function coverRect(
 export function blurSourceUri(uri: string): string {
   return uri.replace(/\/t_(1080p|screenshot_huge)(_2x)?\//, '/t_720p/');
 }
+
+/**
+ * The game page's blur as a band — the owner's reference of 2026-11-04 (a
+ * music app's album page, "eternal sunshine"): "A thin row of blur, that sits
+ * on the title logo… or the genre and buttons, if the title is off", the page
+ * solid from the buttons (title on) or the synopsis (title off) down, and
+ * "the blur should have the same fading effect as the solid color fade… or
+ * add the blur and then the fade on top of it, only that a little lower".
+ *
+ * So, over a band from `from` to `to` (sides): the blur comes in — its
+ * strength and its opacity on one smoothstep — over the band's first
+ * `blurShare`, to `maxPt`; and the page's colour comes in over it on the same
+ * curve, starting `washLag` of the band lower, whole at `to`. Measured off
+ * the reference: the blur begins a little above the first word, is heavy by
+ * the title, and the colour is the page's at the buttons.
+ */
+export const BAND = {
+  /** The blur's full strength, in reference points: the hair under the reference's title. */
+  maxPt: 34,
+  /**
+   * How much of the band the blur takes to come in whole — on an ease *out*,
+   * so it is already heavy just past where it begins (the owner's,
+   * 2026-11-04: "the blur should be stronger when it starts").
+   */
+  blurShare: 0.5,
+  /** How far into the band the page's colour starts, after the blur. */
+  washLag: 0.22,
+  /**
+   * How far above the first word the band begins, in dp — 56, up from 28:
+   * "make it a little bit higher on the artwork".
+   */
+  lead: 56,
+} as const;
+
+/** An ease out: quick from nothing, settling into whole. */
+function easeOut(from: number, to: number, value: number): number {
+  const t = Math.min(1, Math.max(0, (value - from) / (to - from)));
+  return 1 - (1 - t) * (1 - t);
+}
+
+/** The band's blur radius at a row `fraction` sides down, in reference points. */
+export function bandBlurPt(fraction: number, from: number, to: number): number {
+  const span = Math.max(to - from, 0.01);
+  return BAND.maxPt * easeOut(from, from + span * BAND.blurShare, fraction);
+}
+
+/** How much of the page's colour is over a row `fraction` sides down, in the band. */
+export function bandWash(fraction: number, from: number, to: number): number {
+  const span = Math.max(to - from, 0.01);
+  return smoothstep(from + span * BAND.washLag, to, fraction);
+}
+
+/** The band's wash as a gradient over a box `extent` sides tall, 32 steps. */
+export function bandWashStops(
+  from: number,
+  to: number,
+  extent: number
+): { locations: number[]; alphas: number[] } {
+  const steps = 32;
+  const locations: number[] = [];
+  const alphas: number[] = [];
+  for (let i = 0; i <= steps; i += 1) {
+    const at = i / steps;
+    locations.push(at);
+    alphas.push(bandWash(at * extent, from, to));
+  }
+  return { locations, alphas };
+}
+
+/**
+ * One pass of the band's blur, as SkSL: `bandBlurPt` and its fade-in on the
+ * same curve, the climb as the page scrolls, and `slide` for the cover in
+ * front. Uniforms: `size`, `side`, `pxPerPt`, `progress`, `from`, `to` (sides)
+ * and `slide`.
+ */
+export function bandShader(axis: 'horizontal' | 'vertical'): string {
+  const b = PROGRESSIVE_BLUR;
+  const f = (value: number) => (Number.isInteger(value) ? `${value}.0` : `${value}`);
+  const vertical = axis === 'vertical';
+  return `
+uniform shader image;
+uniform float2 size;
+uniform float side;
+uniform float pxPerPt;
+uniform float progress;
+uniform float from;
+uniform float to;
+uniform float slide;
+
+float ease(float a, float b, float x) {
+  float t = clamp((x - a) / (b - a), 0.0, 1.0);
+  return t * t * (3.0 - 2.0 * t);
+}
+
+float easeOut(float a, float b, float x) {
+  float t = clamp((x - a) / (b - a), 0.0, 1.0);
+  return 1.0 - (1.0 - t) * (1.0 - t);
+}
+
+float climbPt(float fr) {
+  float rs = mix(${f(b.climbFrom[0])}, ${f(b.climbFrom[1])}, progress);
+  float re = mix(${f(b.climbTo[0])}, ${f(b.climbTo[1])}, progress);
+  return ${f(b.climb)} * ease(rs, re, fr);
+}
+
+half4 main(float2 c) {
+  float2 axis = ${vertical ? 'float2(0.0, 1.0)' : 'float2(1.0, 0.0)'};
+  float row = c.y / side - slide;
+  float span = max(to - from, 0.01);
+  float band = easeOut(from, from + span * ${f(BAND.blurShare)}, row);
+  float climb = climbPt(c.y / side);
+  float pt = max(${f(BAND.maxPt)} * band, climb);
+  float s = pt * pxPerPt;
+  if (s < 0.05) {
+    return ${vertical ? 'half4(0.0)' : 'image.eval(c)'};
+  }
+  float stepPx = max(1.0, s * 3.0 / ${f(b.taps)});
+  float4 acc = float4(0.0);
+  float wsum = 0.0;
+  for (int i = -${b.taps}; i <= ${b.taps}; i++) {
+    float d = float(i) * stepPx;
+    float w = exp(-0.5 * d * d / (s * s));
+    float2 q = clamp(c + axis * d, float2(0.5), size - 0.5);
+    acc += float4(image.eval(q)) * w;
+    wsum += w;
+  }
+  float4 col = acc / wsum;${
+    vertical
+      ? `
+  float n = fract(sin(dot(c, float2(12.9898, 78.233))) * 43758.5453) - 0.5;
+  col.rgb += n / 255.0;
+  col *= max(band, ease(0.0, ${f(b.fadeIn)}, climb));`
+      : ''
+  }
+  return half4(col);
+}
+`;
+}

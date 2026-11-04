@@ -77,6 +77,11 @@ export type GameHeaderWordsProps = {
   onOpenProgress: () => void;
   onOpenLists: () => void;
   onReadMore: () => void;
+  /**
+   * Where the rows the blur's band is set by stand in the words: the genres,
+   * the Log pill's row and the synopsis (`<PinnedHero band>`).
+   */
+  onRows?: (row: 'genres' | 'keys' | 'about', y: number) => void;
 };
 
 export function GameHeaderWords({
@@ -89,6 +94,7 @@ export function GameHeaderWords({
   onOpenProgress,
   onOpenLists,
   onReadMore,
+  onRows,
 }: GameHeaderWordsProps) {
   const unreleased = isUnreleased(game);
   const kind = game.edition ? editionLabel(game.edition) : null;
@@ -125,11 +131,14 @@ export function GameHeaderWords({
         />
       )}
 
-      <Text style={styles.genres} numberOfLines={1}>
+      <Text
+        style={styles.genres}
+        numberOfLines={1}
+        onLayout={(event) => onRows?.('genres', event.nativeEvent.layout.y)}>
         {genres.length > 0 ? genres.join(' · ') : 'Game'}
       </Text>
 
-      <View>
+      <View onLayout={(event) => onRows?.('keys', event.nativeEvent.layout.y)}>
         <HeaderKeys
           game={game}
           log={log}
@@ -138,7 +147,11 @@ export function GameHeaderWords({
         />
       </View>
 
-      {!!game.description && <About text={game.description} onMore={onReadMore} />}
+      {!!game.description && (
+        <View onLayout={(event) => onRows?.('about', event.nativeEvent.layout.y)}>
+          <About text={game.description} onMore={onReadMore} />
+        </View>
+      )}
 
       <FactLine game={game} />
 

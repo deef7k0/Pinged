@@ -154,16 +154,16 @@ export function animatedFormatOf(url: string): AnimatedFormat | null {
 }
 
 /**
- * Whether Skia can play this file in the game page's hero, under its one
- * blur: an animated **WebP or GIF**, or a **video** (WebM, MP4), each read
- * frame by frame (`useAnimationFrames`). Never an **APNG**: Skia has no APNG
- * decoder, so one is its first frame there, still forever — what the owner
- * saw as covers "paused" (2026-11-04). An APNG is expo-image's, over the art.
+ * Whether the hero's one blur can play this file, frame by frame
+ * (`useAnimationFrames`): an animated WebP or GIF (Skia's decoder), an APNG
+ * (split into plain PNGs, `lib/apng` — Skia has no APNG decoder of its own),
+ * or a video (WebM, MP4). Anything it then cannot read is given back and
+ * drawn over the art by expo-image or expo-video.
  */
 export function skiaAnimates(url: string | null | undefined): boolean {
   if (!url) return false;
   const path = url.split(/[?#]/)[0].toLowerCase();
-  return /\.(webp|gif|webm|mp4|m4v)$/.test(path);
+  return /\.(webp|gif|png|apng|webm|mp4|m4v)$/.test(path);
 }
 
 /**

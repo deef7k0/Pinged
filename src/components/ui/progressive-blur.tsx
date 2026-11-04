@@ -10,6 +10,7 @@ import {
   type SkAnimatedImage,
   type SkData,
   type SkImage,
+  type SkSurface,
   type Video,
 } from '@shopify/react-native-skia';
 import { useEffect, useRef } from 'react';
@@ -25,7 +26,14 @@ import {
 import { createWorkletRuntime, runOnRuntimeAsync } from 'react-native-worklets';
 
 import { animatedFormatOf } from '@/lib/animated-cover';
-import { PROGRESSIVE_BLUR, blurShader, blurSourceUri, coverRect } from '@/lib/progressive-blur';
+import { isApng, splitApng } from '@/lib/apng';
+import {
+  PROGRESSIVE_BLUR,
+  bandShader,
+  blurShader,
+  blurSourceUri,
+  coverRect,
+} from '@/lib/progressive-blur';
 
 /* Compiled once, when this module is first loaded — which is when a page
    first draws its hero (`React.lazy`, `<PinnedHero>`). */
@@ -37,6 +45,15 @@ const SHORT = {
 const LONG = {
   horizontal: Skia.RuntimeEffect.Make(blurShader('horizontal', PROGRESSIVE_BLUR.longKnee)),
   vertical: Skia.RuntimeEffect.Make(blurShader('vertical', PROGRESSIVE_BLUR.longKnee)),
+};
+
+/** How much of the art, from its foot, the band's tail is stretched from. */
+const TAIL_STRIP = 0.03;
+
+/* The game page's band (`bandShader`): a thin row of blur under its words. */
+const BAND_PASSES = {
+  horizontal: Skia.RuntimeEffect.Make(bandShader('horizontal')),
+  vertical: Skia.RuntimeEffect.Make(bandShader('vertical')),
 };
 
 export type ProgressiveBlurProps = {
@@ -73,8 +90,14 @@ export type ProgressiveBlurProps = {
   drop?: SharedValue<number>;
   /** How far the whole blur slides down, in sides — the cover in front. */
   slide?: SharedValue<number>;
-  /** How many sides longer than Convx's the tail runs (`heroExtension`). */
+  /** How many sides longer than Convx's the tail runs (`heroExtension`); may be less than nothing. */
   extend?: number;
+  /**
+   * The band, in sides of the art: the blur comes in from `from` and is
+   * heavy well before `to` (`bandShader`) — the game page's, in place of
+   * Convx's foot. Fixed for the life of the component.
+   */
+  band?: { from: number; to: number } | null;
 };
 
 /**
@@ -112,9 +135,14 @@ export default function ProgressiveBlur({
   drop,
   slide,
   extend = 0,
+  band = null,
 }: ProgressiveBlurProps) {
-  const HORIZONTAL = long ? LONG.horizontal : SHORT.horizontal;
-  const VERTICAL = long ? LONG.vertical : SHORT.vertical;
+  const banded = !!band;
+  const passes = banded ? BAND_PASSES : long ? LONG : SHORT;
+  const HORIZONTAL = passes.horizontal;
+  const VERTICAL = passes.vertical;
+  const bandFrom = band?.from ?? 0;
+  const bandTo = band?.to ?? 0;
   const image = useImage(blurSourceUri(uri), onFail);
   const failed = !HORIZONTAL || !VERTICAL;
   const frame = useAnimationFrames(animatedUri, onAnimationFail);
@@ -137,15 +165,33 @@ export default function ProgressiveBlur({
   const h = Math.max(1, Math.ceil(box / PROGRESSIVE_BLUR.downscale));
   const foot = (h * PROGRESSIVE_BLUR.artworkExtent) / extent;
   const side = h / extent;
+  /* The band's tail: the art's last `TAIL_STRIP` stretched from its foot to
+     the canvas's — y → foot + (y − (foot − strip)) · K. */
+  const strip = Math.max(1, foot * TAIL_STRIP);
+  const stretchK = Math.max(1, (h - foot) / strip);
+  const stretchY = foot - stretchK * (foot - strip);
 
-  const uniforms = useDerivedValue(() => ({
-    size: [w, h],
-    side,
-    pxPerPt: w / PROGRESSIVE_BLUR.reference,
-    progress: progress.get(),
-    drop: drop ? drop.get() : 0,
-    slide: slide ? slide.get() : 0,
-  }));
+  /* Each shader is handed exactly its own uniforms. */
+  const uniforms = useDerivedValue((): Record<string, number | number[]> =>
+    banded
+      ? {
+          size: [w, h],
+          side,
+          pxPerPt: w / PROGRESSIVE_BLUR.reference,
+          progress: progress.get(),
+          from: bandFrom,
+          to: bandTo,
+          slide: slide ? slide.get() : 0,
+        }
+      : {
+          size: [w, h],
+          side,
+          pxPerPt: w / PROGRESSIVE_BLUR.reference,
+          progress: progress.get(),
+          drop: drop ? drop.get() : 0,
+          slide: slide ? slide.get() : 0,
+        }
+  );
 
   if (failed || !HORIZONTAL || !VERTICAL || !image) return null;
 
@@ -194,9 +240,17 @@ export default function ProgressiveBlur({
             </Paint>
           }>
           <Group clip={rect(0, 0, w, foot)}>{picture}</Group>
-          {/* The tail: the art turned over in its own foot, y → 2·foot − y. */}
+          {/* The tail. Convx's: the art turned over in its own foot,
+              y → 2·foot − y. The band's: the art's last rows stretched down
+              over it, so under the blur it is the cover's own colours fading
+              out — never a reflection (the owner's, 2026-11-04: "the blur is
+              kinda back to looking like a reflection rather than a fade"). */}
           <Group clip={rect(0, foot, w, h - foot)}>
-            <Group transform={[{ translateY: 2 * foot }, { scaleY: -1 }]}>{picture}</Group>
+            {banded ? (
+              <Group transform={[{ translateY: stretchY }, { scaleY: stretchK }]}>{picture}</Group>
+            ) : (
+              <Group transform={[{ translateY: 2 * foot }, { scaleY: -1 }]}>{picture}</Group>
+            )}
           </Group>
         </Group>
       </Canvas>
@@ -264,8 +318,13 @@ function FrameImage({
  *   disposed. Its Android decoder also takes a frame on every display frame
  *   (twice a 30fps file's speed) and never loops: here it is asked at the
  *   file's own frame rate, and rewound at its end.
- * - **Skia has no APNG decoder**: an APNG is one still frame here, which is
- *   a failure (`getFrameCount() < 2`), so expo-image plays it instead.
+ * - **Skia has no APNG decoder**, and many SteamGridDB grids are APNGs: the
+ *   file is split into one plain PNG a frame (`lib/apng`) and each is drawn,
+ *   as the format says — where it goes, replacing or over what is there,
+ *   cleared or put back after — onto a canvas of the file's size in memory
+ *   (a CPU surface, so the frame it gives is safe to draw anywhere), one
+ *   decode a frame. Before, an APNG was expo-image's, over the art, and the
+ *   blur under it was the still's.
  *
  * A video that gives no frame within `VIDEO_FIRST_FRAME_MS` is a failure
  * too. Everything that touches a frame runs on the UI thread, the disposing
@@ -281,6 +340,8 @@ function useAnimationFrames(
   const current = useSharedValue<SkAnimatedImage | null>(null);
   const bytes = useSharedValue<SkData | null>(null);
   const video = useSharedValue<Video | null>(null);
+  /* An APNG: its frames, the canvas they are drawn on, what to undo next. */
+  const apng = useSharedValue<ApngPlayback | null>(null);
   const videoEnd = useSharedValue(0);
   const shown = useSharedValue(0);
   const started = useSharedValue(-1);
@@ -296,9 +357,46 @@ function useAnimationFrames(
   useEffect(() => {
     if (!uri || kind !== 'image') return;
     let cancelled = false;
-    Skia.Data.fromURI(uri)
-      .then((data) => {
+    fetch(uri)
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then((buffer) => {
         if (cancelled) return;
+        const raw = new Uint8Array(buffer);
+        if (isApng(raw)) {
+          const split = splitApng(raw);
+          const surface = split ? Skia.Surface.Make(split.width, split.height) : null;
+          if (!split || !surface) {
+            failRef.current?.(new Error('Could not read the APNG'));
+            return;
+          }
+          const playback: ApngPlayback = {
+            surface,
+            frames: split.frames.map((frame) => ({
+              data: Skia.Data.fromBytes(frame.png),
+              x: frame.x,
+              y: frame.y,
+              width: frame.width,
+              height: frame.height,
+              delay: Math.max(MIN_FRAME_MS, frame.delay || DEFAULT_FRAME_MS),
+              dispose: frame.dispose,
+              blend: frame.blend,
+            })),
+            index: -1,
+            undo: null,
+            saved: null,
+          };
+          runOnUI((next: ApngPlayback) => {
+            'worklet';
+            apng.set(next);
+            due.set(0);
+            last.set(-1);
+          })(playback);
+          return;
+        }
+        const data = Skia.Data.fromBytes(raw);
         let animation: SkAnimatedImage | null = null;
         try {
           animation = Skia.AnimatedImage.MakeAnimatedImageFromEncoded(data);
@@ -329,14 +427,17 @@ function useAnimationFrames(
         'worklet';
         const gone = current.get();
         const was = frame.get();
+        const played = apng.get();
         current.set(null);
         bytes.set(null);
+        apng.set(null);
         frame.set(null);
         was?.dispose();
         gone?.dispose();
+        played?.saved?.dispose();
       })();
     };
-  }, [uri, kind, current, bytes, frame, due, last]);
+  }, [uri, kind, current, bytes, frame, due, last, apng]);
 
   /* A video: opened off the JS thread, muted, then read on the UI thread. */
   useEffect(() => {
@@ -444,6 +545,20 @@ function useAnimationFrames(
       return;
     }
 
+    const played = apng.get();
+    if (played) {
+      if (last.get() >= 0 && info.timestamp - last.get() < due.get()) return;
+      const image = nextApngFrame(played);
+      if (image) {
+        const was = frame.get();
+        frame.set(image);
+        was?.dispose();
+      }
+      due.set(played.frames[played.index]?.delay ?? DEFAULT_FRAME_MS);
+      last.set(info.timestamp);
+      return;
+    }
+
     const animation = current.get();
     if (!animation) return;
     if (last.get() >= 0 && info.timestamp - last.get() < due.get()) return;
@@ -476,6 +591,86 @@ function useAnimationFrames(
   }, [loop, uri]);
 
   return frame;
+}
+
+/** An APNG playing: its frames as PNG bytes, the canvas, and what to undo before the next. */
+type ApngPlayback = {
+  surface: SkSurface;
+  frames: {
+    data: SkData;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    delay: number;
+    dispose: 0 | 1 | 2;
+    blend: 0 | 1;
+  }[];
+  /** The frame on the canvas now. */
+  index: number;
+  /** What to do to its region before the next is drawn. */
+  undo: { dispose: 0 | 1 | 2; x: number; y: number; width: number; height: number } | null;
+  /** The canvas before the frame on it, for a frame that puts it back. */
+  saved: SkImage | null;
+};
+
+/** Skia's `ClipOp.Intersect`, as the number a worklet can hold. */
+const CLIP_INTERSECT = 1;
+
+/**
+ * The next frame of an APNG drawn onto its canvas, and the canvas as an
+ * image — the format's compositing (W3C PNG § 11.3.3): the last frame's
+ * region cleared or put back as it asked, this one drawn replacing its region
+ * or over it. From the first frame again, on a clear canvas, after the last.
+ * The UI thread's, called by the frame loop.
+ */
+function nextApngFrame(played: ApngPlayback): SkImage | null {
+  'worklet';
+  const canvas = played.surface.getCanvas();
+  const index = played.index + 1 >= played.frames.length ? 0 : played.index + 1;
+  if (index === 0) {
+    canvas.clear(Skia.Color('transparent'));
+    played.saved?.dispose();
+    played.saved = null;
+    played.undo = null;
+  }
+  const undo = played.undo;
+  if (undo && undo.dispose !== 0) {
+    canvas.save();
+    canvas.clipRect(Skia.XYWHRect(undo.x, undo.y, undo.width, undo.height), CLIP_INTERSECT, false);
+    canvas.clear(Skia.Color('transparent'));
+    if (undo.dispose === 2 && played.saved) canvas.drawImage(played.saved, 0, 0);
+    canvas.restore();
+  }
+  const frame = played.frames[index];
+  if (frame.dispose === 2) {
+    played.saved?.dispose();
+    played.saved = played.surface.makeImageSnapshot();
+  }
+  const image = Skia.Image.MakeImageFromEncoded(frame.data);
+  if (image) {
+    if (frame.blend === 0) {
+      canvas.save();
+      canvas.clipRect(
+        Skia.XYWHRect(frame.x, frame.y, frame.width, frame.height),
+        CLIP_INTERSECT,
+        false
+      );
+      canvas.clear(Skia.Color('transparent'));
+      canvas.restore();
+    }
+    canvas.drawImage(image, frame.x, frame.y);
+    image.dispose();
+  }
+  played.index = index;
+  played.undo = {
+    dispose: frame.dispose,
+    x: frame.x,
+    y: frame.y,
+    width: frame.width,
+    height: frame.height,
+  };
+  return played.surface.makeImageSnapshot();
 }
 
 /** Videos are opened here, off the JS and UI threads. */
