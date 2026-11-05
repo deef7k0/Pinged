@@ -67,36 +67,26 @@ export type ButtonProps = Omit<PressableProps, 'children' | 'style'> & {
 };
 
 /**
- * The app's button. Four variants, one object.
+ * The app's button: Apple's capsules (the Apple pass, 2026-11-04 — it was
+ * SimpMusic's one grey pill for every action).
  *
- * **Every action is the same grey pill** — the owner's reference, SimpMusic's
- * "Create room", measured: 52dp, fully round, filled `controlFill` (#181818 on
- * black), a small semibold label in the middle. The variants change the label,
- * not the object:
+ *  - `primary`   **the prominent capsule**: filled with the accent in force —
+ *                white on the app's own pages, the game's Material 3 primary
+ *                on a game's — its words in the fill's own ink
+ *                (`filledRoles`). The one thing a screen is for; at most one
+ *                showing at a time. The default.
+ *  - `secondary` Apple's grey capsule: `controlFill` with the soft label.
+ *  - `ghost`     a plain text action, no capsule; a faint fill only while held.
+ *  - `danger`    the grey capsule with a red label.
  *
- *  - `primary`   the label a step brighter (`text`). The one thing on a screen
- *                you are most likely to want; at most one per screen.
- *  - `secondary` the label in `controlInk`, the reference's soft grey.
- *  - `ghost`     no fill at all — a text action, like the reference's
- *                "Connect". It gains a faint fill only while held.
- *  - `danger`    the same pill with a red label. Destructive must not look safe,
- *                and must not outshout the artwork beside it either.
+ * `tone="vivid"` is kept for the game page's review button and is now what a
+ * `primary` is everywhere.
  *
- * Choices are never drawn like this: a selectable control is outlined
- * (`useSelectable`, `<SelectionCard>`), so an action and a choice cannot be
- * mistaken for each other.
+ * **Disabled is the same shape at 35%**, as iOS draws it — it was an outlined
+ * ghost, which changed the object instead of dimming it. Held, the fill
+ * deepens and the button sinks 3%; from a keyboard it wears the accent's ring.
  *
- * **The one exception is `tone="vivid"`**, the game page's "Write a review":
- * the Material 3 cluster there keeps its own treatment, a pill filled with the
- * game's colour.
- *
- * **Every state is drawn, not faded.** Held, the fill brightens a step
- * (`controlPressed`) and the button sinks 3%. Focused from a keyboard, it wears
- * the accent's ring. Disabled, it is the reference's disabled "Join room": no
- * fill, a faint edge and a dimmed label — told apart by shape as well as by
- * brightness, and still readable enough to say why it is there.
- *
- * 52dp tall (60 when large, 36 when small — lifted to the tap floor by slop).
+ * 52dp tall (60 when large, 32 when small — lifted to the tap floor by slop).
  */
 export function Button({
   title,
@@ -126,40 +116,15 @@ export function Button({
   const vivid = tone === 'vivid';
   const filled = filledRoles(accent);
 
-  /*
-   * One look for every action, the owner's reference measured: SimpMusic's
-   * "Create room" — a grey pill (`controlFill`, #181818 on black) with a small
-   * soft label. Variants change the *label*, not the object: `primary` is a
-   * step brighter, `danger` is red. The only fill that is not grey is the game
-   * page's vivid review button, whose Material 3 treatment is preserved.
-   */
-  const look = unavailable
-    ? {
-        /* The reference's disabled "Join room": no fill, a faint edge, and the
-           label dimmed — told apart from an enabled button by shape as well as
-           by brightness, never by opacity alone. */
-        background: 'transparent',
-        edge: variant === 'ghost' ? 'transparent' : theme.borderStrong,
-        foreground: theme.textMuted,
-        pressed: undefined,
-      }
-    : vivid
+  const look =
+    vivid || variant === 'primary'
       ? {
           background: filled.fill,
-          /* Transparent rather than the fill: the background paints under the
-             border, so the edge deepens with the fill while held instead of
-             staying behind as a lighter 1px ring. */
           edge: 'transparent',
           foreground: filled.ink,
           pressed: filled.pressed,
         }
       : {
-          primary: {
-            background: theme.controlFill,
-            edge: 'transparent',
-            foreground: theme.text,
-            pressed: theme.controlPressed,
-          },
           secondary: {
             background: theme.controlFill,
             edge: 'transparent',
@@ -178,7 +143,7 @@ export function Button({
             foreground: theme.danger,
             pressed: theme.controlPressed,
           },
-        }[variant];
+        }[variant as Exclude<Variant, 'primary'>];
 
   return (
     <PressableScale
@@ -187,7 +152,7 @@ export function Button({
       accessibilityLabel={count != null ? `${title}, ${count}` : title}
       disabled={isInert}
       scaleTo={0.97}
-      pressedColor={look.pressed}
+      pressedColor={unavailable ? undefined : look.pressed}
       focusRing={accent.ring}
       /* A small button is drawn at 32 and touched at the platform floor. */
       hitSlop={hitSlop ?? (small ? SmallControlSlop : undefined)}
@@ -199,6 +164,7 @@ export function Button({
            rectangle would read as a bug rather than as depth. */
         variant === 'ghost' || unavailable ? Elevation.none : Elevation[elevation],
         { backgroundColor: look.background, borderColor: look.edge },
+        unavailable && styles.unavailable,
         fullWidth && styles.fullWidth,
       ])}
       {...rest}>
@@ -276,13 +242,13 @@ const styles = StyleSheet.create({
     minHeight: ControlHeight.large,
   },
   fullWidth: { alignSelf: 'stretch' },
+  unavailable: { opacity: 0.35 },
   content: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8 },
   label: { ...Type.button },
-  /* `body`'s 13 on `button`'s family — the same size as a medium label now that
-     `body` is the reference's 13. A small button is smaller by its height. */
-  labelSmall: { fontSize: Type.body.fontSize, lineHeight: Type.body.lineHeight },
-  /* `h4`'s size on `button`'s family: the hero has to hold the middle of a 60dp
-     slab without the word floating in it. 16, the reference's `labelMedium`. */
+  /* Footnote's 13 on `button`'s family: a small capsule is smaller by its
+     height and its words. */
+  labelSmall: { fontSize: Type.bodySmall.fontSize, lineHeight: Type.bodySmall.lineHeight },
+  /* `h4`'s 17 on `button`'s family — Apple's large-capsule label. */
   labelLarge: { fontSize: Type.h4.fontSize, lineHeight: Type.h4.lineHeight },
   count: {
     minWidth: 22,

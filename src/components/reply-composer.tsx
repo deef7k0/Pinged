@@ -6,7 +6,7 @@ import { StyleSheet, TextInput, View, type TextStyle } from 'react-native';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import { COMPOSER } from '@/constants/review-page';
-import { FontFamily } from '@/constants/theme';
+import { Typeface } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { addComment, type TargetType } from '@/lib/api';
 import { useAuth } from '@/store/auth';
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     borderRightWidth: StyleSheet.hairlineWidth,
   },
   input: {
-    fontFamily: FontFamily.regular,
+    fontFamily: Typeface.regular,
     fontSize: COMPOSER.text,
     paddingTop: COMPOSER.inputTop,
     paddingBottom: 0,
@@ -207,11 +207,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   glyph: { fontSize: COMPOSER.key.glyph, lineHeight: COMPOSER.key.glyph + 4 },
-  bold: { fontFamily: FontFamily.bold },
-  italic: { fontFamily: FontFamily.italic },
+  bold: { fontFamily: Typeface.bold },
+  italic: { fontFamily: Typeface.italic },
   spacer: { flex: 1 },
   counter: {
-    fontFamily: FontFamily.regular,
+    fontFamily: Typeface.regular,
     fontSize: COMPOSER.counter,
     lineHeight: COMPOSER.counter + 4,
     marginRight: COMPOSER.counterGap - COMPOSER.key.gap,

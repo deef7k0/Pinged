@@ -1,6 +1,5 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
-import { Link, type Href } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 
@@ -15,12 +14,11 @@ import { ReadingLanguages } from '@/components/reading-languages';
 import { SurpriseHiddenList } from '@/components/surprise-hidden-list';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
 import { PageScrollView } from '@/components/ui/page-scroll';
-import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, Screen } from '@/components/ui/screen';
 import { useLiquidGlass } from '@/components/ui/liquid-glass';
-import { SelectionCard } from '@/components/ui/selection-card';
+import { InsetGroup, Row } from '@/components/ui/inset-group';
 import { Text } from '@/components/ui/text';
-import { Radius, Spacing, TapTarget } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useAnimatedArtwork } from '@/hooks/use-animated-artwork';
 import { useGameTitle } from '@/hooks/use-game-title';
 import { setLiquidGlass } from '@/lib/liquid-glass';
@@ -108,6 +106,7 @@ export default function SettingsScreen() {
   const userId = useAuth((state) => state.session?.user.id);
   const signOut = useAuth((state) => state.signOut);
   const theme = useTheme();
+  const router = useRouter();
   const gameColours = useGameColours();
   const animatedArtwork = useAnimatedArtwork();
   const gameTitle = useGameTitle();
@@ -173,19 +172,16 @@ export default function SettingsScreen() {
               summary={gameColours.on ? 'The game’s colours' : 'Pinged’s colours'}
             />
             <AccordionContent>
-              <View style={styles.choices} accessibilityRole="radiogroup">
-                <SelectionCard
-                  title="The game’s colours"
-                  hint="A game’s page, its reviews, Surprise Me, collections and studios take their colours from their art."
-                  selected={gameColours.on}
-                  onPress={() => gameColours.setOn(true)}
+              <View style={styles.choices}>
+                <Row
+                  title="Use the game’s colours"
+                  toggle={{ value: gameColours.on, onValueChange: gameColours.setOn }}
                 />
-                <SelectionCard
-                  title="Pinged’s colours"
-                  hint="Every screen in the app’s own dark grey, with a light grey accent, whatever the art."
-                  selected={!gameColours.on}
-                  onPress={() => gameColours.setOn(false)}
-                />
+                <Text variant="bodySmall" color="textSecondary" style={styles.note}>
+                  {gameColours.on
+                    ? 'A game’s page, its reviews, Surprise Me, collections and studios take their colours from their art.'
+                    : 'Every screen is in the app’s own dark grey, with a light grey accent, whatever the art.'}
+                </Text>
               </View>
             </AccordionContent>
           </AccordionItem>
@@ -197,19 +193,16 @@ export default function SettingsScreen() {
               summary={animatedArtwork.on ? 'Animated' : 'Still'}
             />
             <AccordionContent>
-              <View style={styles.choices} accessibilityRole="radiogroup">
-                <SelectionCard
-                  title="Animated"
-                  hint="Surprise Me and a review’s art play a game’s animated cover when it has one."
-                  selected={animatedArtwork.on}
-                  onPress={() => animatedArtwork.setOn(true)}
+              <View style={styles.choices}>
+                <Row
+                  title="Play animated covers"
+                  toggle={{ value: animatedArtwork.on, onValueChange: animatedArtwork.setOn }}
                 />
-                <SelectionCard
-                  title="Still"
-                  hint="Every cover stays still, and nothing is downloaded for it. A game’s cover can still be played from its page."
-                  selected={!animatedArtwork.on}
-                  onPress={() => animatedArtwork.setOn(false)}
-                />
+                <Text variant="bodySmall" color="textSecondary" style={styles.note}>
+                  {animatedArtwork.on
+                    ? 'Surprise Me and a review’s art play a game’s animated cover when it has one.'
+                    : 'Every cover stays still, and nothing is downloaded for it. A game’s cover can still be played from its page.'}
+                </Text>
               </View>
             </AccordionContent>
           </AccordionItem>
@@ -221,19 +214,16 @@ export default function SettingsScreen() {
               summary={gameTitle.shown ? 'Shown' : 'Hidden'}
             />
             <AccordionContent>
-              <View style={styles.choices} accessibilityRole="radiogroup">
-                <SelectionCard
-                  title="Shown"
-                  hint="A game’s page shows its logo or its name over the cover, and the name in the bar as you scroll."
-                  selected={gameTitle.shown}
-                  onPress={() => gameTitle.setShown(true)}
+              <View style={styles.choices}>
+                <Row
+                  title="Show the game’s name"
+                  toggle={{ value: gameTitle.shown, onValueChange: gameTitle.setShown }}
                 />
-                <SelectionCard
-                  title="Hidden"
-                  hint="A game’s page never shows its name: the cover speaks for itself. Other screens still name it."
-                  selected={!gameTitle.shown}
-                  onPress={() => gameTitle.setShown(false)}
-                />
+                <Text variant="bodySmall" color="textSecondary" style={styles.note}>
+                  {gameTitle.shown
+                    ? 'A game’s page shows its logo or its name over the cover, and the name in the bar as you scroll.'
+                    : 'A game’s page never shows its name: the cover speaks for itself. Other screens still name it.'}
+                </Text>
               </View>
             </AccordionContent>
           </AccordionItem>
@@ -245,23 +235,16 @@ export default function SettingsScreen() {
               summary={liquidGlass ? 'On' : 'Off'}
             />
             <AccordionContent>
-              <View style={styles.choices} accessibilityRole="radiogroup">
-                <SelectionCard
+              <View style={styles.choices}>
+                <Row
                   title="Liquid glass"
-                  hint={
-                    Platform.OS === 'ios'
-                      ? 'The back button, the tab bar, menus and the round keys are drawn in Apple’s liquid glass.'
-                      : 'The back button, the tab bar, menus and the round keys are drawn as glass: the page blurred behind them, a rim of light round them.'
-                  }
-                  selected={liquidGlass}
-                  onPress={() => setLiquidGlass(true)}
+                  toggle={{ value: liquidGlass, onValueChange: setLiquidGlass }}
                 />
-                <SelectionCard
-                  title="Solid"
-                  hint="Pinged’s own controls, as they have always been."
-                  selected={!liquidGlass}
-                  onPress={() => setLiquidGlass(false)}
-                />
+                <Text variant="bodySmall" color="textSecondary" style={styles.note}>
+                  {Platform.OS === 'ios'
+                    ? 'The back button, the tab bar, menus and the round keys are drawn in Apple’s liquid glass.'
+                    : 'The back button, the tab bar, menus and the round keys are drawn as glass: the page blurred behind them, a rim of light round them.'}
+                </Text>
               </View>
             </AccordionContent>
           </AccordionItem>
@@ -274,30 +257,25 @@ export default function SettingsScreen() {
                 summary={copyStage3d.on ? 'In 3D' : 'Flat'}
               />
               <AccordionContent>
-                <View style={styles.choices} accessibilityRole="radiogroup">
-                  <SelectionCard
-                    title="In 3D"
-                    hint={
-                      THIRTY_TWO_BIT
+                <View style={styles.choices}>
+                  <Row
+                    title="Draw copies in 3D"
+                    toggle={{ value: copyStage3d.on, onValueChange: copyStage3d.setOn }}
+                  />
+                  <Text variant="bodySmall" color="textSecondary" style={styles.note}>
+                    {copyStage3d.on
+                      ? THIRTY_TWO_BIT
                         ? 'A copy’s case and disc are drawn in 3D, catching the light as they turn. Off by default on this phone: it is 32-bit, and 3D is heavy for it.'
                         : 'A copy’s case and disc are drawn in 3D, catching the light as they turn.'
-                    }
-                    selected={copyStage3d.on}
-                    onPress={() => copyStage3d.setOn(true)}
-                  />
-                  <SelectionCard
-                    title="Flat"
-                    hint="A copy’s case and disc are drawn flat. Lighter on the phone; they still turn and open."
-                    selected={!copyStage3d.on}
-                    onPress={() => copyStage3d.setOn(false)}
-                  />
+                      : 'A copy’s case and disc are drawn flat. Lighter on the phone; they still turn and open.'}
+                  </Text>
                 </View>
               </AccordionContent>
             </AccordionItem>
           )}
 
           <AccordionItem value="pings">
-            <AccordionTrigger icon="radio-outline" title="Pings" summary="Who can ping you" />
+            <AccordionTrigger icon="paper-plane-outline" title="Pings" summary="Who can ping you" />
             <AccordionContent>
               <PingAudienceSetting userId={userId} />
             </AccordionContent>
@@ -307,185 +285,85 @@ export default function SettingsScreen() {
           <SurpriseHiddenList value="hidden" userId={userId} />
         </Accordion>
 
-        <View style={styles.group}>
-          <Text variant="label" color="textMuted">
-            RATINGS
-          </Text>
-          <Link href="/how-ratings-work" asChild>
-            <PressableScale
-              accessibilityRole="link"
-              accessibilityLabel="How ratings work, and how much your own ratings count"
-              scaleTo={0.98}
-              pressedColor={theme.controlPressed}
-              style={StyleSheet.flatten([styles.row, { backgroundColor: theme.controlFill }])}>
-              <Ionicons name="stats-chart-outline" size={20} color={theme.textSecondary} />
-              <View style={styles.rowText}>
-                <Text variant="h5">How ratings work</Text>
-                <Text variant="caption" color="textMuted">
-                  And how much your own ratings count
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
-            </PressableScale>
-          </Link>
-        </View>
+        <InsetGroup header="Ratings">
+          <Row
+            icon="stats-chart"
+            tint={theme.identityGold}
+            title="How ratings work"
+            accessibilityLabel="How ratings work, and how much your own ratings count"
+            onPress={() => router.push('/how-ratings-work')}
+          />
+        </InsetGroup>
 
         {moderator.data === true && (
-          <View style={styles.group}>
-            <Text variant="label" color="textMuted">
-              MODERATION
-            </Text>
-            <Link href="/moderation" asChild>
-              <PressableScale
-                accessibilityRole="link"
-                accessibilityLabel="Review community submissions"
-                scaleTo={0.98}
-                pressedColor={theme.controlPressed}
-                style={StyleSheet.flatten([styles.row, { backgroundColor: theme.controlFill }])}>
-                <Ionicons name="shield-checkmark-outline" size={20} color={theme.textSecondary} />
-                <View style={styles.rowText}>
-                  <Text variant="h5">Review queue</Text>
-                  <Text variant="caption" color="textMuted">
-                    Barcode submissions waiting for a decision
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
-              </PressableScale>
-            </Link>
-
+          <InsetGroup header="Moderation">
+            <Row
+              icon="shield-checkmark"
+              tint={theme.identityJade}
+              title="Review queue"
+              onPress={() => router.push('/moderation')}
+            />
             {/* The list the Must Play badge leads to, which is also where a
                 moderator adds to it and takes from it (0034). */}
-            <Link href="/must-play" asChild>
-              <PressableScale
-                accessibilityRole="link"
-                accessibilityLabel="Manage the Must Play games"
-                scaleTo={0.98}
-                pressedColor={theme.controlPressed}
-                style={StyleSheet.flatten([styles.row, { backgroundColor: theme.controlFill }])}>
-                <Ionicons name="thumbs-up-outline" size={20} color={theme.textSecondary} />
-                <View style={styles.rowText}>
-                  <Text variant="h5">Must Play games</Text>
-                  <Text variant="caption" color="textMuted">
-                    Label games, and take labels off
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
-              </PressableScale>
-            </Link>
-          </View>
+            <Row
+              icon="thumbs-up"
+              tint={theme.mustPlay}
+              title="Must Play games"
+              onPress={() => router.push('/must-play')}
+            />
+          </InsetGroup>
         )}
 
-        <View style={styles.group}>
-          <Text variant="label" color="textMuted">
-            PRIVACY AND SAFETY
-          </Text>
-          <NavRow
-            href="/blocked"
-            icon="ban-outline"
+        <InsetGroup header="Privacy and safety">
+          <Row
+            icon="ban"
+            tint={theme.danger}
             title="Blocked accounts"
-            hint="People you and they can’t see or reach"
+            onPress={() => router.push('/blocked')}
           />
-          <NavRow
-            href={{ pathname: '/legal/[doc]', params: { doc: 'privacy' } }}
-            icon="shield-outline"
+          <Row
+            icon="shield"
+            tint={theme.identitySky}
             title="Privacy policy"
-            hint="What Pinged keeps, who sees it, and deleting it"
+            onPress={() => router.push({ pathname: '/legal/[doc]', params: { doc: 'privacy' } })}
           />
-          <NavRow
-            href={{ pathname: '/legal/[doc]', params: { doc: 'terms' } }}
-            icon="document-text-outline"
+          <Row
+            icon="document-text"
+            tint={theme.identityCobalt}
             title="Terms of use"
-            hint="The rules for what is posted here"
+            onPress={() => router.push({ pathname: '/legal/[doc]', params: { doc: 'terms' } })}
           />
-        </View>
+        </InsetGroup>
 
-        <View style={styles.group}>
-          <Text variant="label" color="textMuted">
-            ACCOUNT
-          </Text>
-          {/* Confirmed first, and its failure reported — see `confirmSignOut`. */}
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel="Sign out"
-            accessibilityState={{ busy: signingOut, disabled: signingOut }}
+        {/* Confirmed first, and its failure reported — see `confirmSignOut`. */}
+        <InsetGroup>
+          <Row
+            title="Sign out"
+            destructive
+            centred
             disabled={signingOut}
             onPress={confirmSignOut}
-            scaleTo={0.98}
-            pressedColor={theme.controlPressed}
-            style={StyleSheet.flatten([styles.row, { backgroundColor: theme.controlFill }])}>
-            <Ionicons name="log-out-outline" size={20} color={theme.danger} />
-            <View style={styles.rowText}>
-              <Text variant="h5" color="danger">
-                Sign out
-              </Text>
-            </View>
-            {signingOut && <Loader size="small" color={theme.textMuted} />}
-          </PressableScale>
-          {/* Google Play's requirement for any app an account can be made in. */}
-          <NavRow
-            href="/delete-account"
-            icon="trash-outline"
-            title="Delete account"
-            hint="Your account and everything in it, for good"
-            danger
+            trailing={signingOut ? <Loader size="small" color={theme.textMuted} /> : undefined}
           />
-        </View>
+        </InsetGroup>
+
+        {/* Google Play's requirement for any app an account can be made in. */}
+        <InsetGroup footer="Your account and everything in it, for good.">
+          <Row
+            title="Delete account"
+            destructive
+            centred
+            onPress={() => router.push('/delete-account')}
+          />
+        </InsetGroup>
       </PageScrollView>
     </Screen>
   );
 }
 
-/** A row that opens another screen, in the action grey, as the others here. */
-function NavRow({
-  href,
-  icon,
-  title,
-  hint,
-  danger = false,
-}: {
-  href: Href;
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  hint: string;
-  danger?: boolean;
-}) {
-  const theme = useTheme();
-  return (
-    <Link href={href} asChild>
-      <PressableScale
-        accessibilityRole="link"
-        accessibilityLabel={`${title}. ${hint}`}
-        scaleTo={0.98}
-        pressedColor={theme.controlPressed}
-        style={StyleSheet.flatten([styles.row, { backgroundColor: theme.controlFill }])}>
-        <Ionicons name={icon} size={20} color={danger ? theme.danger : theme.textSecondary} />
-        <View style={styles.rowText}>
-          <Text variant="h5" color={danger ? 'danger' : undefined}>
-            {title}
-          </Text>
-          <Text variant="caption" color="textMuted">
-            {hint}
-          </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
-      </PressableScale>
-    </Link>
-  );
-}
-
 const styles = StyleSheet.create({
   content: { gap: Spacing.x32, paddingTop: Spacing.x24, paddingBottom: Spacing.x48 },
-  group: { gap: Spacing.x8 },
-  choices: { gap: Spacing.x8 },
-  /* The same row as the hidden-games one above it: a card's corner and the
-     action grey — it opens something, so it is filled, not outlined. */
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.x12,
-    minHeight: TapTarget + Spacing.x8,
-    paddingHorizontal: Spacing.x16,
-    borderRadius: Radius.card,
-  },
-  rowText: { flex: 1, gap: 1 },
+  choices: { gap: Spacing.x4 },
+  /* The switch's explanation, under its row: what Settings puts in a footer. */
+  note: { paddingHorizontal: Spacing.x16, paddingBottom: Spacing.x8 },
 });

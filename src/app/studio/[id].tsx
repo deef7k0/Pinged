@@ -1,28 +1,38 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link, useLocalSearchParams } from 'expo-router';
+import { Image } from 'expo-image';
+import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Share, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { PORTRAIT_COLUMNS, gridItemWidth } from '@/components/gaming/game-tile';
-import { GameCoverRail } from '@/components/game-rail';
+import { CoverRail, GameCoverRail } from '@/components/game-rail';
 import { HomeSection } from '@/components/home-section';
 import { LOGO_WIDTH_RATIO, StudioIdentity } from '@/components/studio-identity';
 import { TrailerBackdrop } from '@/components/trailer-backdrop';
 import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
 import { HandoffTitle } from '@/components/ui/handoff-title';
 import { PageFill, PinnedHero, shownTail } from '@/components/ui/pinned-hero';
-import { PageFlatList } from '@/components/ui/page-scroll';
-import { Poster } from '@/components/ui/poster';
+import { PageScrollView } from '@/components/ui/page-scroll';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { RevealScope } from '@/components/ui/reveal';
 import { EmptyState, ErrorState, Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/surface';
-import { SortBar } from '@/components/ui/sort-bar';
+import { AnchoredMenu, AnchoredMenuItem, useAnchoredMenu } from '@/components/ui/anchored-menu';
+import { Button } from '@/components/ui/button';
+import { ExpandableText } from '@/components/ui/expandable-text';
+import { PressGlyph } from '@/components/ui/press-glyph';
+import { INFO_BOX } from '@/components/game-information';
 import { Text } from '@/components/ui/text';
 import { scoreColor } from '@/constants/score';
 import { Radius, Spacing, Type, withAlpha } from '@/constants/theme';
 import { useStudioBanner } from '@/hooks/use-studio-banner';
-import { BANNER_MAX_ASPECT, useStudioCatalogue } from '@/hooks/use-studio-catalogue';
+import {
+  BANNER_MAX_ASPECT,
+  studioCompanyQuery,
+  useStudioCatalogue,
+} from '@/hooks/use-studio-catalogue';
 import { useStudioLogo } from '@/hooks/use-studio-logo';
 import { useGameTrailer, useTrailerSetting } from '@/hooks/use-game-trailer';
 import { useTheme } from '@/hooks/use-theme';
@@ -30,58 +40,19 @@ import { AccentProvider, useGameAccent } from '@/hooks/use-accent';
 import { useTopBarInset } from '@/hooks/use-header-height';
 import { TOP_BAR_ROW, handoffBand, revealOffset } from '@/constants/top-bar';
 import { footFade, smoothScrimStops } from '@/lib/scrim';
-import { gameSortOptions, sortGames, type GameSearchResult, type GameSort } from '@/lib/games';
+import { sortGames, type GameSearchResult } from '@/lib/games';
+import { facetParams } from '@/lib/games/facets';
 import type { StudioGame } from '@/lib/games/igdb';
+import {
+  ROLE_WORDS,
+  countryName,
+  studioMetaLine,
+  type StudioAbout,
+} from '@/lib/games/studio-about';
 
-/** Three across, the app's portrait size (`PORTRAIT_COLUMNS`). */
-const COLUMNS = PORTRAIT_COLUMNS;
+/** Between covers of the loading grid, three across (`PORTRAIT_COLUMNS`). */
 const GAP = Spacing.x8;
 const RAIL_INSET = Spacing.x16 * 2;
-
-/**
- * How much of the grid exists at once, in multiples of 3 columns.
- * 12 items = 4 full rows up front, rendered cleanly without micro-batches.
- */
-const GRID_INITIAL_ITEMS = 12;
-const GRID_BATCH_ITEMS = 12;
-const GRID_WINDOW = 5;
-
-/** Memoized grid item to eliminate VirtualizedList slow update bottlenecks. */
-const StudioGridItem = memo(function StudioGridItem({
-  item,
-  tileWidth,
-}: {
-  item: StudioGame;
-  tileWidth: number;
-}) {
-  return (
-    <Link href={{ pathname: '/game/[id]', params: { id: item.id } }} asChild>
-      <PressableScale accessibilityRole="button" accessibilityLabel={item.title} scaleTo={0.95}>
-        <View style={{ width: tileWidth }}>
-          <Poster
-            coverUrl={item.coverUrl}
-            heroUrl={item.heroUrl}
-            title={item.title}
-            edition={item.edition}
-            gameId={item.id}
-            width={tileWidth}
-            rounded="image"
-            priority="low"
-          />
-        </View>
-      </PressableScale>
-    </Link>
-  );
-});
-
-/**
- * How a catalogue can be ordered.
- *
- * No "Default": IGDB returns a studio's games newest-first and there is no
- * separate relevance ranking to preserve, so an extra pill would sit there
- * meaning the same thing as "Newest".
- */
-const SORTS = gameSortOptions(['newest', 'oldest', 'rating', 'title']);
 
 /**
  * The banner is square — SimpMusic's artist header on a phone (`aspectRatio(1f)`
@@ -279,8 +250,9 @@ function yearsOf(games: readonly GameSearchResult[]): string | null {
  * else of theirs is good". Four hundred covers deep, release order is close to
  * random.
  *
- * So the grid stays — it is the record, and the sort row is what makes it usable
- * — and bands go above it, each answering a question release order cannot:
+ * So the grid stays — it is the record — and bands go above it; since the
+ * Apple pass (2026-11-05) the grid is a page of its own (`studio-games/[id]`,
+ * "All games ›", Apple Music's "All Albums"), and the bands are each answering a question release order cannot:
  * what is newest, what is best rated, what people played most, what is coming,
  * each of its big franchises (the owner's, 2026-10-22), what it has gone back
  * and redone, and which of its games exist in more than one box. Every one
@@ -322,7 +294,6 @@ export default function StudioScreen() {
   const { width, height } = useWindowDimensions();
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const companyId = Number(id);
-  const [sort, setSort] = useState<GameSort>('newest');
 
   const games = useStudioCatalogue(companyId);
 
@@ -346,7 +317,11 @@ export default function StudioScreen() {
     average,
   } = useMemo(() => shelves(games.data ?? [], now), [games.data, now]);
 
-  const ordered = useMemo(() => sortGames(catalogue, sort), [catalogue, sort]);
+  const allGames = useMemo(() => sortGames(catalogue, 'newest').slice(0, RAIL_SHOWN), [catalogue]);
+  /* The company itself — the catalogue's own first request, so no request. */
+  const company = useQuery(studioCompanyQuery(companyId));
+  const about = company.data?.about ?? null;
+  const router = useRouter();
 
   const banner = bannerCandidates.find((game) => !strips.includes(game.id)) ?? null;
 
@@ -361,7 +336,7 @@ export default function StudioScreen() {
   const trailer = useGameTrailer(banner && banner.heroUrl === bannerUrl ? banner.id : null);
   const trailers = useTrailerSetting();
 
-  const tileWidth = gridItemWidth(width, COLUMNS, Spacing.x16, GAP);
+  const tileWidth = gridItemWidth(width, PORTRAIT_COLUMNS, Spacing.x16, GAP);
   const bannerHeight = Math.round(Math.min(width, height * FRAME_MAX_RATIO));
 
   /*
@@ -396,16 +371,24 @@ export default function StudioScreen() {
      route in the meantime, and stays whenever there is none. */
   const logo = useStudioLogo(companyId, name);
 
-  const keyExtractor = useCallback((game: StudioGame) => game.id, []);
-  const renderItem = useCallback(
-    ({ item }: { item: StudioGame }) => <StudioGridItem item={item} tileWidth={tileWidth} />,
-    [tileWidth]
-  );
+  /* The white capsule under the name: one of its games, chosen at random —
+     Apple Music's Play on an artist, for somebody who wants to be shown. */
+  const surprise = useCallback(() => {
+    const pool = catalogue.filter((game) => game.coverUrl || game.heroUrl);
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    if (pick) router.push({ pathname: '/game/[id]', params: { id: pick.id } });
+  }, [catalogue, router]);
+  const share = useCallback(() => {
+    const label = name ?? company.data?.identity?.name ?? 'A studio';
+    Share.share({ message: `${label} on Pinged — ${catalogue.length} games` }).catch(
+      () => undefined
+    );
+  }, [name, company.data, catalogue.length]);
 
   if (!Number.isFinite(companyId)) {
     return (
       <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="Studio" />}>
-        <EmptyState title="Studio not found" />
+        <EmptyState icon="search" title="Studio not found" />
       </Screen>
     );
   }
@@ -473,116 +456,107 @@ export default function StudioScreen() {
             }
           />
         }>
-        <PageFlatList
+        <PageScrollView
           settle={handoff}
-          data={ordered}
-          key={`grid-${COLUMNS}`}
-          numColumns={COLUMNS}
-          keyExtractor={keyExtractor}
-          /* Opaque, edge to edge, and spaced by their own padding rather than
-               the list's gap, which would leave slits of the art between rows. */
-          columnWrapperStyle={[styles.column, { backgroundColor: page }]}
           contentContainerStyle={styles.grid}
-          showsVerticalScrollIndicator={false}
-          initialNumToRender={GRID_INITIAL_ITEMS}
-          maxToRenderPerBatch={GRID_BATCH_ITEMS}
-          windowSize={GRID_WINDOW}
-          renderItem={renderItem}
-          removeClippedSubviews={Platform.OS === 'android'}
-          ListHeaderComponent={
-            <View>
-              {/* The solid part's soft top edge, under the name block: the art
+          showsVerticalScrollIndicator={false}>
+          <View>
+            {/* The solid part's soft top edge, under the name block: the art
                     the name floats on gives way to the page here. */}
-              <View
-                pointerEvents="none"
-                style={[styles.lip, { top: bannerHeight + shownTail(bannerHeight) - LIP }]}>
-                <LinearGradient
-                  colors={lipColours(page)}
-                  locations={
-                    LIP_STOPS.locations as unknown as readonly [number, number, ...number[]]
-                  }
-                  style={styles.fill}
-                />
-              </View>
+            <View
+              pointerEvents="none"
+              style={[styles.lip, { top: bannerHeight + shownTail(bannerHeight) - LIP }]}>
+              <LinearGradient
+                colors={lipColours(page)}
+                locations={LIP_STOPS.locations as unknown as readonly [number, number, ...number[]]}
+                style={styles.fill}
+              />
+            </View>
 
-              {/* Where the banner shows through, with the studio's name over its
+            {/* Where the banner shows through, with the studio's name over its
                     foot — in the page, so it floats up over the art as the page
                     scrolls. Out of flow, so a logo replacing the name moves
                     nothing below. */}
-              <View style={{ height: bannerHeight }}>
-                <View style={styles.identity}>
-                  <HandoffTitle band={handoff} onHeight={setNameHeight}>
-                    <StudioIdentity
-                      name={name}
-                      logo={logo.data}
-                      pageColor={page}
-                      maxWidth={Math.round(width * LOGO_WIDTH_RATIO)}
-                      nameColor={nameColor}
-                    />
-                  </HandoffTitle>
-                  {games.data && (
-                    <Text
-                      variant="body"
-                      style={[styles.meta, { color: withAlpha(theme.text, META_ALPHA) }]}>
-                      {`${catalogue.length} ${catalogue.length === 1 ? 'game' : 'games'}`}
-                      {span ? ` · ${span}` : ''}
-                      {average !== null && (
-                        <>
-                          {' · Average rating '}
-                          {/* The score's own ramp, never the accent: a blue 55
-                                would read as endorsed (CLAUDE.md, "One score ramp"). */}
-                          <Text variant="h5" style={{ color: scoreColor(average, theme) }}>
-                            {average}
-                          </Text>
-                        </>
-                      )}
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              {/* The blurred tail under the banner, before the solid part. */}
-              <View style={{ height: shownTail(bannerHeight) }} />
-
-              {/* The page's solid part: the rails, opaque, rising over the art. */}
-              <View style={[styles.solid, { backgroundColor: page }]}>
-                {/* The rails rise into place as they scroll into view. */}
-                <RevealScope>
-                  <StudioShelves
-                    latest={latest}
-                    best={best}
-                    popular={popular}
-                    upcoming={upcoming}
-                    franchises={franchises}
-                    redone={redone}
-                    repackaged={repackaged}
-                    count={catalogue.length}
-                    sort={sort}
-                    onSort={setSort}
+            <View style={{ height: bannerHeight }}>
+              <View style={styles.identity}>
+                <HandoffTitle band={handoff} onHeight={setNameHeight}>
+                  <StudioIdentity
+                    name={name}
+                    logo={logo.data}
+                    pageColor={page}
+                    maxWidth={Math.round(width * LOGO_WIDTH_RATIO)}
+                    nameColor={nameColor}
                   />
-                </RevealScope>
+                </HandoffTitle>
+                {games.data && (
+                  <Text
+                    variant="body"
+                    style={[styles.meta, { color: withAlpha(theme.text, META_ALPHA) }]}>
+                    {/* Apple Music's artist line (the Apple pass): what the
+                          company is, since when, how much. Its rating and
+                          span moved to the About card. */}
+                    {studioMetaLine(about, catalogue.length)}
+                  </Text>
+                )}
               </View>
             </View>
-          }
-          ListEmptyComponent={
-            games.isLoading ? (
-              <View style={styles.skeletonGrid}>
-                {Array.from({ length: 12 }).map((_, index) => (
-                  <Skeleton
-                    key={index}
-                    width={tileWidth}
-                    height={tileWidth / (2 / 3)}
-                    radius={Radius.image}
-                  />
-                ))}
-              </View>
-            ) : games.isLoadingError ? (
-              <ErrorState error={games.error} />
-            ) : (
-              <EmptyState title="No games found" message="IGDB has no catalogue for this studio." />
-            )
-          }
-        />
+
+            {/* The blurred tail under the banner, before the solid part. */}
+            <View style={{ height: shownTail(bannerHeight) }} />
+
+            {/* The page's solid part: the rails, opaque, rising over the art. */}
+            <View style={[styles.solid, { backgroundColor: page }]}>
+              {/* The rails rise into place as they scroll into view. */}
+              <RevealScope>
+                <StudioShelves
+                  latest={latest}
+                  best={best}
+                  popular={popular}
+                  upcoming={upcoming}
+                  franchises={franchises}
+                  redone={redone}
+                  repackaged={repackaged}
+                  count={catalogue.length}
+                  allGames={allGames}
+                  studioId={companyId}
+                  studioName={name ?? company.data?.identity?.name ?? null}
+                  about={about}
+                  span={span}
+                  average={average}
+                  ready={!!games.data}
+                  onSurprise={surprise}
+                  onShare={share}
+                />
+              </RevealScope>
+            </View>
+          </View>
+          {/* Until the catalogue is here, or when there is none: under the
+              header, where the rails would be. */}
+          {(!games.data || catalogue.length === 0) && (
+            <View style={styles.state}>
+              {games.isLoading ? (
+                <View style={styles.skeletonGrid}>
+                  {Array.from({ length: 12 }).map((_, index) => (
+                    <Skeleton
+                      key={index}
+                      width={tileWidth}
+                      height={tileWidth / (2 / 3)}
+                      radius={Radius.image}
+                    />
+                  ))}
+                </View>
+              ) : games.isLoadingError ? (
+                <ErrorState error={games.error} />
+              ) : (
+                <EmptyState
+                  icon="search"
+                  title="No games found"
+                  message="IGDB has no catalogue for this studio."
+                />
+              )}
+            </View>
+          )}
+        </PageScrollView>
       </Screen>
     </AccentProvider>
   );
@@ -610,8 +584,15 @@ const StudioShelves = memo(function StudioShelves({
   redone,
   repackaged,
   count,
-  sort,
-  onSort,
+  allGames,
+  studioId,
+  studioName,
+  about,
+  span,
+  average,
+  ready,
+  onSurprise,
+  onShare,
 }: {
   latest: StudioGame[];
   best: StudioGame[];
@@ -621,9 +602,32 @@ const StudioShelves = memo(function StudioShelves({
   redone: StudioGame[];
   repackaged: StudioGame[];
   count: number;
-  sort: GameSort;
-  onSort: (sort: GameSort) => void;
+  allGames: StudioGame[];
+  studioId: number;
+  studioName: string | null;
+  about: StudioAbout | null;
+  span: string | null;
+  average: number | null;
+  ready: boolean;
+  onSurprise: () => void;
+  onShare: () => void;
 }) {
+  const router = useRouter();
+  const theme = useTheme();
+  const [trigger, menu] = useAnchoredMenu();
+  const openAll = () =>
+    router.push({
+      pathname: '/studio-games/[id]',
+      params: { id: String(studioId), name: studioName ?? '' },
+    });
+  const country = countryName(about?.country);
+  const facts = [
+    about?.founded ? { label: 'Founded', value: String(about.founded) } : null,
+    country ? { label: 'Based in', value: country.replace(/^the /, 'The ') } : null,
+    about?.role ? { label: 'Makes', value: ROLE_WORDS[about.role] } : null,
+    { label: 'Games', value: count.toLocaleString() },
+    span ? { label: 'Releases', value: span } : null,
+  ].filter((fact): fact is { label: string; value: string } => !!fact);
   return (
     <View style={styles.header}>
       {/* The bands, in the order the questions get asked: what is new, what is
@@ -633,10 +637,54 @@ const StudioShelves = memo(function StudioShelves({
           `FRANCHISE_FLOOR` — because a heading is a claim. Rows of games, as
           every one in the app is: a heading on the page and small covers under
           it, the rail edge to edge (`railBleed`). */}
-      {latest.length >= RAIL_FLOOR && (
+      {/* Apple Music's artist page (the Apple pass, 2026-11-05): the newest
+          release as one big tile first, then the rest of the new ones. */}
+      {/* Under the name, as an artist's page has: the one white capsule and a
+          ⋯ beside it (the Apple pass, 2026-11-05). */}
+      {ready && count > 0 && (
+        <View style={styles.actions}>
+          <View style={styles.capsule}>
+            <Button title="Surprise me" icon="shuffle" onPress={onSurprise} />
+          </View>
+          <View ref={trigger} collapsable={false}>
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="More"
+              onPress={menu.open}
+              scaleTo={0.92}
+              style={StyleSheet.flatten([styles.moreKey, { backgroundColor: theme.controlFill }])}>
+              <PressGlyph>
+                <Ionicons name="ellipsis-horizontal" size={22} color={theme.text} />
+              </PressGlyph>
+            </PressableScale>
+          </View>
+          <AnchoredMenu menu={menu} label={studioName ?? 'Studio'} align="end" width={240}>
+            <AnchoredMenuItem
+              icon="grid-outline"
+              title="All games"
+              onPress={() => {
+                menu.close();
+                openAll();
+              }}
+            />
+            <AnchoredMenuItem
+              icon="share-outline"
+              title="Share"
+              onPress={() => {
+                menu.close();
+                onShare();
+              }}
+            />
+          </AnchoredMenu>
+        </View>
+      )}
+
+      {latest.length > 0 && <LatestRelease game={latest[0]} />}
+
+      {latest.length - 1 >= RAIL_FLOOR && (
         <HomeSection title="Latest releases">
           <View style={styles.railBleed}>
-            <GameCoverRail games={latest} inset={RAIL_INSET} />
+            <GameCoverRail games={latest.slice(1)} inset={RAIL_INSET} />
           </View>
         </HomeSection>
       )}
@@ -665,13 +713,36 @@ const StudioShelves = memo(function StudioShelves({
         </HomeSection>
       )}
 
-      {franchises.map((franchise) => (
-        <HomeSection key={franchise.id} strapline="Franchise" title={franchise.name}>
+      {/* Its franchises as one Series rail (the Apple pass): a series's first
+          cover and its name, opening every game in it. They were a rail each. */}
+      {franchises.length > 0 && (
+        <HomeSection title="Series">
           <View style={styles.railBleed}>
-            <GameCoverRail games={franchise.games} inset={RAIL_INSET} />
+            <CoverRail
+              data={franchises}
+              keyOf={(franchise) => String(franchise.id)}
+              gameOf={(franchise) => franchise.games[0]}
+              labelOf={(franchise) => `${franchise.name} series`}
+              footOf={(franchise) => (
+                <Text variant="bodySmall" color="textSecondary" numberOfLines={1}>
+                  {franchise.name}
+                </Text>
+              )}
+              inset={RAIL_INSET}
+              onPressItem={(franchise) =>
+                router.navigate({
+                  pathname: '/search',
+                  params: facetParams({
+                    kind: 'franchise',
+                    id: franchise.id,
+                    name: franchise.name,
+                  }),
+                })
+              }
+            />
           </View>
         </HomeSection>
-      ))}
+      )}
 
       {redone.length >= RAIL_FLOOR && (
         <HomeSection title="Remakes & remasters">
@@ -689,28 +760,107 @@ const StudioShelves = memo(function StudioShelves({
         </HomeSection>
       )}
 
-      {/* The heading the grid needs now that it is no longer the whole page:
-          with rails above it, an unlabelled grid reads as a rail that failed
-          to lay out. The sort row only once there is a catalogue to reorder. */}
-      {count > 0 && (
-        <HomeSection title="All games">
-          {count > 1 && (
-            <View style={styles.sort}>
-              <SortBar
-                options={SORTS}
-                value={sort}
-                onChange={onSort}
-                accessibilityLabel="Sort this studio's games"
-              />
+      {/* Apple Music's "All Albums ›": the newest of everything, and the
+          heading to the whole catalogue on its own page. */}
+      {allGames.length > 0 && (
+        <HomeSection title="All games" onSeeAll={openAll}>
+          <View style={styles.railBleed}>
+            <GameCoverRail games={allGames} inset={RAIL_INSET} />
+          </View>
+        </HomeSection>
+      )}
+
+      {/* The artist page's About, at the end: what IGDB says of the company,
+          and its facts as label over value. */}
+      {ready && (about?.description || facts.length > 1) && (
+        <HomeSection title="About">
+          <View style={[styles.about, INFO_BOX]}>
+            {!!about?.description && (
+              <ExpandableText lines={4} variant="body" color="textSecondary">
+                {about.description}
+              </ExpandableText>
+            )}
+            <View style={styles.facts}>
+              {facts.map((fact) => (
+                <View key={fact.label} style={styles.fact}>
+                  <Text variant="bodySmall" color="textMuted">
+                    {fact.label}
+                  </Text>
+                  <Text variant="h5">{fact.value}</Text>
+                </View>
+              ))}
+              {average !== null && (
+                <View style={styles.fact}>
+                  <Text variant="bodySmall" color="textMuted">
+                    Average rating
+                  </Text>
+                  {/* The score's own ramp, never the accent (CLAUDE.md, "One score ramp"). */}
+                  <Text variant="h5" style={{ color: scoreColor(average, theme) }}>
+                    {average}
+                  </Text>
+                </View>
+              )}
             </View>
-          )}
+          </View>
         </HomeSection>
       )}
     </View>
   );
 });
 
+/** The newest release as one landscape tile — Apple Music's "Latest Release". */
+function LatestRelease({ game }: { game: StudioGame }) {
+  const theme = useTheme();
+  const art = game.heroUrl ?? game.coverUrl;
+  const when = game.releaseDate
+    ? new Date(`${game.releaseDate}T00:00:00Z`).toLocaleDateString(undefined, {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        timeZone: 'UTC',
+      })
+    : game.releaseYear
+      ? String(game.releaseYear)
+      : null;
+  return (
+    <Link href={{ pathname: '/game/[id]', params: { id: game.id } }} asChild>
+      <PressableScale
+        accessibilityRole="link"
+        accessibilityLabel={`Latest release: ${game.title}${when ? `, ${when}` : ''}`}
+        scaleTo={0.98}
+        style={styles.latest}>
+        <View style={[styles.latestArt, { backgroundColor: theme.surfaceElevated }]}>
+          {art ? (
+            <Image
+              source={{ uri: art }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              transition={200}
+              accessibilityIgnoresInvertColors
+            />
+          ) : null}
+        </View>
+        <Text variant="caption" color="textSecondary">
+          {when ? `Latest release · ${when}` : 'Latest release'}
+        </Text>
+        <Text variant="h4" numberOfLines={2}>
+          {game.title}
+        </Text>
+      </PressableScale>
+    </Link>
+  );
+}
+
 const styles = StyleSheet.create({
+  latest: { gap: 2 },
+  latestArt: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: Radius.card,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+    marginBottom: Spacing.x8,
+  },
   grid: { paddingHorizontal: Spacing.x16, paddingBottom: Spacing.x48 },
   /* A row of the grid: edge to edge (the list's padding undone and put back
      inside), and its gap below it rather than the list's between rows. */
@@ -743,6 +893,19 @@ const styles = StyleSheet.create({
     gap: Spacing.x4,
   },
   meta: { textAlign: 'center' },
+  state: { paddingTop: Spacing.x16 },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
+  capsule: { flex: 1 },
+  moreKey: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  about: { marginHorizontal: 0, gap: Spacing.x16 },
+  facts: { flexDirection: 'row', flexWrap: 'wrap', rowGap: Spacing.x12, columnGap: Spacing.x24 },
+  fact: { gap: 2, minWidth: '40%' },
   /* `<HomeSection>` insets its own heading but leaves its children to bleed, for
      the rails. The sort row is not a rail and needs the inset back. */
   sort: { paddingHorizontal: Spacing.x16 },

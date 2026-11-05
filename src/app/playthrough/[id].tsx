@@ -3,18 +3,19 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
+import { useBarConfirm } from '@/hooks/use-bar-confirm';
 import { Button } from '@/components/ui/button';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
 import { PageScrollView } from '@/components/ui/page-scroll';
-import { PartialDateField } from '@/components/ui/partial-date-field';
-import { PressableScale } from '@/components/ui/pressable-scale';
+import { InsetGroup } from '@/components/ui/inset-group';
+import { PartialDateRow } from '@/components/ui/partial-date-row';
+import { PullDownRow } from '@/components/ui/pull-down-row';
+import { Segmented } from '@/components/ui/segmented';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
-import { useSelectable } from '@/components/ui/selectable';
-import { SelectField } from '@/components/ui/select-field';
 import { Text } from '@/components/ui/text';
 import { TextField } from '@/components/ui/text-field';
 import { COMPLETION_HINT, COMPLETION_LABEL, COMPLETION_LEVELS } from '@/constants/progress';
-import { Radius, Spacing, TapTarget } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   addPlaythrough,
@@ -65,9 +66,15 @@ export default function PlaythroughEditScreen() {
   } else if (game.isLoadingError || runs.isLoadingError) {
     body = <ErrorState error={game.error ?? runs.error} onRetry={() => void runs.refetch()} />;
   } else if (!game.data) {
-    body = <EmptyState title="Game not found" />;
+    body = <EmptyState icon="search" title="Game not found" />;
   } else if (!isNew && !run) {
-    body = <EmptyState title="That playthrough is gone" message="It may have been deleted." />;
+    body = (
+      <EmptyState
+        icon="timer-outline"
+        title="That playthrough is gone"
+        message="It may have been deleted."
+      />
+    );
   } else {
     /* Seeded from the loaded row by keying the form on it — the pattern
        `log/[id]` uses, and the only one the React Compiler rules allow. */
@@ -106,7 +113,6 @@ function PlaythroughForm({
   number: number;
 }) {
   const theme = useTheme();
-  const selectable = useSelectable();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -196,6 +202,13 @@ function PlaythroughForm({
 
   const error = save.error ?? remove.error;
 
+  useBarConfirm({
+    label: run ? 'Save playthrough' : 'Add playthrough',
+    onPress: () => save.mutate(),
+    loading: save.isPending,
+    disabled: !!percentError || !!hoursError || remove.isPending,
+  });
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -212,104 +225,87 @@ function PlaythroughForm({
           </Text>
         </View>
 
-        <SelectField
-          label="Platform"
-          sheetTitle="Played on"
-          value={platform}
-          options={platformOptions}
-          onChange={setPlatform}
-          placeholder="Not set"
-        />
-
-        <PartialDateField label="Started" value={startedOn} onChange={setStartedOn} />
-        <PartialDateField label="Finished" value={finishedOn} onChange={setFinishedOn} />
-
         {/*
-          How far this run got. "Not finished" is a real answer — a run in
+          Every field a row (the Apple pass, 2026-11-05): the platform a
+          pull-down, the dates rows opening a tray, how far a segmented
+          control, the numbers and notes rows. They were labelled wells and
+          a wrapping row of pills.
+
+          How far this run got: "Not finished" is a real answer — a run in
           progress, or one that ended before the credits — and it is the
           default, because a new run has not finished yet.
         */}
-        <View style={styles.field}>
-          <Text variant="fieldLabel" accessibilityRole="header">
-            How far
-          </Text>
-          <View style={styles.levels} accessibilityRole="radiogroup">
-            {([null, ...COMPLETION_LEVELS] as const).map((level) => {
-              const selected = completion === level;
-              const look = selectable(selected);
-              return (
-                <PressableScale
-                  key={level ?? 'none'}
-                  onPress={() => setCompletion(level)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  accessibilityHint={
-                    level ? COMPLETION_HINT[level] : 'Still going, or stopped short'
-                  }
-                  scaleTo={0.97}
-                  pressedColor={look.pressedColor}
-                  focusRing={look.focusRing}
-                  style={StyleSheet.flatten([styles.level, look.style])}>
-                  <Text variant="bodySmall" color={look.label}>
-                    {level ? COMPLETION_LABEL[level] : 'Not finished'}
-                  </Text>
-                </PressableScale>
-              );
-            })}
-          </View>
-        </View>
+        <InsetGroup>
+          <PullDownRow
+            title="Platform"
+            choices={platformOptions}
+            value={platform || null}
+            onChange={(next) => setPlatform(next ?? '')}
+            anyLabel="Not set"
+          />
+          <PartialDateRow title="Started" value={startedOn} onChange={setStartedOn} />
+          <PartialDateRow title="Finished" value={finishedOn} onChange={setFinishedOn} />
+        </InsetGroup>
 
-        <View style={styles.row}>
-          {/* A percentage is only a question for a run that is not 100% — at
-              100% the answer is already given. */}
-          {completion !== 'full' && (
-            <View style={styles.flex}>
-              <TextField
-                label="Progress %"
-                value={percent}
-                onChangeText={setPercent}
-                keyboardType="numeric"
-                placeholder="—"
-                error={percentError}
-              />
-            </View>
-          )}
-          <View style={styles.flex}>
-            <TextField
-              label="Hours"
-              value={hours}
-              onChangeText={setHours}
-              keyboardType="numeric"
-              placeholder="0"
-              error={hoursError}
+        <InsetGroup
+          header="How far"
+          footer={completion ? COMPLETION_HINT[completion] : 'Still going, or stopped short.'}>
+          <View style={styles.segments}>
+            <Segmented
+              label="How far"
+              value={completion ?? NOT_FINISHED}
+              onChange={(next) => setCompletion(next === NOT_FINISHED ? null : next)}
+              options={[
+                { value: NOT_FINISHED, label: 'Not finished' },
+                ...COMPLETION_LEVELS.map((level) => ({
+                  value: level,
+                  label: COMPLETION_LABEL[level],
+                })),
+              ]}
             />
           </View>
-        </View>
+          {/* A percentage is only a question for a run that is not 100% — at
+              100% the answer is already given. */}
+          {completion !== 'full' ? (
+            <TextField
+              variant="row"
+              label="Progress %"
+              value={percent}
+              onChangeText={setPercent}
+              keyboardType="numeric"
+              placeholder="—"
+              error={percentError}
+            />
+          ) : null}
+          <TextField
+            variant="row"
+            label="Hours"
+            value={hours}
+            onChangeText={setHours}
+            keyboardType="numeric"
+            placeholder="0"
+            error={hoursError}
+          />
+        </InsetGroup>
 
-        <TextField
-          label="Notes"
-          value={notes}
-          onChangeText={setNotes}
-          multiline
-          maxLength={MAX_NOTES}
-          placeholder="Difficulty, mods, who you played it with…"
-          hint={`${notes.length}/${MAX_NOTES}`}
-        />
+        <InsetGroup>
+          <TextField
+            variant="row"
+            value={notes}
+            onChangeText={setNotes}
+            multiline
+            maxLength={MAX_NOTES}
+            accessibilityLabel="Notes"
+            placeholder="Notes — difficulty, mods, who you played it with…"
+            hint={notes.length > 0 ? `${notes.length}/${MAX_NOTES}` : undefined}
+          />
+        </InsetGroup>
 
         {error && (
           <Text variant="bodySmall" color="danger">
             {error instanceof Error ? error.message : 'Could not save this playthrough.'}
           </Text>
         )}
-
-        <Button
-          title={run ? 'Save playthrough' : 'Add playthrough'}
-          fullWidth
-          loading={save.isPending}
-          disabled={!!percentError || !!hoursError || remove.isPending}
-          onPress={() => save.mutate()}
-        />
-
         {run && (
           <Button
             title="Delete playthrough"
@@ -325,20 +321,12 @@ function PlaythroughForm({
   );
 }
 
+/** "Not finished" — no completion — as a segment's value. */
+const NOT_FINISHED = 'none';
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { gap: Spacing.x24, paddingTop: Spacing.x16, paddingBottom: Spacing.x48 },
   head: { gap: Spacing.x4 },
-  field: { gap: Spacing.x8 },
-  row: { flexDirection: 'row', gap: Spacing.x12 },
-  levels: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.x8 },
-  level: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: TapTarget,
-    paddingHorizontal: Spacing.x12,
-    borderRadius: Radius.control,
-    borderWidth: 1,
-  },
+  segments: { padding: Spacing.x12 },
 });

@@ -46,6 +46,24 @@ export function firstPlayable(tracks: readonly QueueTrack[]): number {
 }
 
 /**
+ * The tracks in a shuffled order, for Shuffle on a soundtrack: Fisher–Yates
+ * over a copy, with the random source passed in so a test can fix it. The
+ * playable tracks come first, so the queue starts on one and "next" does not
+ * walk through the ones SoundCloud will not play.
+ */
+export function shuffled<T extends QueueTrack>(
+  tracks: readonly T[],
+  random: () => number = Math.random
+): T[] {
+  const order = [...tracks];
+  for (let index = order.length - 1; index > 0; index -= 1) {
+    const other = Math.floor(random() * (index + 1));
+    [order[index], order[other]] = [order[other], order[index]];
+  }
+  return [...order.filter(playable), ...order.filter((track) => !playable(track))];
+}
+
+/**
  * How far into a track "previous" stops meaning "the one before" and starts
  * meaning "from the top", in seconds — every music player's rule.
  */
@@ -160,6 +178,8 @@ export function noticeText(notice: PlayerNotice, now: number = Date.now()): stri
  */
 export const MINI_PLAYER_HIDDEN_ROUTES: ReadonlySet<string> = new Set([
   'soundtrack',
+  /* The full-screen player is the mini player, opened. */
+  'now-playing',
   'surprise',
   'scan',
   'log',

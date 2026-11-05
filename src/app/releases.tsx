@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 
-import { CoverTile } from '@/components/cover-tile';
+import { GameGridTile } from '@/components/game-grid-tile';
 import { gridItemWidth } from '@/components/gaming/game-tile';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
 import { PageFlatList } from '@/components/ui/page-scroll';
 import { EmptyState, ErrorState, Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/surface';
-import { Spacing } from '@/constants/theme';
+import { PosterAspectRatio, Spacing, Type } from '@/constants/theme';
+import { formatShortReleaseDate } from '@/lib/games/release';
 import { getNewReleases } from '@/lib/news';
 
 const COLUMNS = 3;
@@ -44,12 +45,27 @@ export default function ReleasesScreen() {
         showsVerticalScrollIndicator={false}
         refreshing={releases.isRefetching}
         onRefresh={() => releases.refetch()}
-        renderItem={({ item }) => <CoverTile game={item} width={tileWidth} />}
+        renderItem={({ item }) => (
+          <GameGridTile
+            id={item.id}
+            title={item.title}
+            coverUrl={item.coverUrl}
+            heroUrl={item.heroUrl}
+            edition={item.edition ?? null}
+            steamAppId={item.steamAppId ?? null}
+            caption={item.releaseDate ? formatShortReleaseDate(item.releaseDate) : item.releaseYear}
+            width={tileWidth}
+          />
+        )}
         ListEmptyComponent={
           releases.isLoading ? (
             <View style={styles.skeleton}>
               {Array.from({ length: 9 }).map((_, index) => (
-                <Skeleton key={index} width={tileWidth} height={tileWidth / (2 / 3)} />
+                <View key={index} style={styles.skeletonTile}>
+                  <Skeleton width={tileWidth} height={tileWidth / PosterAspectRatio} />
+                  <Skeleton width={tileWidth * 0.8} height={Type.itemTitle.lineHeight - 4} />
+                  <Skeleton width={tileWidth * 0.5} height={Type.bodySmall.lineHeight - 4} />
+                </View>
               ))}
             </View>
           ) : releases.isLoadingError ? (
@@ -67,4 +83,5 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: Spacing.x16, paddingBottom: Spacing.x48, gap: GAP },
   column: { gap: GAP },
   skeleton: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
+  skeletonTile: { gap: Spacing.x8 },
 });

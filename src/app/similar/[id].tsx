@@ -14,13 +14,11 @@ import { PageFlatList } from '@/components/ui/page-scroll';
 import { Poster } from '@/components/ui/poster';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
-import { useSelectable } from '@/components/ui/selectable';
 import { SortBar, type SortOption } from '@/components/ui/sort-bar';
-import { Card } from '@/components/ui/surface';
 import { Text } from '@/components/ui/text';
 import type { EditionKind } from '@/constants/game-editions';
 import { SIMILARITY_REASON_LABEL, agreementLine, topReasons } from '@/constants/similarity';
-import { Radius, Spacing, TapTarget, withAlpha } from '@/constants/theme';
+import { Radius, Spacing, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   castSimilarityVote,
@@ -227,7 +225,27 @@ function PairDetail({ pair, gameId }: { pair: CommunitySimilarGame; gameId: stri
         vote on it are one block, read top to bottom, and the header is as tall
         as the cover rather than the cover plus a row.
       */}
-      <View style={styles.pairHead}>
+      {/*
+        The Apple pass (2026-11-05): the two games side by side with "≈"
+        between them, the agreement as one big figure, Agree and Disagree as
+        two equal capsules, and the reasons said as a sentence. It was the
+        pick's cover beside a column, a thin bar, and a wrap of tags.
+      */}
+      <View style={styles.pair}>
+        {source.data ? (
+          <Poster
+            coverUrl={source.data.coverUrl}
+            heroUrl={source.data.heroUrl}
+            title={source.data.title}
+            width={COVER}
+            rounded="image"
+          />
+        ) : (
+          <View style={{ width: COVER }} />
+        )}
+        <Text variant="display" color="textSecondary" accessibilityLabel="is like">
+          ≈
+        </Text>
         <Link href={{ pathname: '/game/[id]', params: { id: pair.game_id } }} asChild>
           <PressableScale
             accessibilityRole="link"
@@ -239,73 +257,67 @@ function PairDetail({ pair, gameId }: { pair: CommunitySimilarGame; gameId: stri
               title={pair.title}
               edition={(pair.edition_kind as EditionKind | null) ?? null}
               gameId={pair.game_id}
-              width={88}
+              width={COVER}
               rounded="image"
             />
           </PressableScale>
         </Link>
-        <View style={styles.pairText}>
-          <Text variant="h1" numberOfLines={3}>
-            {pair.title}
-          </Text>
-          <Text variant="bodySmall" color="textMuted" numberOfLines={2}>
-            Suggested as like {source.data?.title ?? 'the game you came from'}
-          </Text>
-          <View style={styles.agreement}>
-            <View style={[styles.track, { backgroundColor: withAlpha(theme.text, 0.08) }]}>
-              <View
-                style={[
-                  styles.fill,
-                  { width: `${Math.round(share * 100)}%`, backgroundColor: theme.primary },
-                ]}
-              />
-            </View>
-            <Text variant="caption" color="textSecondary">
-              {agreementLine(pair)}
-            </Text>
-          </View>
-
-          {userId && (
-            <View style={styles.votes}>
-              <VoteButton
-                icon="thumbs-up"
-                label="Agree"
-                active={pair.viewer_vote === 1}
-                disabled={vote.isPending}
-                onPress={() => vote.mutate(1)}
-              />
-              <VoteButton
-                icon="thumbs-down"
-                label="Disagree"
-                active={pair.viewer_vote === -1}
-                disabled={vote.isPending}
-                onPress={() => vote.mutate(-1)}
-              />
-              {/* Reports the pick, so it sits with the pick's other controls;
-                  each suggestion below carries its own. */}
-              <IconButton
-                icon="flag-outline"
-                accessibilityLabel={`Report the pick of ${pair.title}`}
-                size="small"
-                tone="plain"
-                onPress={() =>
-                  router.push(reportHref({ kind: 'pick', pairId: pair.similarity_id }, gameId))
-                }
-              />
-            </View>
-          )}
-        </View>
       </View>
 
-      {reasons.length > 0 && (
-        <View style={styles.tags} accessibilityLabel="Reasons given">
-          {reasons.map((reason) => (
-            <Tag
-              key={reason}
-              label={`${SIMILARITY_REASON_LABEL[reason]} ${pair.reasons[reason] ?? ''}`.trim()}
-            />
-          ))}
+      <View style={styles.pairText}>
+        <Text variant="h2" numberOfLines={3} style={styles.centred}>
+          {pair.title}
+        </Text>
+        <Text variant="body" color="textSecondary" numberOfLines={2} style={styles.centred}>
+          Suggested as like {source.data?.title ?? 'the game you came from'}
+        </Text>
+        <Text variant="display" style={[styles.centred, styles.share]}>
+          {`${Math.round(share * 100)}% agree`}
+        </Text>
+        <Text variant="caption" color="textSecondary" style={styles.centred}>
+          {agreementLine(pair)}
+        </Text>
+      </View>
+
+      {userId && (
+        <View style={styles.votes}>
+          <VoteButton
+            icon="thumbs-up"
+            label="Agree"
+            active={pair.viewer_vote === 1}
+            disabled={vote.isPending}
+            onPress={() => vote.mutate(1)}
+          />
+          <VoteButton
+            icon="thumbs-down"
+            label="Disagree"
+            active={pair.viewer_vote === -1}
+            disabled={vote.isPending}
+            onPress={() => vote.mutate(-1)}
+          />
+          {/* Reports the pick, so it sits with the pick's other controls;
+              each suggestion below carries its own. */}
+          <IconButton
+            icon="flag-outline"
+            accessibilityLabel={`Report the pick of ${pair.title}`}
+            size="small"
+            tone="plain"
+            onPress={() =>
+              router.push(reportHref({ kind: 'pick', pairId: pair.similarity_id }, gameId))
+            }
+          />
         </View>
+      )}
+
+      {reasons.length > 0 && (
+        <Text variant="body" color="textSecondary" accessibilityLabel="Reasons given">
+          {reasonSentence(
+            reasons.map((reason) => ({
+              label: SIMILARITY_REASON_LABEL[reason].toLowerCase(),
+              count: pair.reasons[reason] ?? 0,
+            }))
+          )}
+        </Text>
       )}
 
       {mutationError && (
@@ -437,7 +449,8 @@ function VoteButton({
   onPress: () => void;
 }) {
   const theme = useTheme();
-  const look = useSelectable()(active);
+  /* A capsule: white with dark words once it is your vote, the grey before. */
+  const ink = active ? theme.onPrimary : theme.text;
   return (
     <PressableScale
       accessibilityRole="button"
@@ -446,15 +459,13 @@ function VoteButton({
       disabled={disabled}
       onPress={onPress}
       scaleTo={0.95}
-      pressedColor={look.pressedColor}
-      focusRing={look.focusRing}
-      style={StyleSheet.flatten([styles.voteButton, look.style])}>
-      <Ionicons
-        name={active ? icon : `${icon}-outline`}
-        size={16}
-        color={active ? theme.text : theme.textSecondary}
-      />
-      <Text variant="bodySmall" color={look.label}>
+      pressedColor={active ? undefined : theme.controlPressed}
+      style={StyleSheet.flatten([
+        styles.voteButton,
+        { backgroundColor: active ? theme.text : theme.controlFill },
+      ])}>
+      <Ionicons name={active ? icon : `${icon}-outline`} size={17} color={ink} />
+      <Text variant="h5" style={{ color: ink }}>
         {label}
       </Text>
     </PressableScale>
@@ -511,8 +522,10 @@ function SuggestionCard({
   /* The padding and the rhythm on a view inside the card, not on the card:
      `<Card>`'s `style` lands on its outer view, where `gap` spaced one child —
      so the byline, the text and the foot sat flush against each other. */
+  /* Apple's review box (the Apple pass, 2026-11-05): white at 7% over the
+     page, a 12 corner, no edge or shadow — it was the card material. */
   const body = (
-    <Card padded={false}>
+    <View style={[styles.box, { backgroundColor: withAlpha(theme.text, 0.07) }]}>
       <View style={styles.card}>
         <View style={styles.who}>
           <Link href={{ pathname: '/profile/[id]', params: { id: entry.author_id } }} asChild>
@@ -613,7 +626,7 @@ function SuggestionCard({
           )}
         </View>
       </View>
-    </Card>
+    </View>
   );
 
   if (!clamped) return body;
@@ -644,37 +657,49 @@ function Tag({ label }: { label: string }) {
   );
 }
 
+/** The two covers' width. */
+const COVER = 96;
+
+/**
+ * The reasons as a sentence: "Players point to the combat (12), the story (4)
+ * and the music (2)."
+ */
+function reasonSentence(reasons: { label: string; count: number }[]): string {
+  const parts = reasons.map(({ label, count }) => (count > 0 ? `${label} (${count})` : label));
+  const list =
+    parts.length <= 1
+      ? (parts[0] ?? '')
+      : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+  return `Players point to ${list}.`;
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   centred: { textAlign: 'center' },
   content: { paddingBottom: Spacing.x48 },
   header: { padding: Spacing.x16, gap: Spacing.x16 },
-  pairHead: { flexDirection: 'row', gap: Spacing.x16, alignItems: 'flex-start' },
-  pairText: { flex: 1, gap: Spacing.x4 },
-  agreement: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8, marginTop: Spacing.x4 },
-  track: { width: 64, height: 4, borderRadius: Radius.pill, overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: Radius.pill },
+  pair: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.x16,
+  },
+  pairText: { gap: Spacing.x4, alignItems: 'center' },
+  share: { marginTop: Spacing.x8 },
   /* In the column beside the cover now. Wraps rather than squeezing — at a large
      system font the flag drops to its own line before either label truncates. */
-  votes: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: Spacing.x8,
-    marginTop: Spacing.x8,
-  },
+  votes: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8 },
   /* `flexGrow` from the label's own width, so the pair fills the column's
      measure together without ever being narrower than its word. */
   voteButton: {
     flexDirection: 'row',
-    flexGrow: 1,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.x8,
-    minHeight: TapTarget,
+    minHeight: 48,
     paddingHorizontal: Spacing.x12,
-    borderRadius: Radius.control,
-    borderWidth: 1,
+    borderRadius: Radius.pill,
   },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.x4 },
   tag: {
@@ -691,7 +716,8 @@ const styles = StyleSheet.create({
   },
   none: { paddingHorizontal: Spacing.x16 },
   cardWrap: { paddingHorizontal: Spacing.x16, paddingBottom: Spacing.x12 },
-  card: { padding: Spacing.x12, gap: Spacing.x8 },
+  box: { borderRadius: 12, borderCurve: 'continuous' },
+  card: { padding: Spacing.x16, gap: Spacing.x8 },
   who: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8 },
   /* Name and avatar are one link; the date sits after them, not pushed away. */
   person: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8, flexShrink: 1 },

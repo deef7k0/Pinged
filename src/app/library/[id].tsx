@@ -287,7 +287,7 @@ export default function LibraryScreen() {
   if (!id) {
     return (
       <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="Library" />}>
-        <EmptyState title="Library not found" />
+        <EmptyState icon="search" title="Library not found" />
       </Screen>
     );
   }
@@ -630,6 +630,7 @@ function LibraryEmpty({
     if (noSteam) {
       return (
         <EmptyState
+          icon="logo-steam"
           title="No Steam account linked"
           message={
             isSelf
@@ -648,7 +649,13 @@ function LibraryEmpty({
       );
     }
     if (search.trim()) {
-      return <EmptyState title="No matches" message={`Nothing here matches “${search.trim()}”.`} />;
+      return (
+        <EmptyState
+          icon="search"
+          title="No matches"
+          message={`Nothing here matches “${search.trim()}”.`}
+        />
+      );
     }
     return (
       <EmptyState

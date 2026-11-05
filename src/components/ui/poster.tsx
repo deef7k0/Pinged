@@ -202,6 +202,10 @@ export const Poster = memo(function Poster({
   const [steamFailed, setSteamFailed] = useState(false);
   const height = width / PosterAspectRatio;
   const radius = Radius[rounded];
+  /* Apple's continuous corner on every cover — except the protected game
+     case's framed cover (`caseImage`), which keeps the circular corner it was
+     drawn with. */
+  const curve = rounded === 'caseImage' ? undefined : ('continuous' as const);
   const badge = width >= BADGE_MIN_WIDTH ? editionLabel(edition) : null;
   /* Rounded, because a fractional inset on one side and its rounding on the
      other would leave a sub-pixel gap at the extreme of the travel — which is
@@ -288,7 +292,12 @@ export const Poster = memo(function Poster({
         ref={setFrame}
         collapsable={false}
         style={[
-          { width, borderRadius: radius, backgroundColor: theme.surfaceElevated },
+          {
+            width,
+            borderRadius: radius,
+            borderCurve: curve,
+            backgroundColor: theme.surfaceElevated,
+          },
           // `flex: 1` rather than a computed height — the parent row's stretch
           // supplies it. See `fillHeight`.
           fillHeight ? styles.fill : { height },
@@ -296,7 +305,7 @@ export const Poster = memo(function Poster({
           /* Lifted: its copy is in the middle of the screen. */
           lifted && styles.lifted,
         ]}>
-        <View style={[styles.clip, { borderRadius: radius }]}>
+        <View style={[styles.clip, { borderRadius: radius, borderCurve: curve }]}>
           {/* The badge below is a *sibling* of this, not a child, which is the
             whole reason the parallax lives here rather than on the frame: the
             artwork slides and the label pinned to the corner does not. Move
@@ -327,7 +336,7 @@ export const Poster = memo(function Poster({
             <View
               style={[styles.badge, { backgroundColor: withAlpha(theme.shadowInk, 0.82) }]}
               pointerEvents="none">
-              <Text variant="label" style={{ color: theme.white }} numberOfLines={1}>
+              <Text variant="badge" style={{ color: theme.white }} numberOfLines={1}>
                 {badge}
               </Text>
             </View>

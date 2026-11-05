@@ -11,7 +11,7 @@ import { Poster } from '@/components/ui/poster';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import { TextField } from '@/components/ui/text-field';
-import { FontFamily, Radius, Spacing, withAlpha } from '@/constants/theme';
+import { Typeface, Radius, Spacing, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { postToWall, type ActivityEntry, type ActivityKind, type WallPost } from '@/lib/api';
 import { displayNameFor, timeAgo } from '@/lib/format';
@@ -322,5 +322,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   activityText: { flex: 1, gap: Spacing.x4 },
-  strong: { fontFamily: FontFamily.semibold },
+  strong: { fontFamily: Typeface.semibold },
 });

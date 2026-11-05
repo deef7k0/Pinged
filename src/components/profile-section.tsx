@@ -33,30 +33,18 @@ export type ProfileWidgetProps = {
 };
 
 /**
- * A widget on the profile: a hairline, a small heading, and what it holds —
- * the favourites, the games, the pinned song.
- *
- * ```
- * ─────────────────────────────────────────
- * ★ Favourites                         Edit
- * [▮▮▮]  [▮▮▮]  [▮▮▮]  [▮▮▮]
- * ─────────────────────────────────────────
- * Ada’s games                     View all ›
- * [▮▮▮]  [▮▮▮]  [▮▮▮]  [▮▮▮]
- * ```
+ * A widget on the profile — the favourites, the games, the pinned song, the
+ * ratings — as an Apple shelf (the Apple pass, 2026-11-04): its heading in
+ * `h2`, and where it leads somewhere a chevron straight after the words, the
+ * whole line the door. It was a hairline over a 13pt heading with a small
+ * "View all ›" at the far end.
  *
  * ## Not a card
  *
- * These are sections of the profile, not objects floating on it, so a hairline
- * and their own space separate them — which also hands a row of covers the
- * full width of the page.
- *
- * For about a week each was a card instead: `<ProfileBox>`, the app's `<Card>`
- * with the title on its first line and a hairline under it, forty from the
- * next, after a Letterboxd-style reference. The owner used it and went back
- * (2026-10-12): "go back to the old profile page layout, remove the widgets
- * being inside cards". This is that old frame, and the three widgets share it
- * so they cannot drift apart again. **Do not box them.**
+ * These are sections of the profile, not objects floating on it; their own
+ * space separates them, and a row of covers keeps the full width of the
+ * page. For about a week each was a card (`<ProfileBox>`), and the owner went
+ * back (2026-10-12). **Do not box them.**
  */
 export function ProfileWidget({
   title,
@@ -71,21 +59,21 @@ export function ProfileWidget({
 
   const heading = (
     <View style={styles.title}>
-      {icon && <Ionicons name={icon} size={13} color={theme.primaryText} />}
-      {/* `itemTitle`: a section title in sentence case, not a metadata tag. */}
-      <Text variant="itemTitle" numberOfLines={1} accessibilityRole="header" style={styles.words}>
+      {icon && <Ionicons name={icon} size={18} color={theme.text} />}
+      <Text variant="h2" numberOfLines={1} accessibilityRole="header" style={styles.words}>
         {title}
         {tail && (
-          <Text variant="itemTitle" color="textSecondary">
+          <Text variant="h2" color="textSecondary">
             {tail}
           </Text>
         )}
       </Text>
+      {href && <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />}
     </View>
   );
 
   return (
-    <View style={[styles.widget, { borderTopColor: theme.border }]}>
+    <View style={styles.widget}>
       {href ? (
         <Link href={href} asChild>
           <PressableScale
@@ -95,12 +83,6 @@ export function ProfileWidget({
             scaleTo={0.98}
             style={StyleSheet.flatten(styles.head)}>
             {heading}
-            <View style={styles.viewAll}>
-              <Text variant="caption" color="primaryText">
-                View all
-              </Text>
-              <Ionicons name="chevron-forward" size={13} color={theme.primaryText} />
-            </View>
           </PressableScale>
         </Link>
       ) : (
@@ -115,29 +97,24 @@ export function ProfileWidget({
   );
 }
 
-/** One line of `itemTitle`; the slop above and below it reaches the tap floor. */
+/** One line of `h2`; the slop above and below it reaches the tap floor. */
 const HEAD_SLOP = {
-  top: Math.ceil(Math.max(0, TapTarget - Type.itemTitle.lineHeight) / 2),
-  bottom: Math.ceil(Math.max(0, TapTarget - Type.itemTitle.lineHeight) / 2),
+  top: Math.ceil(Math.max(0, TapTarget - Type.h2.lineHeight) / 2),
+  bottom: Math.ceil(Math.max(0, TapTarget - Type.h2.lineHeight) / 2),
   left: 0,
   right: 0,
 };
 
 const styles = StyleSheet.create({
-  /* Twelve under the hairline, eight from the heading to what it heads. */
-  widget: {
-    gap: Spacing.x8,
-    paddingTop: Spacing.x12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
+  /* Twelve above, twelve from the heading to what it heads. */
+  widget: { gap: Spacing.x12, paddingTop: Spacing.x12 },
   head: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.x8,
   },
-  /* Shrinks rather than pushing "View all" off the row on a long display name. */
+  /* Shrinks on a long display name; the chevron hugs the words. */
   title: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: Spacing.x4 },
   words: { flexShrink: 1 },
-  viewAll: { flexDirection: 'row', alignItems: 'center', gap: 2 },
 });

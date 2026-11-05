@@ -20,7 +20,7 @@ import {
   type ReviewMetricKey,
   type ReviewMetrics,
 } from '@/constants/review-metrics';
-import { FontFamily, Radius, Spacing, TapTarget, Type, withAlpha } from '@/constants/theme';
+import { Typeface, Radius, Spacing, TapTarget, Type, withAlpha } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
        to out-weigh the label beside it. No `lineHeight` — on Android that clips
        descenders inside a fixed-height input. */
     fontSize: Type.h2.fontSize,
-    fontFamily: FontFamily.semibold,
+    fontFamily: Typeface.semibold,
     // Android centres text differently in a fixed-height input.
     paddingVertical: 0,
   },

@@ -64,8 +64,8 @@ export type DropdownButtonProps<T extends string> = {
  */
 const BUTTON_HEIGHT = 40;
 
-/** A menu row is the platform floor plus a breath, as the collection menu's are. */
-const ROW_HEIGHT = TapTarget + Spacing.x4;
+/** A menu row: iOS's 44 (the Apple pass, 2026-11-05). */
+const ROW_HEIGHT = 44;
 /** The menu's own inset around its rows, so their rounded ends show. */
 const MENU_PAD = Spacing.x8;
 /**
@@ -294,11 +294,16 @@ export function DropdownButton<T extends string>({
           style={StyleSheet.flatten([
             styles.button,
             small && styles.buttonSmall,
+            /* iOS's pull-down button: a grey capsule, no edge (the Apple
+               pass, 2026-11-05) — it was an outlined pill. */
             liquid
               ? { borderColor: 'transparent' }
               : fill
                 ? { backgroundColor: fill.fill, borderColor: fill.fill }
-                : { borderColor: open ? accent.edge : theme.outline },
+                : {
+                    backgroundColor: open ? theme.controlPressed : theme.controlFill,
+                    borderColor: 'transparent',
+                  },
           ])}>
           {liquid && <GlassSurface radius={Radius.pill} flat />}
           {current.icon && <Ionicons name={current.icon} size={16} color={ink} />}
@@ -372,7 +377,6 @@ export function DropdownButton<T extends string>({
                 bounces={false}>
                 {options.map((option) => {
                   const chosen = option.value === value;
-                  const look = selectable(chosen);
                   return (
                     <PressableScale
                       key={option.value}
@@ -381,28 +385,18 @@ export function DropdownButton<T extends string>({
                       accessibilityState={{ selected: chosen }}
                       onPress={() => choose(option.value)}
                       scaleTo={0.98}
-                      pressedColor={look.pressedColor}
-                      style={StyleSheet.flatten([
-                        styles.row,
-                        /* The selected state is the hook's — wash and edge —
-                           and a resting row is flat: a menu of outlined rows
-                           reads as a stack of buttons. */
-                        chosen ? look.style : styles.rowRest,
-                      ])}>
-                      {option.icon && (
-                        <Ionicons
-                          name={option.icon}
-                          size={18}
-                          color={chosen ? theme.text : accent.quietInk}
-                        />
-                      )}
+                      pressedColor={theme.controlPressed}
+                      /* iOS's menu row: flat whether chosen or not, the
+                         chosen one told by its check alone. */
+                      style={styles.row}>
+                      {option.icon && <Ionicons name={option.icon} size={18} color={theme.text} />}
                       <Text
                         variant="optionTitle"
                         numberOfLines={1}
-                        style={[styles.rowLabel, { color: chosen ? theme.text : accent.quietInk }]}>
+                        style={[styles.rowLabel, { color: theme.text }]}>
                         {option.label}
                       </Text>
-                      {chosen && <Ionicons name="checkmark" size={18} color={accent.onSurface} />}
+                      {chosen && <Ionicons name="checkmark" size={18} color={theme.text} />}
                     </PressableScale>
                   );
                 })}
@@ -466,8 +460,7 @@ const styles = StyleSheet.create({
     height: ROW_HEIGHT,
     paddingHorizontal: Spacing.x12,
     borderRadius: Radius.card,
-    borderWidth: 1,
   },
-  rowRest: { backgroundColor: 'transparent', borderColor: 'transparent' },
+
   rowLabel: { flexShrink: 1 },
 });

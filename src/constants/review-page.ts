@@ -23,7 +23,7 @@
  * the listener liked; the like and share; "Replies"; and the reply composer
  * docked at the foot of the screen.
  *
- * The type is Poppins, the app's, so each size is the one whose letters stand
+ * The type is Inter, the app's, so each size is the one whose letters stand
  * as tall as the screenshot's — matched by x-height and capital height — and
  * the screenshot's face, a little narrower, fits a few more words a line.
  */
@@ -44,7 +44,7 @@ export const REVIEW_MAX_COLUMN = 560;
 // ---------------------------------------------------------------------------
 
 /**
- * A line of text: its size, its line, and which Poppins file sets it. The
+ * A line of text: its size, its line, and which Inter file sets it. The
  * weight matters to where its glyphs sit — see `baselineIn`.
  */
 export type ReviewLine = {
@@ -59,8 +59,8 @@ export const REVIEW_TYPE = {
   name: { size: 12, line: 16, weight: 'bold' },
   /** The score and its word, at the far end of the name's line: "87 AMAZING". */
   score: { size: 13, line: 16, weight: 'bold' },
-  /** The game's name: the screenshot's strokes are a fifth of an em — the heaviest Poppins the app ships. */
-  title: { size: 22, line: 27, weight: 'extraBold' },
+  /** The game's name: the screenshot's strokes are a fifth of an em — the heaviest Inter the app ships. */
+  title: { size: 22, line: 25, weight: 'extraBold' },
   /** "by" the developer. */
   credit: { size: 13, line: 18, weight: 'regular' },
   /** The date over the review. */
@@ -82,7 +82,7 @@ export const TITLE_LINES = 4;
 
 /**
  * The game's name is tracked in a little, as the game page's is: the
- * screenshot's face is narrower than Poppins at the same height.
+ * screenshot's face is narrower than Inter at the same height.
  */
 export const TITLE_TRACKING = -0.45;
 
@@ -149,8 +149,8 @@ export const REVIEW_ROW = {
   scoreGap: 8,
   /** From the name's line to the game's. */
   titleTop: 1.5,
-  /** From the game's name to "by" its developer: Poppins' tall line, given back. */
-  creditTop: -2,
+  /** From the game's name to "by" its developer: nothing — Inter's line has no slack to give back. */
+  creditTop: 0,
 } as const;
 
 /** From the row to the quote, and from the quote to the date. */
@@ -187,7 +187,7 @@ export const LIKE_ROW = {
 } as const;
 
 /** From the like row to "Replies". */
-export const REPLIES_TOP = 30;
+export const REPLIES_TOP = 29;
 
 /** Between the last thing on the page and the composer docked under it. */
 export const CONTENT_BOTTOM = 16;
@@ -204,7 +204,7 @@ export const COMPOSER = {
   /** What is typed. */
   text: 15,
   /** From the field to the row of keys under it. */
-  keysTop: 11,
+  keysTop: 14.5,
   /** The keys stand 21px in from the panel's sides and 24px over its foot. */
   keysSide: 10.5,
   keysBottom: 12,
@@ -223,16 +223,16 @@ export const COMPOSER = {
 // Where a line's glyphs sit
 // ---------------------------------------------------------------------------
 
-/** Poppins' vertical metrics, per em, read off the font files the app ships. */
-export const POPPINS_METRICS = {
-  ascent: 1.05,
-  descent: 0.35,
+/** Inter's vertical metrics, per em, read off the font files the app ships. */
+export const FONT_METRICS = {
+  ascent: 0.969,
+  descent: 0.241,
   /** The bounding box's top and foot (`head.yMax` / `yMin`), per weight. */
-  top: { regular: 1.065, medium: 1.077, semibold: 1.091, bold: 1.108, extraBold: 1.121 },
-  bottom: { regular: 0.572, medium: 0.582, semibold: 0.593, bold: 0.606, extraBold: 0.616 },
+  top: { regular: 1.108, medium: 1.109, semibold: 1.111, bold: 1.113, extraBold: 1.115 },
+  bottom: { regular: 0.322, medium: 0.326, semibold: 0.331, bold: 0.334, extraBold: 0.339 },
   /** `OS/2.sxHeight` and `sCapHeight`. */
-  xHeight: { regular: 0.548, medium: 0.551, semibold: 0.554, bold: 0.558, extraBold: 0.561 },
-  capHeight: { regular: 0.698, medium: 0.697, semibold: 0.701, bold: 0.705, extraBold: 0.709 },
+  xHeight: { regular: 0.546, medium: 0.546, semibold: 0.546, bold: 0.546, extraBold: 0.546 },
+  capHeight: { regular: 0.728, medium: 0.728, semibold: 0.728, bold: 0.728, extraBold: 0.728 },
 } as const;
 
 /**
@@ -241,15 +241,15 @@ export const POPPINS_METRICS = {
  *
  * React Native sets a line height with `CustomLineHeightSpan`, which keeps as
  * much of the font as fits in this order: the descent, the ascent, the box's
- * foot, the box's top, and shares out what is left over. Poppins' ascent and
- * descent are 1.4em, so a line tighter than that keeps its descent and cuts
+ * foot, the box's top, and shares out what is left over. Inter's ascent and
+ * descent are 1.21em, so a line tighter than that keeps its descent and cuts
  * its ascent.
  */
 export function baselineIn({ size, line, weight }: ReviewLine): number {
-  const ascent = POPPINS_METRICS.ascent * size;
-  const descent = POPPINS_METRICS.descent * size;
-  const top = POPPINS_METRICS.top[weight] * size;
-  const bottom = POPPINS_METRICS.bottom[weight] * size;
+  const ascent = FONT_METRICS.ascent * size;
+  const descent = FONT_METRICS.descent * size;
+  const top = FONT_METRICS.top[weight] * size;
+  const bottom = FONT_METRICS.bottom[weight] * size;
 
   if (ascent + descent > line) return line - descent;
   if (ascent + bottom > line) return ascent;

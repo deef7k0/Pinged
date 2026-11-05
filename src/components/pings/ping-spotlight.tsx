@@ -246,7 +246,7 @@ function Stage({
         scaleTo={0.97}
         style={StyleSheet.flatten([styles.fan, { width }])}>
         {ping.refs.length > 0 ? (
-          <Fan refs={ping.refs} width={width} />
+          <ReferenceFan refs={ping.refs} width={width} />
         ) : (
           <Avatar uri={ping.avatar_url} name={name} size={88} />
         )}
@@ -307,8 +307,9 @@ function Stage({
 /**
  * The request's games, fanned: the first in front, the second turned out to
  * the right, the third to the left, behind. Each stands on a ring of page.
+ * Exported for a request's own page, which leads with the same fan.
  */
-function Fan({ refs, width }: { refs: readonly PingFeedRef[]; width: number }) {
+export function ReferenceFan({ refs, width }: { refs: readonly PingFeedRef[]; width: number }) {
   const mid = width / 2;
   const cards = refs.slice(0, 3).map((ref, at) => ({
     ref,

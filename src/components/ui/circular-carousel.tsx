@@ -33,6 +33,8 @@ export type CircularCarouselProps<T> = {
   data: readonly T[];
   keyOf: (item: T, index: number) => string;
   renderItem: (item: T, index: number) => ReactNode;
+  /** Drawn behind the card, unclipped, turning with it — the Top 10's numeral. */
+  renderBehind?: (item: T, index: number) => ReactNode;
   /** The card's width; the carousel is the display's. */
   itemWidth: number;
   itemHeight: number;
@@ -46,6 +48,7 @@ export function CircularCarousel<T>({
   data,
   keyOf,
   renderItem,
+  renderBehind,
   itemWidth,
   itemHeight,
   width,
@@ -93,7 +96,8 @@ export function CircularCarousel<T>({
           step={step}
           itemWidth={itemWidth}
           itemHeight={itemHeight}
-          spacing={spacing}>
+          spacing={spacing}
+          behind={renderBehind?.(item, index)}>
           {renderItem(item, index)}
         </Card>
       )}
@@ -108,8 +112,10 @@ function Card({
   itemWidth,
   itemHeight,
   spacing,
+  behind,
   children,
 }: {
+  behind?: ReactNode;
   index: number;
   scrollX: SharedValue<number>;
   step: number;
@@ -137,6 +143,7 @@ function Card({
   return (
     <Animated.View
       style={[{ width: itemWidth, height: itemHeight, marginHorizontal: spacing / 2 }, style]}>
+      {behind}
       <View style={styles.card}>{children}</View>
     </Animated.View>
   );

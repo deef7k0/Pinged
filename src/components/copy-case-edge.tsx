@@ -5,7 +5,7 @@ import { StyleSheet, Text as RNText, View } from 'react-native';
 import { PLASTIC } from '@/components/copy-case-back';
 import { caseBuildFor } from '@/constants/copy-stage';
 import { CASE_TEMPLATES, hasCase, type PlatformKey } from '@/constants/platform-cases';
-import { FontFamily } from '@/constants/theme';
+import { Typeface } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { mix } from '@/lib/color';
 
@@ -148,8 +148,8 @@ const styles = StyleSheet.create({
     gap: 8,
     transform: [{ rotate: '90deg' }],
   },
-  brand: { fontFamily: FontFamily.bold, letterSpacing: 0.5, opacity: 0.85 },
-  title: { fontFamily: FontFamily.semibold, flexShrink: 1 },
+  brand: { fontFamily: Typeface.bold, letterSpacing: 0.5, opacity: 0.85 },
+  title: { fontFamily: Typeface.semibold, flexShrink: 1 },
   seam: {
     position: 'absolute',
     top: 0,

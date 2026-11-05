@@ -10,7 +10,7 @@ import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
-import { FontFamily, Palette, Spacing, withAlpha } from '@/constants/theme';
+import { Typeface, Palette, Spacing, withAlpha } from '@/constants/theme';
 import { useHeaderHeight } from '@/hooks/use-header-height';
 import { FAVOURITES_MAX, getFavorites, getProfile } from '@/lib/api';
 import { displayNameFor } from '@/lib/format';
@@ -19,6 +19,9 @@ import { sharpCoverUrl } from '@/lib/games/sharp-cover';
 /** The line of "Number 1", as tall as its type. */
 const NUMBER_LINE = 52;
 const TITLE_LINE = 26;
+/** The numeral behind each poster: its size and how far over the top it rises, of the poster's height. */
+const RANK_SIZE = 0.44;
+const RANK_RISE = 0.27;
 
 /**
  * Somebody's Top 10, full screen (the owner's, 2026-11-03): their Favourites
@@ -52,8 +55,9 @@ export default function TopTenScreen() {
   const title = name ? `${name}’s Top 10` : 'Top 10';
   const items = (favorites.data?.items ?? []).filter((item) => item.game).slice(0, FAVOURITES_MAX);
 
+  /* The numeral rises a little past the carousel's own room above a card. */
   const room = height - headerHeight - NUMBER_LINE - TITLE_LINE * 2 - Spacing.x48 * 2;
-  const itemWidth = Math.round(Math.min(width * 0.7, room / 1.5));
+  const itemWidth = Math.round(Math.min(width * 0.66, room / 1.5));
   const itemHeight = Math.round(itemWidth * 1.5);
   const current = items[Math.min(index, items.length - 1)];
   const credit = current?.game
@@ -94,6 +98,25 @@ export default function TopTenScreen() {
           itemHeight={itemHeight}
           width={width}
           onIndexChange={(next) => setIndex(Math.max(0, Math.min(items.length - 1, next)))}
+          /* Apple TV's Top 10: the place as a huge numeral behind the poster,
+             rising out over its top (the Apple pass, 2026-11-05). It turns and
+             drops with its card, so each cover carries its own number. */
+          renderBehind={(_, position) => (
+            <Text
+              accessible={false}
+              numberOfLines={1}
+              style={[
+                styles.rank,
+                {
+                  top: -itemHeight * RANK_RISE,
+                  fontSize: itemHeight * RANK_SIZE,
+                  lineHeight: itemHeight * RANK_SIZE,
+                  letterSpacing: -itemHeight * RANK_SIZE * 0.06,
+                },
+              ]}>
+              {position + 1}
+            </Text>
+          )}
           renderItem={(item, position) => (
             <PressableScale
               accessibilityRole="button"
@@ -143,9 +166,18 @@ export default function TopTenScreen() {
 
 const styles = StyleSheet.create({
   stage: { flex: 1, justifyContent: 'center', paddingBottom: Spacing.x32 },
+  rank: {
+    position: 'absolute',
+    left: -40,
+    right: -40,
+    textAlign: 'center',
+    fontFamily: Typeface.extraBold,
+    color: withAlpha(Palette.white, 0.16),
+    fontVariant: ['tabular-nums'],
+  },
   cover: { flex: 1, backgroundColor: withAlpha(Palette.white, 0.06) },
   number: {
-    fontFamily: FontFamily.extraBold,
+    fontFamily: Typeface.extraBold,
     fontSize: 44,
     lineHeight: NUMBER_LINE,
     letterSpacing: -1,
@@ -153,14 +185,14 @@ const styles = StyleSheet.create({
   },
   titleBox: { marginTop: Spacing.x4, paddingHorizontal: Spacing.x24 },
   title: {
-    fontFamily: FontFamily.semibold,
+    fontFamily: Typeface.semibold,
     fontSize: 18,
     lineHeight: TITLE_LINE,
     color: Palette.white,
   },
   credit: {
     textAlign: 'center',
-    fontFamily: FontFamily.regular,
+    fontFamily: Typeface.regular,
     fontSize: 14,
     lineHeight: 20,
     color: withAlpha(Palette.white, 0.65),

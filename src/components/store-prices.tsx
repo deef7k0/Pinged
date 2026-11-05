@@ -4,7 +4,7 @@ import { Linking, StyleSheet, View } from 'react-native';
 import { ArtRail, Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { OFFICIAL_STORES, storeBrand, storeInitial, type StoreBrand } from '@/constants/stores';
-import { FontFamily, Spacing, readableInk } from '@/constants/theme';
+import { Typeface, Spacing, readableInk } from '@/constants/theme';
 import { useGamePrices } from '@/hooks/use-game-prices';
 import { useTheme } from '@/hooks/use-theme';
 import { formatPrice, type StorePrice } from '@/lib/games/itad';
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initial: { fontFamily: FontFamily.extraBold, fontSize: 40, lineHeight: 46 },
+  initial: { fontFamily: Typeface.extraBold, fontSize: 40, lineHeight: 46 },
   /* Opaque: a wash of its own hue has no fixed ground to be measured on. */
   cut: {
     position: 'absolute',

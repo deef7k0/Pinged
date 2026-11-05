@@ -2,7 +2,7 @@ import { StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { labelFor, scoreColor } from '@/constants/score';
-import { FontFamily, Radius, Spacing } from '@/constants/theme';
+import { Typeface, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { readableInk } from '@/lib/color';
 
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   band: {
     fontSize: 8,
     letterSpacing: 0.4,
-    fontFamily: FontFamily.bold,
+    fontFamily: Typeface.bold,
     paddingHorizontal: 2,
   },
 });
@@ -272,7 +272,7 @@ export function ScoreChip({ score, narrow = false }: { score: number; narrow?: b
         {rounded}
       </Text>
       <Text
-        variant="label"
+        variant="badge"
         style={[styles.chipBand, narrow && styles.chipBandNarrow, { color: ink }]}
         numberOfLines={1}>
         {labelFor(score).toUpperCase()}

@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
+import { useBarConfirm } from '@/hooks/use-bar-confirm';
 import { GameSearchResults } from '@/components/game-search-results';
 import { ReferenceCovers } from '@/components/pings/reference-covers';
 import { Button } from '@/components/ui/button';
@@ -65,6 +66,7 @@ export default function SuggestGameScreen() {
     return (
       <Screen edges={['bottom']} insetHeader modal topBar={bar}>
         <EmptyState
+          icon="paper-plane-outline"
           title="Not taking suggestions"
           message={
             ping.data?.user_id === userId
@@ -117,6 +119,17 @@ function SuggestFlow({ ping, alreadyMine }: { ping: PingFeedRow; alreadyMine: st
       router.back();
     },
   });
+
+  useBarConfirm(
+    chosen
+      ? {
+          label: message.trim() ? 'Suggest it' : 'Suggest it without a reason',
+          onPress: () => send.mutate(),
+          loading: send.isPending,
+          disabled: message.length > SUGGESTION_MESSAGE_MAX,
+        }
+      : null
+  );
 
   if (!chosen) {
     return (
@@ -231,16 +244,6 @@ function SuggestFlow({ ping, alreadyMine }: { ping: PingFeedRow; alreadyMine: st
             {send.error instanceof Error ? send.error.message : 'Could not send that.'}
           </Text>
         )}
-
-        <Button
-          title={message.trim() ? 'Suggest it' : 'Suggest it without a reason'}
-          icon="paper-plane"
-          size="large"
-          fullWidth
-          loading={send.isPending}
-          disabled={tooLong}
-          onPress={() => send.mutate()}
-        />
       </PageScrollView>
     </KeyboardAvoidingView>
   );

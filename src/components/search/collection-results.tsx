@@ -84,6 +84,7 @@ function CollectionSearch({ query }: { query: string }) {
       renderItem={renderTile}
       ListEmptyComponent={
         <EmptyState
+          icon="search"
           title="No collections found"
           message={`No collection is called anything like “${query}”. Try one word of its title.`}
         />
@@ -141,6 +142,7 @@ function CollectionsDiscover() {
   if (popular.isSuccess && latest.isSuccess && liked.length === 0 && newest.length === 0) {
     return (
       <EmptyState
+        icon="albums-outline"
         title="No collections yet"
         message="Build one from your profile and it can be found here."
       />

@@ -34,9 +34,9 @@ import {
 const INSETS = [0, 24, 47, 59];
 
 describe('the top bar’s size — SimpMusic’s, which is Material 3’s', () => {
-  it('is a row 64 high', () => {
-    /* `TopAppBarDefaults.TopAppBarExpandedHeight`. */
-    assert.equal(TOP_BAR_ROW, 64);
+  it('is a row 52 high', () => {
+    /* An iOS navigation bar's row, with room for a 48dp control (2026-11-04). */
+    assert.equal(TOP_BAR_ROW, 52);
   });
 
   it('holds a 24dp glyph in a control 48 to touch, its held circle 40', () => {
@@ -69,8 +69,8 @@ describe('the glass discs over artwork', () => {
     assert.equal(TOP_BAR_EDGE, 12);
   });
 
-  it('take 60 off the top of the page, which fits inside the bar’s row', () => {
-    assert.equal(TOP_BAR_DISC_ROOM, 60);
+  it('take 50 off the top of the page, which fits inside the bar’s row', () => {
+    assert.equal(TOP_BAR_DISC_ROOM, 50);
     /* A page laid out under its discs is not under the bar that follows them. */
     assert.ok(TOP_BAR_DISC_ROOM <= TOP_BAR_ROW);
   });

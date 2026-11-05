@@ -93,6 +93,7 @@ function ReviewSearch({ query }: { query: string }) {
       windowSize={7}
       ListEmptyComponent={
         <EmptyState
+          icon="search"
           title="No reviews found"
           message={`Nothing written here mentions “${query}”. Try the game’s title.`}
         />

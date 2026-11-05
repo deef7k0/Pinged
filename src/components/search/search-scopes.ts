@@ -10,7 +10,8 @@ export type ScopeInfo = {
 };
 
 /**
- * The six kinds of thing Search finds, in the order the tabs list them.
+ * The six kinds of thing Search finds, after Top results (all of them at
+ * once), in the order the tabs list them.
  *
  * Events was a seventh; the owner moved it to the News tab (2026-10-14),
  * where `<EventResults>` is drawn untyped.
@@ -19,10 +20,12 @@ export type ScopeInfo = {
  * placeholder and the history's "in Studios" all read it, so an eighth kind is
  * an entry here and a results component, and none of those drift.
  *
- * Games is first because it is where the tab rests: Discover until a title is
- * typed. The rest follow in the order they were asked for.
+ * Top results is first because it is where the tab rests; Games next. The rest follow in the order they were asked for.
  */
 export const SEARCH_SCOPE_INFO: readonly ScopeInfo[] = [
+  /* Apple Music's search (the Apple pass, 2026-11-05): a Top Result and a
+     section of every kind, each leading to its own tab (`<TopResults>`). */
+  { key: 'top', label: 'Top results', placeholder: 'Games, studios, people…' },
   { key: 'games', label: 'Games', placeholder: 'Search games…' },
   { key: 'reviews', label: 'Reviews', placeholder: 'Search reviews…' },
   { key: 'people', label: 'People', placeholder: 'Search people…' },

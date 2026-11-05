@@ -20,6 +20,7 @@ import { PlatformDirectory } from '@/components/search/platform-directory';
 import { ReviewResults } from '@/components/search/review-results';
 import { SEARCH_SCOPE_INFO, scopeInfo } from '@/components/search/search-scopes';
 import { SearchBrowse } from '@/components/search/search-browse';
+import { TopResults } from '@/components/search/top-results';
 import { StudioResults } from '@/components/search/studio-results';
 import { SearchHistory } from '@/components/search-history';
 import { Avatar } from '@/components/ui/avatar';
@@ -133,7 +134,7 @@ export default function SearchScreen() {
   const facet = facets.length > 0;
   const facetKey = facets.map((entry) => `${entry.kind}:${entry.id}`).join(',');
 
-  const [chosenScope, setScope] = useState<SearchScope>('games');
+  const [chosenScope, setScope] = useState<SearchScope>('top');
   /* A facet's games are games, whatever tab the reader left open. */
   const scope: SearchScope = facet ? 'games' : chosenScope;
 
@@ -217,7 +218,7 @@ export default function SearchScreen() {
         Keyboard.dismiss();
         setTyped({ owner: '', text: '' });
         setLooking({ owner: '', kind: null });
-        setScope('games');
+        setScope('top');
         router.setParams({ facets: undefined, match: undefined });
       }
     );
@@ -257,7 +258,7 @@ export default function SearchScreen() {
   /* "Search by" answers the field being touched in Games, before anything is
      typed — the owner's "the app tells the user a few options" — over the
      recent searches when there are some, alone when there are none. */
-  const showSearchBy = focused && scope === 'games' && !isQueryable;
+  const showSearchBy = focused && (scope === 'games' || scope === 'top') && !isQueryable;
   const searchBy = <SearchBy value={lookup} onChange={setLookup} />;
 
   /*
@@ -278,7 +279,8 @@ export default function SearchScreen() {
    * scope, and stay while one other than Games is chosen, whose untyped
    * view is still its own.
    */
-  const browsing = !focused && input === '' && scope === 'games' && !facet && !lookup;
+  const browsing =
+    !focused && input === '' && (scope === 'top' || scope === 'games') && !facet && !lookup;
 
   /** What a focused field brings over the scope: "Search by", a kind's values, the history. */
   function renderPanel() {
@@ -375,6 +377,8 @@ export default function SearchScreen() {
     }
 
     switch (scope) {
+      case 'top':
+        return isQueryable ? <TopResults query={query} onSeeAll={setScope} /> : <SearchBrowse />;
       case 'reviews':
         return <ReviewResults query={query} />;
       case 'people':

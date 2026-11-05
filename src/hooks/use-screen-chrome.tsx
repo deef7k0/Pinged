@@ -1,4 +1,6 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+
+import { createConfirmSlot, type ConfirmSlot } from '@/hooks/use-bar-confirm';
 import type { View } from 'react-native';
 import { useSharedValue, type SharedValue } from 'react-native-reanimated';
 
@@ -69,6 +71,8 @@ export type ScreenChrome = {
    * it has scrolled away. `null` when the page has none.
    */
   largeTitle: string | null;
+  /** One quiet line under the large title (the Profile tab's @handle), or null. */
+  largeSubtitle: string | null;
   /** 1 while a page scroller is drawing the large title, so the bar knows to hold its own back. */
   largeTitleDrawn: SharedValue<number>;
   /**
@@ -79,6 +83,8 @@ export type ScreenChrome = {
    * the other way, and the header flips back — the loop the owner saw.
    */
   dragging: SharedValue<number>;
+  /** Where a form registers its commit, drawn as the ✓ in the bar (`useBarConfirm`). */
+  confirmSlot: ConfirmSlot;
 };
 
 const ScreenChromeContext = createContext<ScreenChrome | null>(null);
@@ -88,6 +94,7 @@ export type ScreenChromeProviderProps = {
   background: string;
   insetHeader?: boolean;
   largeTitle?: string | null;
+  largeSubtitle?: string | null;
   children: (chrome: ScreenChrome & { blurTargetRef: { current: View | null } }) => ReactNode;
 };
 
@@ -104,6 +111,7 @@ export function ScreenChromeProvider({
   background,
   insetHeader = false,
   largeTitle = null,
+  largeSubtitle = null,
   children,
 }: ScreenChromeProviderProps) {
   const [target, setTarget] = useState<View | null>(null);
@@ -111,6 +119,7 @@ export function ScreenChromeProvider({
   const layout = useSharedValue(0);
   const largeTitleDrawn = useSharedValue(0);
   const dragging = useSharedValue(0);
+  const [confirmSlot] = useState(createConfirmSlot);
 
   /*
    * A ref object that is also a subscription.
@@ -150,10 +159,24 @@ export function ScreenChromeProvider({
       background,
       insetHeader,
       largeTitle,
+      largeSubtitle,
       largeTitleDrawn,
       dragging,
+      confirmSlot,
     }),
-    [target, modal, scrollY, layout, background, insetHeader, largeTitle, largeTitleDrawn, dragging]
+    [
+      target,
+      modal,
+      scrollY,
+      layout,
+      background,
+      insetHeader,
+      largeTitle,
+      largeSubtitle,
+      largeTitleDrawn,
+      dragging,
+      confirmSlot,
+    ]
   );
 
   return (

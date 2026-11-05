@@ -28,8 +28,9 @@ describe('the top bar', () => {
   it('reserves the bar’s row under a list, and the discs’ room under artwork', () => {
     assert.match(heights, /useTopBarInset\(modal\) \+ TOP_BAR_ROW/);
     assert.match(heights, /useTopBarInset\(modal\) \+ TOP_BAR_DISC_ROOM/);
-    /* A page laid out under its discs does not move when the bar's row grows. */
-    assert.equal(TOP_BAR_ROW - TOP_BAR_DISC_ROOM, 4);
+    /* The discs are centred in the bar's row (2026-11-04), so the room a page
+       keeps for them is the row less the gap left under a disc. */
+    assert.equal(TOP_BAR_ROW - TOP_BAR_DISC_ROOM, 2);
   });
 
   it('is told how far the page has scrolled by the page’s own scroller', () => {

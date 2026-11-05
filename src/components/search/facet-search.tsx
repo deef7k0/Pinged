@@ -298,6 +298,7 @@ export function FacetBar({
             value={match}
             onChange={onMatchChange}
             accessibilityLabel="Selection mode"
+            kind="choice"
           />
         </View>
       )}

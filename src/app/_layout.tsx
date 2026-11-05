@@ -7,23 +7,20 @@
  * eighteen — megabytes of fonts in every APK that were never drawn. The
  * subpaths require one file each.
  *
- * Poppins — SimpMusic's own font, read off its `Typo.kt` (one family, pinned
- * to its `poppins_medium` file for every weight) and brought in properly
- * instead: real weight files, same as Inter's were, so `fontWeight` keeps
- * working rather than leaning on Android's fake-bold the way SimpMusic's does.
- * The owner's direction (2026-10-17): replace Inter app-wide. Onboarding's
- * Geist Mono is untouched — it was always its own reference, not SimpMusic's.
- * See `FontFamily` in `constants/theme.ts`.
+ * Inter — the closest open face to SF Pro, the Apple pass's choice
+ * (2026-11-04), in real weight files so `fontWeight` is never leaned on.
+ * The game case is set in it too. Onboarding's Geist
+ * Mono is its own reference. See `Typeface` in `constants/theme.ts`.
  */
 import { GeistMono_400Regular } from '@expo-google-fonts/geist-mono/400Regular';
-import { Poppins_300Light } from '@expo-google-fonts/poppins/300Light';
-import { Poppins_400Regular } from '@expo-google-fonts/poppins/400Regular';
-import { Poppins_400Regular_Italic } from '@expo-google-fonts/poppins/400Regular_Italic';
-import { Poppins_500Medium } from '@expo-google-fonts/poppins/500Medium';
-import { Poppins_600SemiBold } from '@expo-google-fonts/poppins/600SemiBold';
-import { Poppins_600SemiBold_Italic } from '@expo-google-fonts/poppins/600SemiBold_Italic';
-import { Poppins_700Bold } from '@expo-google-fonts/poppins/700Bold';
-import { Poppins_800ExtraBold } from '@expo-google-fonts/poppins/800ExtraBold';
+import { Inter_300Light } from '@expo-google-fonts/inter/300Light';
+import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
+import { Inter_400Regular_Italic } from '@expo-google-fonts/inter/400Regular_Italic';
+import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
+import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
+import { Inter_600SemiBold_Italic } from '@expo-google-fonts/inter/600SemiBold_Italic';
+import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
+import { Inter_800ExtraBold } from '@expo-google-fonts/inter/800ExtraBold';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
@@ -81,35 +78,20 @@ export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     ...Ionicons.font,
     /*
-     * Poppins, in the four weights the type scale uses. Each weight is a
-     * separate family on purpose — Android will not synthesise a bold from a
-     * custom font, so `fontWeight` on Poppins silently renders regular. See
-     * `FontFamily`.
+     * Inter, in the weights the type scale uses. Each weight is a separate
+     * family on purpose — Android will not synthesise a bold or an italic
+     * from a custom font. See `Typeface`. Light is the release year beside a
+     * review's title; the italics are user-written emphasis (`<RichText>`);
+     * ExtraBold is onboarding's headlines and a review's quote.
      */
-    Poppins_400Regular,
-    Poppins_500Medium,
-    Poppins_600SemiBold,
-    Poppins_700Bold,
-    /*
-     * The two italics, for user-written emphasis only — `*italic*` in a
-     * collection's description, through `<RichText>`. `fontStyle: 'italic'` is
-     * the same silent no-op on Android that `fontWeight` is, for the same
-     * reason: a custom family has no oblique to synthesise from.
-     */
-    Poppins_400Regular_Italic,
-    Poppins_600SemiBold_Italic,
-    /*
-     * Poppins Light, for exactly one thing: the release year beside a review's
-     * game title. The brief calls for Graphik Light there, and a year sitting
-     * next to a bold title has to recede without shrinking.
-     */
-    Poppins_300Light,
-    /*
-     * Onboarding's two (`FontFamily.extraBold`, `FontFamily.mono`). Loaded with
-     * the rest rather than on the onboarding screens, because the signed-out
-     * pitch is the first thing a new install draws.
-     */
-    Poppins_800ExtraBold,
+    Inter_300Light,
+    Inter_400Regular,
+    Inter_400Regular_Italic,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_600SemiBold_Italic,
+    Inter_700Bold,
+    Inter_800ExtraBold,
     GeistMono_400Regular,
   });
 
@@ -264,6 +246,7 @@ export default function RootLayout() {
                 <Stack.Screen name="must-play" />
                 <Stack.Screen name="review/[id]" />
                 <Stack.Screen name="soundtrack/[id]" />
+                <Stack.Screen name="now-playing" options={FULL_SHEET} />
                 <Stack.Screen name="notifications/index" />
                 {/* Pings (0046): a request's page, the news that left the
                     tab bar for it, and three sheets — ask, answer, send. */}

@@ -6,7 +6,7 @@ import { StyleSheet, View } from 'react-native';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Reveal } from '@/components/ui/reveal';
 import { Text } from '@/components/ui/text';
-import { FontFamily, Spacing, TapTarget, Type } from '@/constants/theme';
+import { Typeface, Spacing, TapTarget, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type HomeSectionProps = {
@@ -32,6 +32,8 @@ export type HomeSectionProps = {
   avatar?: ReactNode;
   /** Where the section leads. Omit to render the heading without a chevron. */
   seeAll?: Href;
+  /** The heading leads on by a callback instead of a route (Search's Top results switching tab). */
+  onSeeAll?: () => void;
   /**
    * A small control at the far end of the heading's line — the period on
    * "Beloved by the community". In place of the chevron, never beside it.
@@ -77,6 +79,7 @@ export function HomeSection({
   strapline,
   avatar,
   seeAll,
+  onSeeAll,
   trailing,
   children,
 }: HomeSectionProps) {
@@ -93,6 +96,15 @@ export function HomeSection({
       <Text variant="h2" accessibilityRole="header" numberOfLines={strapline ? 1 : undefined}>
         {lead && <Text variant="h2" style={styles.lead}>{`${lead} `}</Text>}
         {title}
+        {/* Apple's: the chevron straight after the words, on their line and
+            in the quiet ink — not pushed to the far end of the row. Inline,
+            so it wraps with the last word. */}
+        {(seeAll || onSeeAll) && (
+          <Text variant="h2" color="textSecondary">
+            {' '}
+            <Ionicons name="chevron-forward" size={CHEVRON} color={theme.textSecondary} />
+          </Text>
+        )}
       </Text>
       {subtitle && (
         <Text variant="bodySmall" color="textMuted">
@@ -116,7 +128,17 @@ export function HomeSection({
      rails), the section rises into place as it scrolls into view. */
   return (
     <Reveal style={styles.section}>
-      {seeAll ? (
+      {onSeeAll && !seeAll ? (
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={`See all ${(lead ? `${lead} ${title}` : title).toLowerCase()}`}
+          hitSlop={HEAD_SLOP}
+          onPress={onSeeAll}
+          scaleTo={0.98}
+          style={StyleSheet.flatten(styles.head)}>
+          {text}
+        </PressableScale>
+      ) : seeAll ? (
         <Link href={seeAll} asChild>
           <PressableScale
             accessibilityRole="link"
@@ -125,7 +147,6 @@ export function HomeSection({
             scaleTo={0.98}
             style={StyleSheet.flatten(styles.head)}>
             {text}
-            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
           </PressableScale>
         </Link>
       ) : (
@@ -140,7 +161,10 @@ export function HomeSection({
   );
 }
 
-/** One line of `h2` is 25dp; the slop above and below it reaches the tap floor. */
+/** The chevron after a heading that leads somewhere: Apple's, a little under the words' cap height. */
+const CHEVRON = 18;
+
+/** One line of `h2` is 28dp; the slop above and below it reaches the tap floor. */
 const HEAD_SLOP = {
   top: Math.ceil(Math.max(0, TapTarget - Type.h2.lineHeight) / 2),
   bottom: Math.ceil(Math.max(0, TapTarget - Type.h2.lineHeight) / 2),
@@ -162,5 +186,5 @@ const styles = StyleSheet.create({
   withAvatar: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   /* The heading's size in the regular family: Android synthesises no weight
      for a custom font, so the lighter half is a family, not a `fontWeight`. */
-  lead: { fontFamily: FontFamily.regular },
+  lead: { fontFamily: Typeface.regular },
 });

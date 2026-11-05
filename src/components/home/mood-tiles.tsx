@@ -16,6 +16,7 @@ import {
   ART_TURN,
   GRADIENT_ANGLE,
   NAME_LINES,
+  NAME_TYPE,
   TILE_GAP,
   TILE_INK,
   TILE_PAD,
@@ -245,9 +246,9 @@ const MoodTile = memo(function MoodTile({
       )}
 
       <Text
-        variant="itemTitle"
+        variant="h5"
         numberOfLines={NAME_LINES}
-        style={[styles.name, { color: TILE_INK }]}>
+        style={[styles.name, NAME_TYPE, { color: TILE_INK }]}>
         {tile.title}
       </Text>
     </PressableScale>

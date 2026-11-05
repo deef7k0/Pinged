@@ -99,6 +99,7 @@ export const CARD_GAP = Spacing.x12;
 export const cardShape = StyleSheet.create({
   shape: {
     borderRadius: Radius.review,
+    borderCurve: 'continuous',
     borderWidth: 1,
     ...Elevation.card,
   },

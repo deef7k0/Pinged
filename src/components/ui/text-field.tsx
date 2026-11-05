@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { forwardRef, useState, type ReactNode } from 'react';
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
+import { INSET_GROUP } from '@/components/ui/inset-group';
 import { Text } from '@/components/ui/text';
 import { ControlHeight, Radius, Spacing, TapTarget, Type } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
@@ -26,10 +27,15 @@ export type TextFieldProps = TextInputProps & {
    */
   trailing?: ReactNode;
   /**
-   * `search` centres a single line on the field's midline. Same shape and fill
-   * as every other field — a search bar is a field you type into.
+   * `search` is iOS's search field: a 44 capsule, one line on its midline.
+   *
+   * `row` is a field inside an `<InsetGroup>` (the Apple pass, 2026-11-05):
+   * no well and no edge — the group is the fill — the words 16 in, and a
+   * multi-line row grows with what is typed. Its `label`, when given, leads
+   * the row in the quiet ink, as Contacts' fields do; most rows say what they
+   * are by their placeholder alone.
    */
-  variant?: 'field' | 'search';
+  variant?: 'field' | 'search' | 'row';
 };
 
 /**
@@ -39,8 +45,10 @@ export type TextFieldProps = TextInputProps & {
  */
 const EDGE = 1.5;
 
-/** A search bar's height: SimpMusic's, from Material's search bar. */
-const SEARCH_HEIGHT = 56;
+/** A search field's height: iOS's, 36 drawn in a 44 row — here the 44. */
+const SEARCH_HEIGHT = 44;
+/** A row field's height at one line: an inset group's row. */
+const ROW_HEIGHT = INSET_GROUP.rowHeight;
 
 /**
  * A text field: a label above, a hint or error below, and between them a soft
@@ -77,6 +85,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
   const accent = useAccent();
   const [focused, setFocused] = useState(false);
   const search = variant === 'search';
+  const row = variant === 'row';
   const disabled = editable === false;
 
   const edge = error ? theme.danger : focused ? accent.onSurface : 'transparent';
@@ -109,7 +118,8 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
       style={[
         styles.input,
         search && styles.search,
-        multiline && styles.multiline,
+        multiline && (row ? styles.rowArea : styles.multiline),
+        row && styles.rowInput,
         icon != null && styles.withIcon,
         { color: disabled ? theme.textMuted : theme.text },
         style,
@@ -117,6 +127,30 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
       {...rest}
     />
   );
+
+  if (row) {
+    return (
+      <View>
+        <View style={[styles.row, multiline && styles.shellArea]}>
+          {label && (
+            <Text variant="body" color="textSecondary" style={styles.rowLabel}>
+              {label}
+            </Text>
+          )}
+          {field}
+          {trailing && <View style={styles.trailing}>{trailing}</View>}
+        </View>
+        {(error || hint) && (
+          <Text
+            variant="bodySmall"
+            color={error ? 'danger' : 'textSecondary'}
+            style={styles.rowNote}>
+            {error ?? hint}
+          </Text>
+        )}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.wrapper}>
@@ -129,6 +163,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
       <View
         style={[
           styles.shell,
+          search && styles.searchShell,
           multiline && styles.shellArea,
           { backgroundColor: theme.input, borderColor: edge },
         ]}>
@@ -158,6 +193,23 @@ const styles = StyleSheet.create({
     borderWidth: EDGE,
   },
   shellArea: { alignItems: 'stretch' },
+  searchShell: { borderRadius: Radius.pill },
+  row: { flexDirection: 'row', alignItems: 'center', paddingLeft: Spacing.x16 },
+  rowLabel: { width: 110 },
+  rowInput: {
+    paddingLeft: 0,
+    paddingRight: Spacing.x16,
+    fontSize: 16,
+    minHeight: ROW_HEIGHT,
+  },
+  /* A row that grows: no floor beyond one line, no scroll inside it. */
+  rowArea: {
+    minHeight: ROW_HEIGHT,
+    textAlignVertical: 'top',
+    paddingTop: 15,
+    paddingBottom: 15,
+  },
+  rowNote: { paddingHorizontal: Spacing.x16, paddingBottom: Spacing.x8 },
   icon: { paddingLeft: Spacing.x16 },
   /* Sized to the floor even though its contents are a 20dp glyph: whatever the
      caller puts here is tappable often enough that it must not be the one

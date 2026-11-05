@@ -465,6 +465,9 @@ src/
                      this with the log form and ?mode=log raises the game
                      page's progress sheet over it (modal)
     surprise         Surprise Me: one dealt game, one song from it
+    now-playing      the music full screen, opened from the mini player (modal)
+    studio-games/[id]  every game a studio made, three across, sorted — its
+                     page's "All games ›"
     platform/[id]    every game on one platform, ten to a page, with the pager
                      over them. Opened from Search's Platforms
     event/[id]       one showcase or award show, laid out as the owner's race
@@ -1093,7 +1096,7 @@ src/
     review-highlight.ts  the share sheet's highlighter as data: the
                      review's words and breaks, their layout, the word under a
                      finger, a pick's lines on the card. Pure, tested
-    inter-advance.ts Inter Regular's and Bold's advance widths, read from the
+    font-advance.ts  Inter Regular's, Bold's and ExtraBold's advance widths, read from the
                      font files: text laid out before it is drawn
     review-colour.ts whether a review's page wears its game's colours, kept
                      on the device per account (`useReviewColour`)
@@ -2674,7 +2677,7 @@ be made into an image to save or send, after SimpMusic's lyrics card.
   second `.or()` on the same request is ANDed with it — verified live.
 - **85 characters** (`QUOTE_MAX`): the owner asked for "no more than 3 lines…
   in the surprise me screen". It was measured with Inter's own advance widths
-  (`lib/testkit/inter-font.ts` reads the TTF): Surprise Me's card holds about
+  (`lib/testkit/app-font.ts` reads the TTF): Surprise Me's card holds about
   ninety, a list's card — beside its art, the narrowest — about eighty-five,
   and the owner's own example is eighty-one. An 85-character quote can take a
   fourth line in a list's card, which then grows by a line; 0004's CHECK still
@@ -2694,7 +2697,7 @@ be made into an image to save or send, after SimpMusic's lyrics card.
   room for it and a last word that would run into it goes down. One fixed
   size a place (`PULL_QUOTE`: 12 on cards, 15 on the page, 16 on the classic
   image, 14 on the Rating one), all in Inter ExtraBold — onboarding's headline
-  weight, measured from its own font file (`lib/inter-advance.ts`) so the lines
+  weight, measured from its own font file (`lib/font-advance.ts`) so the lines
   break where the phone breaks them — the marks a little taller than the
   capitals, a gap of about two spaces from the words.
   - **The page's quote was fitted to the score's row for one pass** — every
@@ -2703,7 +2706,7 @@ be made into an image to save or send, after SimpMusic's lyrics card.
     smaller." Do not bring the fitting back. Justification went the pass
     before ("just have it regular").
   - **`<QuoteBlock>` lays the lines out itself** (`lib/quote-layout.ts`, from
-    Inter's advance widths in `lib/inter-advance.ts`) and draws each as a
+    Inter's advance widths in `lib/font-advance.ts`) and draws each as a
     one-line text where it was put: a first-line indent is not something
     React Native's text can do, and the closing mark's room can only be kept
     by a layout that knows where the lines break. A mark stands a little above
@@ -3871,7 +3874,11 @@ the start to the end, or three hours after a start with no end) and prints the
 games **only once it is over** (`showsGames`) — the owner's words. Its foot bar
 is the action for the moment; going in person is a quiet line, not a button.
 
-**The progress pills** (`<ProgressPills>`) are the poster palette
+**Superseded (2026-11-05): the log form's progress is one Status row and a
+pull-down** (`<ProgressStatus>`) — § The Apple pass. The poster hues tint its
+glyphs; the rule below that a new log starts with nothing chosen stands.
+
+**The progress pills** (`<ProgressPills>`, deleted) were the poster palette
 (`PROGRESS_POSTER`) in `PROGRESS_ROWS`' grid. **Each rests as an outline in
 its own colour, and the chosen one pours solid** (`<PaintFill>`) — the owner's
 second rule; the first had all seven solid until one was chosen, the rest
@@ -4174,6 +4181,7 @@ and the event page's foot bar are all for a device.
   `AnalyticsScreen.kt` (the typography and spacing). Go back to those files
   before changing a control's measurements. DESIGN.md § 9 is the full statement.
   In short:
+  - **Superseded (2026-11-04)**: `primary` is the prominent capsule — § The Apple pass.
   - **Every action is the same grey pill** (`<Button>`): 52dp
     (`ControlHeight.medium`), `Radius.pill`, filled `controlFill` (#181818 on
     black), a small semibold label in `controlInk`. Variants change the label,
@@ -4236,6 +4244,7 @@ and the event page's foot bar are all for a device.
 - **Reanimated shared values**: use `.get()` / `.set()`, never `.value =`. The
   React Compiler rules flag assignment to `.value` as mutating a captured
   binding; the accessors behave identically. See `ui/pressable-scale.tsx`.
+- **Superseded (2026-11-04): the family is `Typeface` (Inter) at Apple's sizes** — § The Apple pass. The bullet below is history.
 - **One family: Inter, for everything — the owner removed the review serif.**
   Source Serif 4 set reviews and nothing else (a review's title, its prose, the
   headline on a card) on the argument that a serif makes writing read as
@@ -6247,6 +6256,343 @@ that a little lower from the blur."
     the facts line, so the facts, the keys (round glass at the left, a big
     filled like at the right with its count) and a rule are on the page;
     the quote and the review under the rule.
+
+## The Apple pass: foundations (2026-11-04)
+
+The owner's critique of the whole app against Apple Music and Apple TV on
+iOS 26 (`.impeccable/critique/2026-11-04T23-23-58Z__src-app.md`, 24/40), and
+their answers: **Apple's pattern wins over older rulings in this file, except
+five, which stay** — lists of games in pages of ten (the pager), the bouncy
+Settings accordion, the mascot loader, covers on rows with nothing printed
+under them, and Liquid glass off by default. Where a section above disagrees
+with this one, this one is current. The foundations came first; the forms
+layer, the chrome and the community pages are next, in that order.
+
+- **Inter at Apple's sizes** (`Type`, `constants/theme.ts`): large title 34,
+  `display` 28, `h2` 22 (every section heading), `h3` 20, `h4` 17 semibold,
+  `h5` 15 semibold, `body` 15, `bodySmall` 13, `caption` 12, `button` 16; row
+  titles (`itemTitle`) are 15 *medium*. The app's family is **`Typeface`**.
+  **`FontFamily` is the protected game case's Poppins, frozen** — the case
+  imports it by name, so the name kept Poppins and the app took a new one;
+  the root layout loads Poppins in those three weights for the case alone.
+  Never use `FontFamily` outside the case.
+- **Measured layout reads Inter now.** `lib/font-advance.ts` (was
+  `poppins-advance`) holds Inter's advance widths, printed from the font
+  files by `node --import ./scripts/esm-register.mjs scripts/font-advance.mjs`;
+  `lib/testkit/app-font.ts` (was `poppins-font`) reads them for tests; the
+  review page's baselines use Inter's vertical metrics (`FONT_METRICS`), and
+  its row was retuned so every line is still within a dp of the screenshot.
+  The tab bar's liquid lens draws Inter SemiBold. A change of face re-runs
+  the script.
+- **No capitals in content.** `variant="label"` is a sentence-case footnote
+  (13 semibold); **`variant="badge"`** is the old caps label, for words
+  printed over artwork (an edition on a cover, an event's phase on its art,
+  a discount capsule, a score tile's word). The `.toUpperCase()` on list
+  tiles, the score line ("92 Outstanding"), moderation, copies and Steam
+  headings went with it.
+- **The room is true black**: `background` `#000`, `surface` `#1C1C1E`,
+  `surfaceElevated` `#28282A`, `surfaceSelected` `#333336`, `skeleton`
+  `#28282A`. `review-card.test.ts` allows a step up to 1.3 (Apple's own card
+  on black is 1.24). `#28282A` and not Apple's `#2C2C2E` because `textMuted`
+  on a control must hold AA. **The three text inks did not move**: the
+  protected case's back is set in them.
+- **Buttons**: `primary` (the default) is the prominent capsule, filled with
+  the accent in force (`filledRoles`: white on the house pages, the game's
+  primary on a game's); `secondary` is the grey capsule; disabled is the same
+  shape at 35%. "Every action is the same grey pill" is reversed.
+- **`showAlert` is Apple's alert**: centred, 300 wide, 30 round, title and
+  message centred, full-width capsules — side by side for two (cancel left),
+  stacked for more; the last non-destructive button prominent. It no longer
+  passes `disabled` while leaving (that restyled every button on exit).
+- **One section heading** (`SectionHeader`, `HomeSection`, `ProfileWidget`):
+  `h2`, the chevron straight after the words, the whole line the door. The
+  profile's widgets lost their hairline and "View all".
+- **`EmptyState` takes an `icon`** (a controller by default) and is
+  `ContentUnavailableView`: 52pt symbol, `h2` title, one 15pt line at most 300
+  wide, one button. `ErrorState` picks its symbol from the failure. About
+  seventy call sites were given a symbol for what is missing.
+- **Corners**: `Radius.image` 8, `card` / `review` 16, `sheet` 26, and
+  `borderCurve: 'continuous'` on covers, cards and skeletons — never on the
+  case's framed cover (`rounded="caseImage"`).
+- **In-page tabs**: `segmentPill` is white at 22% with white words.
+- **Releases and Upcoming** draw `<GameGridTile>` (title and short date under
+  each cover) with a skeleton of the same shape; `CoverTile` there was a
+  sideways row squeezed into a three-column grid.
+- **The protected case is set in Inter too** (the owner, 2026-11-04: "the
+  case doesn't need poppins"). `FontFamily` is kept only as the name
+  `<GameCaseBack>` imports, pointing at Inter; Poppins is uninstalled. Its
+  inks, radii and sizes did not move.
+- **Do not reorder the game page's Overview — the information stays at the
+  top.** The critique suggested moving the Information and Details box to the
+  foot of the Overview, Apple TV's order; the owner refused (2026-11-04):
+  "you must not change the order of the information in the overview tab…
+  the information must be at the top, not bottom". The order is § Apple TV's
+  third pass: trailers and screenshots, then Information and Details, then
+  the rest. No Apple-pass change may move it.
+
+**Not seen on a phone.** Types, lint and `npm test` (1,090) pass. To judge
+on a device: whether body 15 crowds the denser rows and cards, every fixed
+height that held 13pt text, the white primary capsules, and the alert.
+
+## The Apple pass: forms and chrome (2026-11-04)
+
+The second part of § The Apple pass, the same day.
+
+- **`<Switch>`** (`ui/switch`): iOS's 51×31 track, a 27 white knob. Apple's
+  green on the house pages and the game's primary on a game's, or a meaning
+  colour passed as `tint` (the log form's platinum, a spoiler's red). The knob
+  and the colour are CSS transitions on React props. There was no switch in
+  the app before.
+- **`<InsetGroup>` and `<Row>`** (`ui/inset-group`): iOS Settings' grouped
+  list — a quiet heading over it, rows in one `surface` container 26 round
+  with hairlines starting where the words do, a footer under it for the
+  explanation. A row takes a tinted 29dp glyph tile, a trailing value, a
+  chevron (`onPress`), a switch (`toggle`), or is `destructive` (red, and
+  `centred` for Sign out). New settings and forms are built from these.
+- **Settings**: the accordion stays (a kept ruling), and each on/off item in
+  it is now one switch row and a line explaining it, where it was two radio
+  cards with a paragraph each. Ratings, Moderation and Privacy are inset
+  groups with tinted tiles; Sign out and Delete account are red rows in
+  groups of their own. The Pings item's glyph is the paper plane.
+- **`<SelectionCard>` is Apple's checklist row**: a filled row, the name and
+  its hint, and a checkmark at the trailing edge once chosen (a checkbox
+  shows an empty circle that fills with a check). The leading radio and the
+  outline are gone, everywhere it is used.
+- **A modal's commit is the ✓ in its bar.** `<FrostedTopBar confirm>` draws
+  it — a disc filled with the accent in force, a check in its ink, dimmed when
+  disabled, a spinner while saving. A form that owns its mutation in a child
+  component registers it with **`useBarConfirm()`** (`hooks/use-bar-confirm`,
+  a per-screen store on `ScreenChrome.confirmSlot`), passing `null` while a
+  picker stands in for the form. Done on the log form, New and Edit
+  collection, Edit profile, a playthrough, a new ping, Suggest a game,
+  Suggest similar, a report and a copy; their full-width foot buttons are
+  gone. A destructive action (Remove log, Delete playthrough) stays at the
+  foot. **A new modal form commits the same way.** Still with a foot button:
+  award-edit, add-release, send-ping (its Send lives beside the message), the
+  scanner's result states.
+- **The log form**: Save is the ✓; Platinum and Contains spoilers are
+  switch rows; its error line sits at the foot of the scroll. The progress
+  pills are unchanged this pass.
+- **The top bar**: the row is **52** (an iOS bar's 44 with room for 48dp
+  controls; it was M3's 64), and the discs over artwork are centred in it
+  (`TOP_BAR_DISC_TOP`, 2 — the side distance `TOP_BAR_EDGE` is still 12), so
+  `useDiscRoom()` is 50. **Every bar's title is centred**, 17 semibold (`h4`),
+  inset by the wider of its two sides (measured) so it never runs under a
+  control; `centerTitle` is kept for its callers and means nothing now. The
+  back key is a filled disc on plain pages too. Pages laid out under
+  `useHeaderHeight()` moved up 12dp.
+- **The tab bar**: labels 10 medium, the unchosen ones white at 55%; Pings'
+  glyph is the paper plane, not `radio`.
+
+**The remaining plan, with specs, is `.impeccable/critique/apple-pass-backlog.md`.**
+
+**Large titles that collapse, everywhere (2026-11-05).** Every tab and
+every list page opens on its name in `largeTitle`, which folds into the
+centred bar title as the page is read:
+
+- **Home** is the plain bar (`<FrostedTopBar variant="bar">` — a page that
+  keeps the bar's room itself, under its glow, asks for it that way and
+  `<Screen>` gives it a large title anyway) with **one capsule: your face,
+  Create, the bell**. The page places the title itself
+  (`<PageLargeTitle>`, `<PageScrollView ownLargeTitle>`) inside the glow's
+  block, with **the chips on a 44 row under it**: filled 32 capsules, the
+  chosen one white, Mood and Genre **pull-downs** (an `<AnchoredMenu>` with a
+  check on the one in force; the chip reads the choice). SimpMusic's
+  expanding chip, the fixed 112 header, the "Welcome back," row and the
+  "Search every game on IGDB" footer are gone.
+- **Pings** and **the Profile tab** are the plain bar under `insetHeader`
+  with their keys in its capsule (+; + and Settings — the + drops an
+  `<AnchoredMenu>`); Pings' tabs and filters head its list; the Profile
+  tab's @handle is a line under its large title (`FrostedTopBar subtitle`).
+  Neither draws `<HeaderFade>` any more.
+- **Inbox, News, People and Moderation** have no `largeTitle={false}`: their
+  tab rows are the list's header (`inset={0}` inside the list's margin), and
+  their loading and failed states keep the title and the tabs
+  (`<PageWithHeader>` in `ui/page-scroll`). The Inbox's "Mark all as read"
+  is a `checkmark-done` key in the bar, shown while the tab in front has
+  something unread; its rows are flat on the page — the unread dot, a 40
+  face, the words, a 44 square of the thing at the trailing edge, hairlines
+  from where the words start.
+- `<AnchoredMenu>` scrolls inside the display when long, and its rows may
+  have no glyph.
+
+**The log form's progress is one row (2026-11-05)** — `<ProgressStatus>`
+(`components/progress-status`): **Status** with the choice at its far end,
+opening a pull-down of the seven in `PROGRESS_ROWS`' order, each glyph in its
+poster hue (lifted to 3:1 on the menu), a check on the one in force;
+"Completed" adds **How far**, a two-segment `<Segmented>` (`ui/segmented`,
+iOS's control: a grey capsule, a white thumb that glides — use it for any
+choice of two to four). A new log still starts with nothing chosen and the
+form will not save without one; there is no "tap again to clear" any more.
+The seven poured pills are deleted.
+
+**The last foot buttons are in the bar (2026-11-05).** award-edit's Save and
+add-release's Submit / Save changes are the ✓ (`useBarConfirm`); on
+add-release's result the ✓ is Done — one registration for both states, so
+the two never race for the slot. The scanner: "Look it up" is the ✓ while the
+field is up, and **"Scan another" is a key in the bar** whenever a result is
+shown (it was a ghost button at the foot of five results; the camera re-arms
+when the code clears). **send-ping**: the people you ping most as a rail of
+56 round faces that tick, then the searchable checklist (flat rows, 40
+faces, an iOS check), and the line **in a capsule docked over the keyboard
+with its own white send disc** — the full-width "Ping 3 people" button is
+gone; the disc's label still says it.
+
+**Forms are rows, and the primitives changed under every screen
+(2026-11-05).** The pieces, each used everywhere it applies:
+
+- **`<TextField variant="row">`** — a field inside an `<InsetGroup>`: no
+  well, no edge, 16 in, a leading `label` in the quiet ink (Contacts'), a
+  multi-line row grows. **`variant="search"`** is a 44 capsule (was 56).
+- **`<PullDownRow>`** (`ui/pull-down-row`) — a group row whose value drops
+  its choices as a menu, the one in force ticked; `anyLabel` adds a
+  clearing first option. `<Row menu>` draws iOS's up-and-down chevron.
+- **`<ChecklistGroup>` / `chosenLine`** (`ui/checklist-group`) — a
+  many-of list as checked rows with a limit, pushed over its form from a
+  row that sums it up; the form's ✓ (`useBarConfirm`) reads **Done** while it
+  is up and returns. New ping's Genres and Platforms, Suggest similar's
+  twelve reasons.
+- **`<PartialDateRow>`** (`ui/partial-date-row`) — a year or a month of one,
+  as a row opening a tray of two columns with Clear and Done.
+  `<PartialDateField>` is no longer used by the copy or playthrough forms.
+- **`<SortBar>`** is one "Sort by Newest ⌄" pull-down (the same props, all
+  fourteen callers); `kind="choice"` (a filter or a mode) is a
+  `<Segmented>` for two to four options and a plain pull-down for more.
+  **`<ChoiceChips>`** without hints is the same: segmented up to four, a
+  pull-down past that; with hints it stays the checklist of cards.
+- **`<DropdownButton>`** is a grey capsule with no edge; its menu rows are
+  44, all in the full ink, the chosen one told by its check alone.
+- **Toasts are one at a time** (`TOAST_KEPT` 1): a centred capsule as wide
+  as its words, glass under Liquid glass; a tap dismisses; a new one
+  replaces it. The stack and its spread are gone.
+- **`showPrompt`** (`ui/dialog`) — Apple's alert with a text field; the
+  confirming button is enabled only while `accepts` holds.
+- **`<ModerationRow>`** (`components/moderation-row`) — a queue entry in an
+  inset box: swipe right for the verdict that keeps it, left for the one
+  that takes it down (`ReanimatedSwipeable`), ⋯ for both and anything else
+  (Read in full, Open the thread) — which is how a screen reader reaches
+  them. The cards' rows of two buttons are gone; Reject still asks why in
+  place.
+
+And the screens: **New / Edit collection** are Apple Music's New Playlist
+(`components/collection-form`: a 140 art tile — the cover's box on Edit — a
+centred borderless 22pt name, then Description and Type as rows); **Edit
+profile** is Contacts' (a 96 face with **Edit**, which picks a photo and
+uploads it to `avatars` on Save — the "Avatar URL" field is gone; the fields
+as rows; Game accounts a row a service, each opening its own page in the
+sheet — Steam's the SteamID64 — with Android's back returning to the
+profile); **New ping** (the question a borderless 20pt field, the games a
+⊖/⊕ list, Preferences five rows); **Suggest similar** (one reasons row and
+the line); **add-copy, add-release and a playthrough** (every field a row,
+Region / Condition / What came with it / Platform pull-downs, dates rows,
+How far a segmented control; add-release's "More details" is a group, no
+longer folded); **Delete account** (two groups, what is deleted and what
+stays, and a red row opening `showPrompt` for the username).
+
+**The community and utility pages (2026-11-05, backlog item 5, in part):**
+
+- **Ratings** — "Ratings" is the large title, the game named in the line
+  under it; the sort is the "Sort by" pull-down; the pager at the foot only;
+  each score a trailing 17 semibold figure in the ramp, the name regular.
+- **Comments** — one row (`components/comment-row`) for a review's replies
+  and the thread: a 32 face, "Ada · 2h" on one line, the words at 16, Reply /
+  Delete / Report in a ⋯ and on a long press; replies indented 44
+  (`COMMENT_INDENT`), hairlines from the words, no rule down the side.
+- **The reviews sheet** — "Ratings & Reviews" (no repeated game name, no
+  "REVIEWS"); one filter key (white with the count while any is on) opening
+  a tray of pull-down rows; the pager at the foot only, its count over the
+  list.
+- **An event** — its page in its art's Material 3 colours
+  (`useGameAccent`), the phase a capsule (LIVE filled red), date · time ·
+  watching as one line (no strip), links as 88 square tiles with the
+  network's glyph.
+- **Achievements** — `components/achievement-parts`: `<AchievementHead>`
+  (the game's art dissolving into the page, an 88 `<ProgressRing>` —
+  `ui/progress-ring`, plain views, two rotated half-arcs, no SVG — and the
+  figures as rounded tiles), `<AchievementMedallion>` (three across, round,
+  35% and a lock while locked, rarity in sentence case) and `<GameArtHead>`.
+  The game's achievements, Steam's across games, game-stats (art at the head
+  now, figures as tiles, "From Steam") and playthroughs (art head, + in the
+  bar, runs in inset boxes) use them.
+- **A similar pick** — the two covers with "≈", "78% agree" as one figure,
+  Agree / Disagree as two equal capsules (white when yours), the reasons as
+  a sentence, suggestions in Apple's review box.
+- **A ping** — the games fanned on top (`ReferenceFan`, exported from the
+  spotlight), the question at 22, "Asked by Ada · 2h" with a 20 face; Edit
+  joined Close / Reopen / Delete in the owner's ⋯.
+- **Copies** — a two-across grid of covers; Scan / Add by hand are the + in
+  the bar.
+- **A collection** — Surprise me (a random game of it) and Shuffle (a seeded
+  random order, not written back) as two equal capsules, sort and layout in a
+  ⋯; nothing at all when there is no description.
+- **A studio** — the newest release as one 16:9 tile first; its franchises
+  as one **Series** rail, each opening that franchise as a facet search.
+- **The game page** — MORE is bare bold text; the bar's keys are ⋯ (the
+  animated cover, the trailer, Ping) and Share.
+- **Tabs** — the profile's counts on one line ("12 followers · 48 logged ·
+  30 following") and its tabs labelled; News rows are Apple News's (the
+  outlet, the headline, the time, an 80 square) on Home and News alike; the
+  Top 1000 is an inset group with the rank 17 secondary and "‹ Page 3 of 50 ›"
+  at its foot (the pages kept, restyled); the Pings board has no
+  registration marks, a "Closed" / "Found it" tag in place of the
+  strike-through, and its filters behind one key opening a tray.
+
+**The rest of item 5 (2026-11-05, the second pass):**
+
+- **Explore** — the slider has no heading and has page dots under it (the
+  one in front wider, driven by the row's offset on the UI thread); Popular
+  reviews is a rail of the App Store's review boxes (`<ReviewBox showGame>`,
+  exported from `game-overview`), Popular collections a shelf of mosaic
+  squares (`<CollectionShelfCard>`, `<CollectionMosaic>` in `list-tile`), ten
+  of each.
+- **Search typed is "Top results"** — a seventh scope, first, where the tab
+  rests (`'top'` in `SEARCH_SCOPES`; untyped it is still the browse grid):
+  one Top Result (`<TopResults>`, `search/top-results`) — a studio or a person
+  whose name *is* what was typed beats the first game unless the game's
+  title is as exact — then Games, Studios, People, Collections and Reviews,
+  a few each, every heading switching to its tab (`<HomeSection onSeeAll>`).
+  Each section is its tab's own query under its own key. "Search by" in a
+  ⋯ in the field was not done.
+- **The Top 10** — a huge numeral behind each poster, rising over its top
+  and turning with its card (`<CircularCarousel renderBehind>`). "Number 1"
+  under the cover stays, the owner's.
+- **The calendar** — the month and year are the bar's title (so the large
+  title); ‹ › are the bar's capsule; a sideways swipe turns the month (the
+  grid follows the finger by half, a fifth of the page or a flick turns it,
+  the new month fades in from the side it came from). Months run across
+  years. The twelve pills and the year row are gone.
+- **A soundtrack** — Play and Shuffle as two grey capsules under its name
+  (`shuffled()` in `lib/player-queue`, tested: playable first); the count,
+  the length and the upload's credit, mark and link moved to an album-page
+  footer under the last track.
+- **Now Playing** (`now-playing`, full-screen modal, in
+  `MINI_PLAYER_HIDDEN_ROUTES`) — the mini player opens it, not the
+  soundtrack: the track's art blurred over the display and darkened, the art
+  large, title and uploader with SoundCloud's mark, a scrubber that swells
+  under the finger, the transport as bare glyphs, Keep playing as a switch,
+  and a key to the whole soundtrack. Art in memory only. It closes itself
+  when the music stops.
+- **The game page** — trailer captions are under their tiles (`ArtRail`'s
+  `titleOf` may answer `undefined` for an item with none); the Similar tab is
+  two cover rails, "From the community" (`<CommunitySimilarRail>`, "N agree"
+  under each, a cover opens the pick) and IGDB's; on the Soundtrack tab a
+  track row opens the soundtrack playing that track (`?play=`) — the player
+  stays on its own screen, the owner's earlier rule. `<CommunitySimilarCard>`
+  has no caller now.
+- **A studio** — under the banner, "Surprise me" (a random game of theirs,
+  the white capsule) and a ⋯ (All games, Share); the line under the name is
+  "Developer · Since 1986 · 155 games" (`lib/games/studio-about`, tested
+  against live IGDB answers: `companies.start_date` with its precision, read
+  in UTC; `country` is ISO numeric; the role from `developed` / `published`);
+  the grid moved to its own page, `studio-games/[id]` ("All games ›", sorted,
+  three across), the page keeping a rail of the newest; an About card at the
+  end — IGDB's description, then Founded, Based in, Makes, Games, Releases,
+  Average rating. `getStudioCompany` asks for the four new fields
+  (`StudioCompany.about`, optional: saved rows predate it).
+- **A collection row** — a ⋯ at its far end: Ping, Share, the owner's
+  profile.
+
+**Not seen on a phone.** Types, lint, `npm test` (1,100) pass.
 
 ## Store-release compliance (audited 2026-10-29)
 

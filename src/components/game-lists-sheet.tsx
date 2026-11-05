@@ -77,6 +77,7 @@ export function GameListsSheet({ gameId, gameTitle }: GameListsSheetProps) {
   if (data.length === 0) {
     return (
       <EmptyState
+        icon="albums-outline"
         title="Not in any collections"
         message={`Nobody has put ${gameTitle} on a shelf yet. Add it to one of yours from the game page.`}
       />

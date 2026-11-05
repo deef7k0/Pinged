@@ -4,7 +4,7 @@ import { ScoreFigure } from '@/components/ui/score-figure';
 import { Text } from '@/components/ui/text';
 import { MAX_SCORE, MIN_SCORE, clampScore, labelFor, scoreColor } from '@/constants/score';
 import { SHOW_SCORE_FIGURES } from '@/constants/score-figure';
-import { FontFamily, Radius, Spacing } from '@/constants/theme';
+import { Typeface, Radius, Spacing } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   readout: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.x12 },
   centred: { justifyContent: 'center' },
   number: {
-    fontFamily: FontFamily.bold,
+    fontFamily: Typeface.bold,
     fontSize: NUMBER_SIZE,
     lineHeight: NUMBER_LINE,
     letterSpacing: -1,
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   compactOneLine: { alignItems: 'baseline' },
   compactVerdict: { flexShrink: 1 },
   numberCompact: {
-    fontFamily: FontFamily.bold,
+    fontFamily: Typeface.bold,
     fontSize: COMPACT_NUMBER_SIZE,
     lineHeight: COMPACT_NUMBER_LINE,
     letterSpacing: -0.5,

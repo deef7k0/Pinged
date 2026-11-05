@@ -7,7 +7,7 @@ import { QuoteBlock } from '@/components/quote-block';
 import { ScoreTile } from '@/components/ui/score-tile';
 import { labelFor } from '@/constants/score';
 import { SHARE_PODIUM, shareCardRamp, shareInkToken, shareTintOn } from '@/constants/share-card';
-import { FontFamily, withAlpha } from '@/constants/theme';
+import { Typeface, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ReviewPodiumCardProps = {
@@ -147,9 +147,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  initial: { fontSize: 12, lineHeight: 14, fontFamily: FontFamily.bold },
-  handle: { ...SHARE_PODIUM.handle, flex: 1, minWidth: 0, fontFamily: FontFamily.bold },
-  time: { ...SHARE_PODIUM.time, fontFamily: FontFamily.regular },
+  initial: { fontSize: 12, lineHeight: 14, fontFamily: Typeface.bold },
+  handle: { ...SHARE_PODIUM.handle, flex: 1, minWidth: 0, fontFamily: Typeface.bold },
+  time: { ...SHARE_PODIUM.time, fontFamily: Typeface.regular },
   mark: {
     width: SHARE_PODIUM.mark,
     height: SHARE_PODIUM.mark,
@@ -169,10 +169,10 @@ const styles = StyleSheet.create({
     borderRadius: SHARE_PODIUM.artRadius,
   },
   titles: { flex: 1, minWidth: 0, gap: 4 },
-  title: { ...SHARE_PODIUM.title, fontFamily: FontFamily.bold },
-  credit: { ...SHARE_PODIUM.credit, fontFamily: FontFamily.regular },
+  title: { ...SHARE_PODIUM.title, fontFamily: Typeface.bold },
+  credit: { ...SHARE_PODIUM.credit, fontFamily: Typeface.regular },
   words: { marginTop: SHARE_PODIUM.rowGap },
   /* The reference sets its line in italic: a family here, never a style —
      Android synthesises no oblique for a custom font. */
-  text: { ...SHARE_PODIUM.text, fontFamily: FontFamily.italic },
+  text: { ...SHARE_PODIUM.text, fontFamily: Typeface.italic },
 });

@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
 import { PageScrollView } from '@/components/ui/page-scroll';
@@ -9,10 +11,11 @@ import { ScorePill } from '@/components/ui/score';
 import { EmptyState, LoadingState, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
 import { STATUS_LABEL, statusColor } from '@/constants/status';
-import { Spacing } from '@/constants/theme';
+import { Spacing, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { getMyLog, getOwnedGames, getProfile } from '@/lib/api';
 import { displayNameFor } from '@/lib/format';
+import { getGameById } from '@/lib/games';
 import { formatPlaytime } from '@/lib/gaming';
 import { normaliseQuote } from '@/lib/review-quote';
 import { useAuth } from '@/store/auth';
@@ -74,6 +77,15 @@ export default function GameStatsScreen() {
     enabled: !!userId && !!gameId,
   });
 
+  /* The game's art at the head (the Apple pass, 2026-11-05) — the page had
+     none. Shares the game page's `['game', id]`. */
+  const game = useQuery({
+    queryKey: ['game', gameId],
+    queryFn: ({ signal }) => getGameById(gameId, signal),
+    enabled: !!gameId,
+    staleTime: 30 * 60_000,
+  });
+
   if (!userId || !gameId) {
     return (
       <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="Game record" />}>
@@ -97,6 +109,8 @@ export default function GameStatsScreen() {
         owned={owned.data ?? null}
         loading={log.isLoading}
         ownerName={ownerName}
+        artUrl={game.data?.heroUrl ?? game.data?.coverUrl ?? null}
+        title={game.data?.title ?? null}
       />
     </Screen>
   );
@@ -107,13 +121,18 @@ function Stats({
   owned,
   loading,
   ownerName,
+  artUrl,
+  title,
 }: {
   log: Awaited<ReturnType<typeof getMyLog>>;
   owned: Awaited<ReturnType<typeof getOwnedGames>>[number] | null;
   loading: boolean;
   ownerName: string;
+  artUrl: string | null;
+  title: string | null;
 }) {
   const theme = useTheme();
+  const { width } = useWindowDimensions();
 
   if (loading) return <LoadingState />;
 
@@ -128,6 +147,31 @@ function Stats({
 
   return (
     <PageScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      {artUrl ? (
+        <View style={[styles.art, { height: Math.round(width * 0.42) }]}>
+          <Image
+            source={{ uri: artUrl }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            transition={200}
+            accessibilityIgnoresInvertColors
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={[
+              withAlpha(theme.background, 0.1),
+              withAlpha(theme.background, 0.55),
+              theme.background,
+            ]}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
+      ) : null}
+      {title ? (
+        <Text variant="h2" style={styles.gameTitle}>
+          {title}
+        </Text>
+      ) : null}
       <View style={styles.stats}>
         {log && (
           <View style={[styles.statCard, { borderTopColor: theme.border }]}>
@@ -164,8 +208,8 @@ function Stats({
           <View style={[styles.statCard, { borderTopColor: theme.border }]}>
             <View style={styles.statHead}>
               <Ionicons name="logo-steam" size={15} color={theme.textSecondary} />
-              <Text variant="caption" color="textSecondary">
-                FROM STEAM
+              <Text variant="h5" color="textSecondary">
+                From Steam
               </Text>
             </View>
 
@@ -194,10 +238,17 @@ function Stats({
   );
 }
 
+/** A figure in a rounded tile — Fitness' (the Apple pass, 2026-11-05). */
 function Stat({ label, value }: { label: string; value: string }) {
+  const theme = useTheme();
   return (
-    <View style={styles.stat}>
-      <Text variant="h5">{value}</Text>
+    <View
+      accessible
+      accessibilityLabel={`${label}: ${value}`}
+      style={[styles.stat, { backgroundColor: withAlpha(theme.text, 0.07) }]}>
+      <Text variant="h3" numberOfLines={1} adjustsFontSizeToFit>
+        {value}
+      </Text>
       <Text variant="caption" color="textMuted">
         {label}
       </Text>
@@ -206,7 +257,9 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: Spacing.x16, paddingBottom: Spacing.x32 },
+  content: { paddingHorizontal: Spacing.x16, paddingBottom: Spacing.x32 },
+  art: { marginHorizontal: -Spacing.x16, overflow: 'hidden' },
+  gameTitle: { marginTop: -Spacing.x24, marginBottom: Spacing.x8 },
   stats: { gap: Spacing.x12 },
   statCard: {
     paddingVertical: Spacing.x16,
@@ -214,6 +267,15 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   statHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8 },
-  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.x24 },
-  stat: { gap: 1 },
+  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.x8 },
+  stat: {
+    flexGrow: 1,
+    flexBasis: '30%',
+    gap: 2,
+    alignItems: 'center',
+    paddingVertical: Spacing.x12,
+    paddingHorizontal: Spacing.x8,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+  },
 });

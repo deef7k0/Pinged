@@ -78,7 +78,15 @@ export function Shimmer({ radius = 0, color, style }: ShimmerProps) {
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       onLayout={reduceMotion ? undefined : onLayout}
-      style={[{ backgroundColor: fill, borderRadius: radius, overflow: 'hidden' }, style]}>
+      style={[
+        {
+          backgroundColor: fill,
+          borderRadius: radius,
+          borderCurve: 'continuous',
+          overflow: 'hidden',
+        },
+        style,
+      ]}>
       {sweep && !reduceMotion && (
         <Animated.View
           style={[

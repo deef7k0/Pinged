@@ -15,6 +15,7 @@ import {
   previousPlayable,
   progressOf,
   resetClock,
+  shuffled,
   type QueueTrack,
 } from './player-queue.ts';
 
@@ -232,5 +233,41 @@ describe('where the mini player is drawn', () => {
     assert.ok(names.includes('onboarding') && names.includes('welcome'), names.join(', '));
     /* By its first segment, as `hidesMiniPlayer` reads a route. */
     for (const name of names) assert.ok(MINI_PLAYER_HIDDEN_ROUTES.has(name.split('/')[0]), name);
+  });
+});
+
+describe('shuffled', () => {
+  const tracks: QueueTrack[] = [
+    { urn: 'a' },
+    { urn: 'b', access: 'blocked' },
+    { urn: 'c' },
+    { urn: 'd', access: 'preview' },
+    { urn: 'e' },
+  ];
+
+  it('keeps every track once and leaves the original alone', () => {
+    const order = shuffled(tracks, () => 0.42);
+    assert.deepEqual(order.map((t) => t.urn).sort(), ['a', 'b', 'c', 'd', 'e']);
+    assert.deepEqual(
+      tracks.map((t) => t.urn),
+      ['a', 'b', 'c', 'd', 'e']
+    );
+  });
+
+  it('puts the tracks that cannot be played last', () => {
+    for (const seed of [0, 0.2, 0.5, 0.8, 0.99]) {
+      const order = shuffled(tracks, () => seed);
+      assert.equal(order[order.length - 1].urn, 'b');
+      assert.equal(firstPlayable(order), 0);
+    }
+  });
+
+  it('is decided by the random source', () => {
+    let n = 0;
+    const seq = [0.9, 0.1, 0.6, 0.3];
+    const a = shuffled(tracks, () => seq[n++ % seq.length]).map((t) => t.urn);
+    n = 0;
+    const b = shuffled(tracks, () => seq[n++ % seq.length]).map((t) => t.urn);
+    assert.deepEqual(a, b);
   });
 });

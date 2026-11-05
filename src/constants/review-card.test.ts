@@ -26,8 +26,10 @@ const AA = 4.5;
 
 describe('the card on the page', () => {
   /*
-   * The owner's pair, measured out of their own reference (2026-10-20): the
-   * page is `#14171C` there and the card on it `#1B1F28`, which is 1.089:1.
+   * Apple's pair since the Apple pass (2026-11-04): the page is true black
+   * and the card iOS's `secondarySystemBackground`, #1C1C1E — 1.24:1, the
+   * step Apple Music and Apple TV draw a card on. It was the owner's #1B1F28
+   * on #14171C (1.089:1) from 2026-10-20.
    *
    * It used to be the other way round — the review card was its own near-black
    * a shade *under* the page (1.03:1), which is why this file is named after
@@ -38,7 +40,7 @@ describe('the card on the page', () => {
   for (const page of ['background', 'homeBackground']) {
     it(`is one step above \`${page}\``, () => {
       const ratio = contrast(card, token(page));
-      assert.ok(ratio > 1.05 && ratio < 1.15, `card against ${page}: ${ratio.toFixed(3)}`);
+      assert.ok(ratio > 1.05 && ratio < 1.3, `card against ${page}: ${ratio.toFixed(3)}`);
     });
 
     it(`is lighter than \`${page}\``, () => {
@@ -80,7 +82,7 @@ describe('the surface ladder', () => {
     for (let step = 1; step < ladder.length; step += 1) {
       const ratio = contrast(token(ladder[step]), token(ladder[step - 1]));
       assert.ok(
-        ratio > 1.04 && ratio < 1.2,
+        ratio > 1.04 && ratio < 1.3,
         `${ladder[step - 1]} → ${ladder[step]}: ${ratio.toFixed(3)}`
       );
     }

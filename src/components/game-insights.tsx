@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/surface';
 import { Text } from '@/components/ui/text';
 import { clampScore, ratingVerdict, scoreColor } from '@/constants/score';
 import { STATUS_LABEL } from '@/constants/status';
-import { FontFamily, Spacing } from '@/constants/theme';
+import { Typeface, Spacing } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useReadingLanguages } from '@/hooks/use-reading-languages';
 import { useTheme } from '@/hooks/use-theme';
@@ -477,5 +477,5 @@ const styles = StyleSheet.create({
      ratings are under theirs. */
   face: { alignItems: 'center', gap: Spacing.x4, minWidth: FACE },
   /* The bold family — Android synthesises no weight for a custom font. */
-  faceScore: { fontFamily: FontFamily.bold, fontVariant: ['tabular-nums'] },
+  faceScore: { fontFamily: Typeface.bold, fontVariant: ['tabular-nums'] },
 });

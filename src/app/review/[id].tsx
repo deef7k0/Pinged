@@ -55,7 +55,7 @@ import {
 import { wordsTop } from '@/constants/game-header';
 import { labelFor, scoreColor } from '@/constants/score';
 import { TOP_BAR_ROW, handoffBand, revealOffset } from '@/constants/top-bar';
-import { FontFamily, Palette, Spacing, withAlpha } from '@/constants/theme';
+import { Typeface, Palette, Spacing, withAlpha } from '@/constants/theme';
 import { AccentProvider, useAccent } from '@/hooks/use-accent';
 import { useLikeToggle } from '@/hooks/use-like-toggle';
 import { useAnimatedCover } from '@/hooks/use-animated-cover';
@@ -161,6 +161,7 @@ export default function ReviewScreen() {
     return (
       <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back variant="art" />}>
         <EmptyState
+          icon="search"
           title="Review not found"
           message="It may have been deleted by the person who wrote it."
         />
@@ -708,9 +709,9 @@ function GameName({ game, gameId }: { game: CachedGame | null; gameId: string })
   );
 }
 
-/** A measured line as a style: its Poppins file, its size and its line. */
+/** A measured line as a style: its Inter file, its size and its line. */
 function lineStyle({ size, line, weight }: ReviewLine): TextStyle {
-  return { fontFamily: FontFamily[weight], fontSize: size, lineHeight: line };
+  return { fontFamily: Typeface[weight], fontSize: size, lineHeight: line };
 }
 
 const styles = StyleSheet.create({
@@ -795,7 +796,7 @@ const styles = StyleSheet.create({
     backgroundColor: withAlpha(Palette.white, 0.14),
   },
   tagText: {
-    fontFamily: FontFamily.semibold,
+    fontFamily: Typeface.semibold,
     fontSize: 11,
     lineHeight: 14,
     color: withAlpha(Palette.white, 0.86),

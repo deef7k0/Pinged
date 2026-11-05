@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, View } from 'react-native';
 
+import { AnchoredMenu, AnchoredMenuItem, useAnchoredMenu } from '@/components/ui/anchored-menu';
 import { PressableScale } from '@/components/ui/pressable-scale';
+import { Segmented } from '@/components/ui/segmented';
 import { useSelectable } from '@/components/ui/selectable';
 import { SelectionCard } from '@/components/ui/selection-card';
 import { Text } from '@/components/ui/text';
@@ -13,6 +15,7 @@ import {
   Spacing,
 } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
+import { useTheme } from '@/hooks/use-theme';
 
 export type Choice<T extends string> = {
   value: T;
@@ -63,6 +66,32 @@ export function ChoiceChips<T extends string>({
 }: ChoiceChipsProps<T>) {
   const selectable = useSelectable();
 
+  /*
+   * Bare choices are iOS's (the Apple pass, 2026-11-05): up to four, a
+   * segmented control; more, a pull-down. They were a wrapping row of
+   * outlined pills. Choices with hints stay a checklist.
+   */
+  if (!withHints) {
+    const pick = (next: T) => onChange(next === value && clearable ? null : next);
+    return (
+      <View style={styles.field}>
+        <Text variant="fieldLabel" accessibilityRole="header">
+          {label}
+        </Text>
+        {choices.length <= 4 ? (
+          <Segmented
+            label={label}
+            value={value}
+            onChange={pick}
+            options={choices.map((choice) => ({ value: choice.value, label: choice.label }))}
+          />
+        ) : (
+          <ChoicePullDown label={label} choices={choices} value={value} onPick={pick} />
+        )}
+      </View>
+    );
+  }
+
   return (
     <View style={styles.field}>
       <Text variant="fieldLabel" accessibilityRole="header">
@@ -110,8 +139,74 @@ export function ChoiceChips<T extends string>({
   );
 }
 
+/** A grey capsule holding the choice (or "Choose"), dropping the rest as a menu. */
+function ChoicePullDown<T extends string>({
+  label,
+  choices,
+  value,
+  onPick,
+}: {
+  label: string;
+  choices: readonly Choice<T>[];
+  value: T | null;
+  onPick: (value: T) => void;
+}) {
+  const theme = useTheme();
+  const [trigger, menu] = useAnchoredMenu();
+  const current = choices.find((choice) => choice.value === value) ?? null;
+
+  return (
+    <>
+      <View ref={trigger} collapsable={false} style={styles.pullAnchor}>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={`${label}: ${current?.label ?? 'not chosen'}`}
+          accessibilityState={{ expanded: menu.isOpen }}
+          onPress={menu.open}
+          scaleTo={0.97}
+          hitSlop={SmallControlSlop}
+          pressedColor={theme.controlPressed}
+          style={StyleSheet.flatten([styles.pull, { backgroundColor: theme.controlFill }])}>
+          <Text variant="h5" color={current ? 'text' : 'textMuted'} numberOfLines={1}>
+            {current?.label ?? 'Choose'}
+          </Text>
+          <Ionicons name="chevron-expand" size={14} color={theme.textMuted} />
+        </PressableScale>
+      </View>
+      <AnchoredMenu menu={menu} label={label} width={260}>
+        {choices.map((choice) => (
+          <AnchoredMenuItem
+            key={choice.value}
+            title={choice.label}
+            hint={choice.hint}
+            checked={choice.value === value}
+            trailing={
+              choice.value === value ? (
+                <Ionicons name="checkmark" size={20} color={theme.text} />
+              ) : undefined
+            }
+            onPress={() => {
+              menu.close();
+              onPick(choice.value);
+            }}
+          />
+        ))}
+      </AnchoredMenu>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   field: { gap: Spacing.x12 },
+  pullAnchor: { alignSelf: 'flex-start' },
+  pull: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.x8,
+    height: ControlHeight.small,
+    paddingHorizontal: Spacing.x16,
+    borderRadius: Radius.pill,
+  },
   /* Columns `x8` (8), Material's floor between touch targets. Rows exactly the
      two slops that meet across the gap, so wrapped rows' touch boxes tile
      without overlapping — see `SmallControlRowGap`. */

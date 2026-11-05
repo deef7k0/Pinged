@@ -11,7 +11,7 @@ import { PageFlatList } from '@/components/ui/page-scroll';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Skeleton } from '@/components/ui/surface';
 import { Text } from '@/components/ui/text';
-import { FontFamily, MaxContentWidth, Palette, Spacing, withAlpha } from '@/constants/theme';
+import { Typeface, MaxContentWidth, Palette, Spacing, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { getPopularGames } from '@/lib/news';
 
@@ -199,14 +199,14 @@ const styles = StyleSheet.create({
   tile: { borderRadius: RADIUS, overflow: 'hidden', justifyContent: 'flex-end' },
   door: { padding: Spacing.x12, justifyContent: 'space-between' },
   doorTitle: {
-    fontFamily: FontFamily.extraBold,
+    fontFamily: Typeface.extraBold,
     fontSize: 17,
     lineHeight: 21,
     letterSpacing: -0.3,
     color: Palette.white,
   },
   name: {
-    fontFamily: FontFamily.bold,
+    fontFamily: Typeface.bold,
     fontSize: 12,
     lineHeight: 16,
     color: Palette.white,

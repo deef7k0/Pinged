@@ -78,6 +78,7 @@ export function StudioResults({ query }: { query: string }) {
       renderItem={({ item }) => <StudioTile studio={item} width={tileWidth} />}
       ListEmptyComponent={
         <EmptyState
+          icon="search"
           title="No studios found"
           message={`Nothing in IGDB’s companies matches “${query}”. Try the studio’s full name.`}
         />

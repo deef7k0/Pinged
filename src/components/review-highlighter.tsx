@@ -5,7 +5,7 @@ import { Platform, Text as RNText, StyleSheet, View, type LayoutChangeEvent } fr
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 
-import { FontFamily, withAlpha } from '@/constants/theme';
+import { Typeface, withAlpha } from '@/constants/theme';
 import {
   dragEnd,
   layoutWords,
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     lineHeight: LINE,
     /* The weight the words were measured in (`layoutWords`), so each is
        drawn exactly as wide as its place. */
-    fontFamily: FontFamily.regular,
+    fontFamily: Typeface.regular,
   },
   end: { position: 'absolute' },
   rule: {

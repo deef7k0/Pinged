@@ -52,71 +52,49 @@ function openExternal(url: string) {
  */
 export function ArticleCard({ article }: { article: Article }) {
   const theme = useTheme();
-  const initial = article.source.trim().charAt(0).toUpperCase() || '?';
 
+  /* Apple News's row (the Apple pass, 2026-11-05): the outlet, the headline,
+     the time, and the story's picture as an 80 square at the trailing edge.
+     No summary and no "Read story" — the whole row is the door. It was a card
+     with the picture full-bleed over a byline, a headline, three lines of
+     summary and "Read story". */
   return (
     <PressableScale
       accessibilityRole="link"
       accessibilityLabel={`${article.title} — ${article.source}`}
       onPress={() => openExternal(article.url)}
-      scaleTo={0.98}>
-      <Card padded={false}>
-        {/* A story without art keeps its shape: the byline and headline simply
-            start at the top of the card instead of under a photograph. */}
-        {article.imageUrl && (
-          <Image
-            source={{ uri: article.imageUrl }}
-            recyclingKey={article.id}
-            cachePolicy="memory-disk"
-            style={[styles.storyImage, { backgroundColor: theme.surfaceElevated }]}
-            contentFit="cover"
-            transition={200}
-            accessibilityIgnoresInvertColors
-          />
+      scaleTo={0.98}
+      style={styles.row}>
+      <View style={styles.rowText}>
+        <Text variant="h5" color="textSecondary" numberOfLines={1}>
+          {article.source}
+        </Text>
+        <Text variant="h4" numberOfLines={3}>
+          {article.title}
+        </Text>
+        {article.publishedAt && (
+          <Text variant="caption" color="textMuted">
+            {timeAgo(article.publishedAt)}
+          </Text>
         )}
-
-        <View style={styles.storyBody}>
-          <View style={styles.bylineRow}>
-            <View style={[styles.outletBadge, { backgroundColor: theme.surfaceElevated }]}>
-              <Text variant="caption" style={{ color: theme.primary }}>
-                {initial}
-              </Text>
-            </View>
-
-            {/* `label` is the app's caps variant — uppercase and letterspaced
-                are baked into the token, so this is not shouting by hand. */}
-            <Text variant="label" color="textSecondary" numberOfLines={1} style={styles.outlet}>
-              {article.source}
-            </Text>
-
-            {article.publishedAt && (
-              <Text variant="caption" color="textMuted">
-                {timeAgo(article.publishedAt)}
-              </Text>
-            )}
-          </View>
-
-          <Text variant="h2" numberOfLines={3}>
-            {article.title}
-          </Text>
-
-          {article.summary && (
-            <Text variant="body" color="textSecondary" numberOfLines={3}>
-              {article.summary}
-            </Text>
-          )}
-
-          {/* Not a button. The whole card is the tap target — this is the
-              affordance that says so, which is exactly how the reference
-              handles it. */}
-          <Text variant="label" style={[styles.readStory, { color: theme.text }]}>
-            Read story
-          </Text>
-        </View>
-      </Card>
+      </View>
+      {article.imageUrl ? (
+        <Image
+          source={{ uri: article.imageUrl }}
+          recyclingKey={article.id}
+          cachePolicy="memory-disk"
+          style={[styles.thumb, { backgroundColor: theme.surfaceElevated }]}
+          contentFit="cover"
+          transition={200}
+          accessibilityIgnoresInvertColors
+        />
+      ) : null}
     </PressableScale>
   );
 }
+
+/** A news row's height, for its skeleton: the 80 picture and the row's padding. */
+export const ARTICLE_ROW_HEIGHT = 80 + 24;
 
 /**
  * A showcase that has finished, laid out as a news story — Home's "Latest
@@ -252,6 +230,14 @@ export function EventCard({ event }: { event: GameEvent }) {
 }
 
 const styles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.x12,
+    paddingVertical: Spacing.x12,
+  },
+  rowText: { flex: 1, minWidth: 0, gap: 2 },
+  thumb: { width: 80, height: 80, borderRadius: Radius.image, borderCurve: 'continuous' },
   storyImage: { width: '100%', aspectRatio: HeroAspectRatio },
   /* 16 all round rather than the card's usual padding: this is a page of type,
      and type wants a margin. */

@@ -13,8 +13,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GlassSurface, useLiquidGlass } from '@/components/ui/liquid-glass';
 import { Text } from '@/components/ui/text';
-import { FontFamily, Spacing, withAlpha } from '@/constants/theme';
+import { Typeface, Spacing, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   TOAST_LIFETIME,
@@ -32,6 +33,13 @@ import {
 } from '@/lib/toast';
 
 /*
+ * **The Apple pass (2026-11-05): one at a time, a centred capsule** as wide
+ * as its words (at most the display less the margins) — iOS's notice, glass
+ * under Settings → Liquid glass, the raised grey otherwise. A new toast
+ * replaces the one shown (`TOAST_KEPT`); a tap or a swipe dismisses it. The
+ * stack and its spread-on-tap are gone; the motion below is still
+ * reacticx's.
+ *
  * reacticx's `Toast` (`molecules/Toast`, MIT), restated in this app's tokens
  * (the owner's, 2026-11-03). Its numbers, kept: a 18dp corner, 14 × 16 in, a
  * 20dp glyph, a hairline edge and a long soft shadow; four seconds a toast;
@@ -46,7 +54,7 @@ import {
  * the mini player and the docked reply field.
  */
 
-const RADIUS = 18;
+const RADIUS = 26;
 const GAP = 14;
 const COLLAPSE_OFFSET = 16;
 const COLLAPSE_SCALE_STEP = 0.05;
@@ -102,7 +110,7 @@ function ToastStack() {
                 was[record.id] === height ? was : { ...was, [record.id]: height }
               )
             }
-            onPress={() => setExpanded((open) => !open)}
+            onPress={() => say.dismiss(record.id)}
           />
         );
       })}
@@ -128,6 +136,7 @@ const ToastRow = memo(function ToastRow({
   onPress: () => void;
 }) {
   const theme = useTheme();
+  const liquid = useLiquidGlass();
   const reduceMotion = useReducedMotion();
   const [height, setHeight] = useState(0);
 
@@ -229,15 +238,16 @@ const ToastRow = memo(function ToastRow({
           onPress={onPress}
           accessibilityRole="alert"
           accessibilityLabel={[record.title, record.description].filter(Boolean).join('. ')}
-          accessibilityHint={count > 1 ? 'Shows every notice' : undefined}
+          accessibilityHint="Dismisses it"
           style={[
             styles.toast,
             {
-              backgroundColor: theme.surfaceElevated,
-              borderColor: theme.border,
+              backgroundColor: liquid ? withAlpha(theme.surfaceElevated, 0) : theme.surfaceElevated,
+              borderColor: liquid ? withAlpha(theme.border, 0) : theme.border,
               boxShadow: `0 10px 20px ${withAlpha(theme.shadowInk, 0.45)}`,
             },
           ]}>
+          {liquid && <GlassSurface radius={RADIUS} />}
           {glyph && <Ionicons name={glyph} size={ICON} color={accent} />}
           <View style={styles.words}>
             <Text numberOfLines={2} style={[styles.title, { color: theme.text }]}>
@@ -297,8 +307,9 @@ function kindColour(kind: ToastKind, theme: ReturnType<typeof useTheme>): string
 
 const styles = StyleSheet.create({
   region: { position: 'absolute', left: VIEWPORT_OFFSET, right: VIEWPORT_OFFSET, zIndex: 1000 },
-  row: { position: 'absolute', top: 0, left: 0, right: 0 },
+  row: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center' },
   toast: {
+    maxWidth: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -307,9 +318,9 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  words: { flex: 1, gap: 3 },
-  title: { fontFamily: FontFamily.bold, fontSize: 14, lineHeight: 19 },
-  description: { fontFamily: FontFamily.medium, fontSize: 13, lineHeight: 18 },
+  words: { flexShrink: 1, gap: 3 },
+  title: { fontFamily: Typeface.bold, fontSize: 14, lineHeight: 19 },
+  description: { fontFamily: Typeface.medium, fontSize: 13, lineHeight: 18 },
   action: { paddingVertical: 7, paddingHorizontal: 13, borderRadius: 10 },
-  actionLabel: { fontFamily: FontFamily.bold, fontSize: 13, lineHeight: 17 },
+  actionLabel: { fontFamily: Typeface.bold, fontSize: 13, lineHeight: 17 },
 });

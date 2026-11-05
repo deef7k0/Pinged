@@ -33,3 +33,10 @@ export function formatReleaseDate(iso: string): string {
   if (Number.isNaN(date.getTime())) return iso;
   return date.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
 }
+
+/** "14 Mar 2027" — the same date, short enough for the line under a grid's cover. */
+export function formatShortReleaseDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}

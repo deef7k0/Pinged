@@ -1,11 +1,11 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
-import { memo, useMemo, useState } from 'react';
+import { memo, useMemo, useState, type ReactElement } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useTabBarClearance } from '@/components/app-tab-bar';
-import { PageSectionList } from '@/components/ui/page-scroll';
+import { PageSectionList, PageWithHeader } from '@/components/ui/page-scroll';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
@@ -48,7 +48,12 @@ export function formatEventDay(unixSeconds: number): string {
  * a frame of the stream stands in for the rest (`getEvents`); the lettered
  * panel is the last rung, so a row never has a hole where its picture goes.
  */
-export function EventResults({ query = '' }: { query?: string }) {
+/**
+ * @param header drawn at the head of the list, under the page's large title —
+ *   News's tab row; also over the loading and error states, so the tabs never
+ *   leave the page while the events load.
+ */
+export function EventResults({ query = '', header }: { query?: string; header?: ReactElement }) {
   const clearance = useTabBarClearance();
   const term = query.length >= MIN_QUERY_LENGTH ? query : '';
   /* Read once, when the list mounts: "today" must not move between renders, and
@@ -77,12 +82,23 @@ export function EventResults({ query = '' }: { query?: string }) {
     ];
   }, [events.data, term, now]);
 
-  if (events.isLoading) return <LoadingState />;
-  if (events.isLoadingError)
-    return <ErrorState error={events.error} onRetry={() => events.refetch()} />;
+  const state = events.isLoading ? (
+    <LoadingState />
+  ) : events.isLoadingError ? (
+    <ErrorState error={events.error} onRetry={() => events.refetch()} />
+  ) : null;
+  if (state)
+    return header ? (
+      <PageWithHeader header={header} contentContainerStyle={styles.content}>
+        {state}
+      </PageWithHeader>
+    ) : (
+      state
+    );
 
   return (
     <PageSectionList
+      ListHeaderComponent={header}
       sections={sections}
       keyExtractor={(event) => String(event.id)}
       {...ArtRowWindow}

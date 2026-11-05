@@ -4,7 +4,7 @@ import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { labelFor, scoreColor } from '@/constants/score';
 import { SHOW_SCORE_FIGURES, figureFor, type ScoreFigureKey } from '@/constants/score-figure';
-import { FontFamily, Spacing } from '@/constants/theme';
+import { Typeface, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /*
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   layer: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   figured: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8 },
   number: {
-    fontFamily: FontFamily.bold,
+    fontFamily: Typeface.bold,
     letterSpacing: -0.5,
     /* Every digit the same width, so a 71 and a 77 are the same block. */
     fontVariant: ['tabular-nums'],

@@ -1,12 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, View } from 'react-native';
 
-import { IconButton } from '@/components/ui/icon-button';
+import { AnchoredMenu, AnchoredMenuItem, useAnchoredMenu } from '@/components/ui/anchored-menu';
 import { PressableScale } from '@/components/ui/pressable-scale';
-import { useSelectable } from '@/components/ui/selectable';
 import { Text } from '@/components/ui/text';
-import { Spacing, TapTarget } from '@/constants/theme';
-import { useAccent } from '@/hooks/use-accent';
+import { Radius, Spacing, TapTarget } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { GameSort } from '@/lib/games';
 
@@ -52,20 +50,11 @@ export type CollectionToolbarProps = {
 };
 
 /**
- * "Sort" and how to read it — the one row of controls above a collection's games.
- *
- * ## Why glyphs and not the old pills
- *
- * `<SortBar>` is a row of uppercase text pills that wraps. On a collection it
- * wrapped to two lines on most phones, and it had no room for the thing this row
- * also has to carry: a way to change the layout. Compressing the sorts to glyphs
- * buys that space back and puts the whole control on one line at any width.
- *
- * The layout toggle is pushed to the far edge rather than sitting at the end of
- * the sort run, because it is a different *kind* of choice — the sorts are five
- * views of one order, and this is two ways of drawing whatever order won. Same
- * reason it is a single button that shows the layout you would get, rather than
- * a second pair of radio pills.
+ * The row above a collection's games — Apple Music's playlist (the Apple
+ * pass, 2026-11-05): **Surprise me** and **Shuffle** as two equal grey
+ * capsules, and a ⋯ at the end holding the sorts (the one in force ticked)
+ * and the layout. It was five round sort glyphs and a layout key; a caller
+ * with neither Surprise nor Shuffle (search results) gets the ⋯ alone.
  */
 export function CollectionToolbar({
   sort,
@@ -74,66 +63,115 @@ export function CollectionToolbar({
   onLayout,
   showSort = true,
   sorts = SORTS,
-}: CollectionToolbarProps) {
+  onSurprise,
+  onShuffle,
+  shuffled = false,
+}: CollectionToolbarProps & {
+  /** Opens one of the games at random. */
+  onSurprise?: () => void;
+  /** Puts the games in a random order (a sort, not written back). */
+  onShuffle?: () => void;
+  /** The order on screen is a shuffle — no sort is ticked. */
+  shuffled?: boolean;
+}) {
   const theme = useTheme();
-  const accent = useAccent();
-  const selectable = useSelectable();
+  const [trigger, menu] = useAnchoredMenu();
+  const tick = <Ionicons name="checkmark" size={20} color={theme.text} />;
 
   return (
     <View style={styles.bar}>
-      {showSort && (
-        <>
-          <Text variant="label" color="textMuted">
-            Sort
-          </Text>
-
-          <View style={styles.sorts}>
-            {sorts.map((option) => {
-              const active = option.value === sort;
-              const look = selectable(active);
-              return (
-                <PressableScale
-                  key={option.value}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: active }}
-                  accessibilityLabel={option.label}
-                  onPress={() => onSort(option.value)}
-                  scaleTo={0.9}
-                  hitSlop={KEY_SLOP}
-                  pressedColor={look.pressedColor}
-                  focusRing={look.focusRing}
-                  style={StyleSheet.flatten([styles.key, look.style])}>
-                  <Ionicons
-                    name={option.icon}
-                    size={16}
-                    color={active ? accent.onSurface : theme.textSecondary}
-                  />
-                </PressableScale>
-              );
-            })}
-          </View>
-        </>
+      {onSurprise && <Capsule icon="dice-outline" label="Surprise me" onPress={onSurprise} />}
+      {onShuffle && (
+        <Capsule icon="shuffle" label="Shuffle" onPress={onShuffle} active={shuffled} />
       )}
+      {!onSurprise && !onShuffle && <View style={styles.spacer} />}
 
-      <View style={styles.spacer} />
+      <View ref={trigger} collapsable={false}>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel="Sort and layout"
+          accessibilityState={{ expanded: menu.isOpen }}
+          onPress={menu.open}
+          scaleTo={0.92}
+          pressedColor={theme.controlPressed}
+          style={StyleSheet.flatten([styles.more, { backgroundColor: theme.controlFill }])}>
+          <Ionicons name="ellipsis-horizontal" size={20} color={theme.text} />
+        </PressableScale>
+      </View>
 
-      {/* Shows the layout you would *get*, not the one you are in. A toggle
-          labelled with its current state reads as a status line and people tap
-          it expecting nothing to happen. */}
-      <IconButton
-        icon={layout === 'grid' ? 'list' : 'grid'}
-        accessibilityLabel={layout === 'grid' ? 'Show as a list' : 'Show as a grid'}
-        size="small"
-        onPress={() => onLayout(layout === 'grid' ? 'rows' : 'grid')}
-      />
+      <AnchoredMenu menu={menu} label="Sort and layout" align="end">
+        {showSort &&
+          sorts.map((option) => (
+            <AnchoredMenuItem
+              key={option.value}
+              icon={option.icon}
+              title={option.label}
+              checked={!shuffled && option.value === sort}
+              trailing={!shuffled && option.value === sort ? tick : undefined}
+              onPress={() => {
+                menu.close();
+                onSort(option.value);
+              }}
+            />
+          ))}
+        <AnchoredMenuItem
+          icon="grid-outline"
+          title="As a grid"
+          checked={layout === 'grid'}
+          trailing={layout === 'grid' ? tick : undefined}
+          onPress={() => {
+            menu.close();
+            onLayout('grid');
+          }}
+        />
+        <AnchoredMenuItem
+          icon="list-outline"
+          title="As a list"
+          checked={layout === 'rows'}
+          trailing={layout === 'rows' ? tick : undefined}
+          onPress={() => {
+            menu.close();
+            onLayout('rows');
+          }}
+        />
+      </AnchoredMenu>
     </View>
   );
 }
 
-/** The sort keys' edge — `<IconButton size="small">`'s, so the row is one size. */
-const KEY = 32;
-/** Vertical only: the keys sit in a row, and sideways slop would overlap. */
-const KEY_SLOP = { top: (TapTarget - KEY) / 2, bottom: (TapTarget - KEY) / 2 };
+/** One of the two capsules: its glyph and word, grey; white while in force. */
+function Capsule({
+  icon,
+  label,
+  onPress,
+  active = false,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  active?: boolean;
+}) {
+  const theme = useTheme();
+  const ink = active ? theme.onPrimary : theme.text;
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={label}
+      onPress={onPress}
+      scaleTo={0.96}
+      pressedColor={active ? undefined : theme.controlPressed}
+      style={StyleSheet.flatten([
+        styles.capsule,
+        { backgroundColor: active ? theme.text : theme.controlFill },
+      ])}>
+      <Ionicons name={icon} size={18} color={ink} />
+      <Text variant="h5" style={{ color: ink }}>
+        {label}
+      </Text>
+    </PressableScale>
+  );
+}
 
 const styles = StyleSheet.create({
   bar: {
@@ -142,17 +180,15 @@ const styles = StyleSheet.create({
     gap: Spacing.x8,
     minHeight: TapTarget,
   },
-  sorts: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x4 },
   spacer: { flex: 1 },
-  /* Round keys, `<IconButton>`'s small size: a glyph with no word is a
-     transport key in this language. Radios rather than `<IconButton>`s because
-     five of them choose one order between them. */
-  key: {
-    width: KEY,
-    height: KEY,
-    borderRadius: KEY / 2,
-    borderWidth: 1,
+  capsule: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: Spacing.x8,
+    height: 44,
+    borderRadius: Radius.pill,
   },
+  more: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 });

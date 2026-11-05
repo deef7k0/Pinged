@@ -19,10 +19,10 @@ import { PageFlatList } from '@/components/ui/page-scroll';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
 import { SlideUpSheet } from '@/components/ui/slide-up-sheet';
-import { StatsStrip, type StatsCell } from '@/components/ui/stats-strip';
 import { Text } from '@/components/ui/text';
 import { CoverGridWindow } from '@/constants/list-window';
 import { MaxContentWidth, Spacing, TapTarget, withAlpha } from '@/constants/theme';
+import { AccentProvider, useGameAccent } from '@/hooks/use-accent';
 import { useEventAttendance } from '@/hooks/use-event-attendance';
 import { useTheme } from '@/hooks/use-theme';
 import { getEventWatchers, type EventWatcher } from '@/lib/api';
@@ -54,6 +54,23 @@ const NAME_BLOCK = 64;
 /** Faces in the row before "+N". */
 const FACES = 7;
 const FACE_SIZE = 40;
+
+/** A link's square tile. */
+const LINK_TILE = 88;
+
+/** A link's glyph by its label: the network when it is one this app knows. */
+function linkGlyph(label: string): keyof typeof Ionicons.glyphMap {
+  const name = label.toLowerCase();
+  if (name.includes('youtube')) return 'logo-youtube';
+  if (name.includes('twitch')) return 'logo-twitch';
+  if (name.includes('twitter') || name.includes(' x')) return 'logo-twitter';
+  if (name.includes('facebook')) return 'logo-facebook';
+  if (name.includes('instagram')) return 'logo-instagram';
+  if (name.includes('tiktok')) return 'logo-tiktok';
+  if (name.includes('discord')) return 'logo-discord';
+  if (name.includes('steam')) return 'logo-steam';
+  return 'globe-outline';
+}
 
 /** Room under the last row for the foot bar: its button, its padding, its fade. */
 const FOOT_ROOM = 112;
@@ -115,6 +132,11 @@ export default function EventScreen() {
   const gameIds = data?.gameIds ?? [];
   const wantGames = showsGames(phase) && gameIds.length > 0;
 
+  /* The page in its art's Material 3 colours (the Apple pass, 2026-11-05),
+     as a game's, a studio's and a collection's are. */
+  const accent = useGameAccent(data?.bannerUrl ?? null, null);
+  const page = data?.bannerUrl && accent.tonal ? accent.page : theme.background;
+
   const games = useQuery({
     queryKey: ['event-games', eventId],
     queryFn: ({ signal }) => getEventGames(gameIds, signal),
@@ -141,7 +163,7 @@ export default function EventScreen() {
   if (!data) {
     return (
       <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back variant="art" />}>
-        <EmptyState title="Event not found" />
+        <EmptyState icon="search" title="Event not found" />
       </Screen>
     );
   }
@@ -167,7 +189,7 @@ export default function EventScreen() {
     <View style={styles.head}>
       {/* Cancels the list's side padding so the art reaches both edges. */}
       <View style={styles.bleed}>
-        <EventBanner event={data} width={width} />
+        <EventBanner event={data} width={width} background={page} />
       </View>
 
       <View style={styles.title}>
@@ -175,9 +197,8 @@ export default function EventScreen() {
           {data.name}
         </Text>
         <SmallInfo event={data} phase={phase} />
+        <Figures event={data} phase={phase} now={now} gameEvent={gameEvent} />
       </View>
-
-      <Figures event={data} phase={phase} now={now} gameEvent={gameEvent} />
 
       <Watching
         event={gameEvent}
@@ -195,17 +216,26 @@ export default function EventScreen() {
         </InfoCard>
       ) : null}
 
+      {/* Where it lives, as square tiles — Apple TV's "Watch on" (the Apple
+          pass, 2026-11-05); they were a wrapping row of grey pills. */}
       {data.links.length > 0 && (
         <View style={styles.links}>
           {data.links.map((link) => (
-            <Button
+            <PressableScale
               key={link.url}
-              title={link.label}
-              size="small"
-              variant="secondary"
+              accessibilityRole="link"
               accessibilityLabel={`Open ${data.name} on ${link.label}`}
               onPress={() => open(link.url)}
-            />
+              scaleTo={0.95}
+              style={StyleSheet.flatten([
+                styles.linkTile,
+                { backgroundColor: withAlpha(theme.text, 0.07) },
+              ])}>
+              <Ionicons name={linkGlyph(link.label)} size={26} color={theme.text} />
+              <Text variant="caption" numberOfLines={2} style={styles.linkLabel}>
+                {link.label}
+              </Text>
+            </PressableScale>
           ))}
         </View>
       )}
@@ -231,75 +261,78 @@ export default function EventScreen() {
     /* The banner runs under the disc, so no `insetHeader`. The disc leaves
        with it; the bar that follows carries the event's name, once the banner
        and the name under it have gone. */
-    <Screen
-      edges={['bottom']}
-      topBar={
-        <FrostedTopBar
-          back
-          title={data.name}
-          header={Math.round(width * BANNER_RATIO) + NAME_BLOCK}
-          right={
-            <>
-              {pingTo && (
-                <TopBarDisc
-                  icon={PING_GLYPH}
-                  label={`Ping ${data.name} to someone`}
-                  onPress={() =>
-                    pingTo({
-                      kind: 'event',
-                      targetId: String(data.id),
-                      title: data.name,
-                      subtitle: data.startTime
-                        ? new Date(data.startTime * 1000).toLocaleDateString(undefined, {
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric',
-                          })
-                        : null,
-                      imageUrl: data.thumbnailUrl ?? data.bannerUrl,
-                    })
-                  }
-                />
-              )}
-              <TopBarDisc icon="share-outline" label={`Share ${data.name}`} onPress={share} />
-            </>
+    <AccentProvider artwork={data.bannerUrl} genres={null}>
+      <Screen
+        edges={['bottom']}
+        background={page}
+        topBar={
+          <FrostedTopBar
+            back
+            title={data.name}
+            header={Math.round(width * BANNER_RATIO) + NAME_BLOCK}
+            right={
+              <>
+                {pingTo && (
+                  <TopBarDisc
+                    icon={PING_GLYPH}
+                    label={`Ping ${data.name} to someone`}
+                    onPress={() =>
+                      pingTo({
+                        kind: 'event',
+                        targetId: String(data.id),
+                        title: data.name,
+                        subtitle: data.startTime
+                          ? new Date(data.startTime * 1000).toLocaleDateString(undefined, {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                            })
+                          : null,
+                        imageUrl: data.thumbnailUrl ?? data.bannerUrl,
+                      })
+                    }
+                  />
+                )}
+                <TopBarDisc icon="share-outline" label={`Share ${data.name}`} onPress={share} />
+              </>
+            }
+          />
+        }>
+        <PageFlatList
+          data={shown}
+          numColumns={PORTRAIT_COLUMNS}
+          keyExtractor={(game) => game.id}
+          {...CoverGridWindow}
+          columnWrapperStyle={styles.column}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: hasFoot ? FOOT_ROOM : Spacing.x48 },
+          ]}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={head}
+          renderItem={({ item }) => (
+            <GameGridTile
+              id={item.id}
+              title={item.title}
+              coverUrl={item.coverUrl}
+              heroUrl={item.heroUrl}
+              edition={item.edition}
+              steamAppId={item.steamAppId}
+              caption={item.releaseYear}
+              width={tileWidth}
+            />
+          )}
+          ListEmptyComponent={
+            !wantGames ? null : games.isLoadingError ? (
+              <ErrorState error={games.error} onRetry={() => games.refetch()} />
+            ) : (
+              <LoadingState />
+            )
           }
         />
-      }>
-      <PageFlatList
-        data={shown}
-        numColumns={PORTRAIT_COLUMNS}
-        keyExtractor={(game) => game.id}
-        {...CoverGridWindow}
-        columnWrapperStyle={styles.column}
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: hasFoot ? FOOT_ROOM : Spacing.x48 },
-        ]}
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={head}
-        renderItem={({ item }) => (
-          <GameGridTile
-            id={item.id}
-            title={item.title}
-            coverUrl={item.coverUrl}
-            heroUrl={item.heroUrl}
-            edition={item.edition}
-            steamAppId={item.steamAppId}
-            caption={item.releaseYear}
-            width={tileWidth}
-          />
-        )}
-        ListEmptyComponent={
-          !wantGames ? null : games.isLoadingError ? (
-            <ErrorState error={games.error} onRetry={() => games.refetch()} />
-          ) : (
-            <LoadingState />
-          )
-        }
-      />
-      {hasFoot ? <FootBar event={gameEvent} phase={phase} background={theme.background} /> : null}
-    </Screen>
+        {hasFoot ? <FootBar event={gameEvent} phase={phase} background={page} /> : null}
+      </Screen>
+    </AccentProvider>
   );
 }
 
@@ -308,7 +341,16 @@ export default function EventScreen() {
  * the name under it stands on the page and not on a hard edge — or, for the
  * few with none, a panel with its initial.
  */
-function EventBanner({ event, width }: { event: EventDetail; width: number }) {
+function EventBanner({
+  event,
+  width,
+  background,
+}: {
+  event: EventDetail;
+  width: number;
+  /** The page's colour, which the art's foot dissolves into. */
+  background: string;
+}) {
   const theme = useTheme();
   const height = Math.round(width * BANNER_RATIO);
 
@@ -337,7 +379,7 @@ function EventBanner({ event, width }: { event: EventDetail; width: number }) {
       />
       <LinearGradient
         pointerEvents="none"
-        colors={[withAlpha(theme.background, 0), theme.background]}
+        colors={[withAlpha(background, 0), background]}
         style={[styles.bannerFade, { height: height * 0.4 }]}
       />
     </View>
@@ -371,10 +413,15 @@ function SmallInfo({ event, phase }: { event: EventDetail; phase: EventPhase }) 
           {where}
         </Text>
       ) : null}
+      {/* Apple TV's capsule: LIVE filled red, the rest the control grey. */}
       {tag ? (
-        <View style={styles.tag}>
-          <Ionicons name={tag.icon} size={13} color={tag.color} />
-          <Text variant="label" style={{ color: tag.color }}>
+        <View
+          style={[
+            styles.tag,
+            { backgroundColor: phase === 'live' ? theme.danger : theme.controlFill },
+          ]}>
+          <Ionicons name={tag.icon} size={12} color={phase === 'live' ? theme.text : tag.color} />
+          <Text variant="badge" style={{ color: phase === 'live' ? theme.text : tag.color }}>
             {tag.label}
           </Text>
         </View>
@@ -414,28 +461,23 @@ function Figures({
         ? `ran ${ran}`
         : 'started';
   const watchingLabel = phase === 'over' ? 'watched' : 'watching';
-  const figures: StatsCell[] = [
-    {
-      key: 'date',
-      value: cells.date,
-      label: cells.weekday,
-      a11y: `${cells.weekday} ${cells.date}`,
-    },
-    {
-      key: 'time',
-      value: cells.time,
-      label: timeLabel,
-      a11y: `${phase === 'upcoming' ? 'Starts' : 'Started'} at ${cells.time}, ${timeLabel}, your time`,
-    },
-    {
-      key: 'watching',
-      value: total.toLocaleString(),
-      label: watchingLabel,
-      a11y: `${total.toLocaleString()} ${watchingLabel}`,
-    },
-  ];
 
-  return <StatsStrip cells={figures} />;
+  /* One line — Apple TV's facts line (the Apple pass, 2026-11-05); it was a
+     strip of three figures. */
+  return (
+    <Text
+      variant="body"
+      color="textSecondary"
+      accessibilityLabel={`${cells.weekday} ${cells.date}, ${phase === 'upcoming' ? 'starts' : 'started'} at ${cells.time} your time, ${timeLabel}. ${total.toLocaleString()} ${watchingLabel}.`}>
+      {[
+        `${cells.weekday} ${cells.date}`,
+        `${cells.time} · ${timeLabel}`,
+        total > 0 ? `${total.toLocaleString()} ${watchingLabel}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')}
+    </Text>
+  );
 }
 
 /**
@@ -683,7 +725,15 @@ const styles = StyleSheet.create({
   bleed: { marginHorizontal: -Spacing.x16, marginBottom: -Spacing.x12 },
   title: { gap: Spacing.x8 },
   smallInfo: { gap: Spacing.x4 },
-  tag: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x4 + 2 },
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: Spacing.x4,
+    height: 24,
+    paddingHorizontal: Spacing.x8,
+    borderRadius: 12,
+  },
   section: { gap: Spacing.x12 },
   sectionHead: { gap: 2 },
   faces: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.x8, alignSelf: 'flex-start' },
@@ -711,7 +761,18 @@ const styles = StyleSheet.create({
   watcherText: { flex: 1, gap: 2 },
   /* Wrapped: an event has four or five places it lives, and their names are
      different lengths. `rowGap` clears the small buttons' touch slop. */
-  links: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.x8, rowGap: Spacing.x16 },
+  links: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.x12 },
+  linkTile: {
+    width: LINK_TILE,
+    height: LINK_TILE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.x8,
+    padding: Spacing.x8,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+  },
+  linkLabel: { textAlign: 'center' },
   gamesHead: {
     flexDirection: 'row',
     alignItems: 'baseline',

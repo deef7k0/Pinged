@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { css, cubicBezier, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -107,7 +107,7 @@ export function AnchoredMenu({
   const liquid = useLiquidGlass();
   const reduceMotion = useReducedMotion();
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { anchor, phase } = menu;
 
   if (phase === 'closed' || !anchor) return null;
@@ -116,6 +116,8 @@ export function AnchoredMenu({
   const wanted = align === 'start' ? anchor.x : anchor.x + anchor.width - menuWidth;
   const left = Math.max(EDGE, Math.min(wanted, windowWidth - EDGE - menuWidth));
   const top = Math.max(insets.top, anchor.y + anchor.height + GAP);
+  /* A long menu (Home's ten moods) scrolls inside the display, never past it. */
+  const maxHeight = Math.max(160, windowHeight - top - insets.bottom - EDGE);
 
   const motion =
     phase === 'closing'
@@ -164,7 +166,13 @@ export function AnchoredMenu({
         ]}>
         {/* Settings → Liquid glass: the menu is glass. */}
         {liquid && <GlassSurface radius={16} />}
-        <View style={styles.clip}>{children}</View>
+        <ScrollView
+          style={[styles.clip, { maxHeight }]}
+          contentContainerStyle={styles.list}
+          bounces={false}
+          showsVerticalScrollIndicator={false}>
+          {children}
+        </ScrollView>
       </Animated.View>
     </Modal>
   );
@@ -177,15 +185,22 @@ export function AnchoredMenu({
  */
 export function AnchoredMenuItem({
   icon,
+  iconColor,
+  checked,
   title,
   hint,
   trailing,
   onPress,
 }: {
-  icon: IconName;
+  /** A glyph before the words; a list of plain choices has none. */
+  icon?: IconName;
+  /** The glyph's colour when it carries meaning (a status's hue). */
+  iconColor?: string;
   title: string;
   hint?: string;
   trailing?: ReactNode;
+  /** The row is the one in force — a screen reader hears it as checked. */
+  checked?: boolean;
   onPress: () => void;
 }) {
   const theme = useTheme();
@@ -195,12 +210,13 @@ export function AnchoredMenuItem({
     <PressableScale
       accessibilityRole="menuitem"
       accessibilityLabel={title}
+      accessibilityState={checked === undefined ? undefined : { checked }}
       accessibilityHint={hint}
       onPress={onPress}
       scaleTo={0.98}
       pressedColor={theme.controlPressed}
       style={StyleSheet.flatten([styles.item, hint ? styles.itemTall : null])}>
-      <Ionicons name={icon} size={24} color={accent.quietInk} />
+      {icon && <Ionicons name={icon} size={24} color={iconColor ?? accent.quietInk} />}
       <View style={styles.itemText}>
         <Text variant="optionTitle" numberOfLines={1}>
           {title}
@@ -219,7 +235,8 @@ export function AnchoredMenuItem({
 const styles = StyleSheet.create({
   /* `RoundedCornerShape(16.dp)`, the reference menu's. */
   menu: { position: 'absolute', borderRadius: 16, borderWidth: StyleSheet.hairlineWidth },
-  clip: { borderRadius: 16, overflow: 'hidden', paddingVertical: Spacing.x8 },
+  clip: { flexGrow: 0, borderRadius: 16, overflow: 'hidden' },
+  list: { paddingVertical: Spacing.x8 },
   item: {
     flexDirection: 'row',
     alignItems: 'center',

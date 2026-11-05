@@ -6,7 +6,7 @@ import { StyleSheet, View } from 'react-native';
 import { Avatar } from '@/components/ui/avatar';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
-import { Spacing, withAlpha } from '@/constants/theme';
+import { Radius, Spacing, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { PingFeedRef, PingFeedRow } from '@/lib/database.types';
 import { displayNameFor, timeAgoPosted } from '@/lib/format';
@@ -110,14 +110,18 @@ export const PingPlate = memo(function PingPlate({
           style={[styles.footLeft, { color: foot.leftLit ? theme.primaryText : theme.textMuted }]}>
           {foot.left}
         </Text>
-        <Text variant="label" color="textMuted" numberOfLines={1}>
-          {foot.right}
-        </Text>
-        {foot.struck && (
-          <View
-            pointerEvents="none"
-            style={[styles.strike, { backgroundColor: withAlpha(theme.textMuted, 0.8) }]}
-          />
+        {/* A request no longer open says so in a tag (the Apple pass,
+            2026-11-05) — its foot was struck through. */}
+        {foot.struck ? (
+          <View style={[styles.tag, { backgroundColor: theme.controlFill }]}>
+            <Text variant="label" color="textSecondary" numberOfLines={1}>
+              {foot.right}
+            </Text>
+          </View>
+        ) : (
+          <Text variant="label" color="textMuted" numberOfLines={1}>
+            {foot.right}
+          </Text>
         )}
       </View>
     </PressableScale>
@@ -177,45 +181,24 @@ function Band({
           </View>
         );
       })}
-      <Crosshairs color={theme.text} />
     </View>
   );
 }
 
-/** A plate's registration marks, one in each corner — the board's one ornament. */
-function Crosshairs({ color }: { color: string }) {
-  const ink = withAlpha(color, 0.75);
-  return (
-    <>
-      {CORNERS.map((corner) => (
-        <View key={corner.key} pointerEvents="none" style={[styles.mark, corner.style]}>
-          <View style={[styles.markH, { backgroundColor: ink }]} />
-          <View style={[styles.markV, { backgroundColor: ink }]} />
-        </View>
-      ))}
-    </>
-  );
-}
-
-const MARK = 9;
-const MARK_INSET = 5 - MARK / 2 + 0.5;
-const CORNERS = [
-  { key: 'tl', style: { top: MARK_INSET, left: MARK_INSET } },
-  { key: 'tr', style: { top: MARK_INSET, right: MARK_INSET } },
-  { key: 'bl', style: { bottom: MARK_INSET, left: MARK_INSET } },
-  { key: 'br', style: { bottom: MARK_INSET, right: MARK_INSET } },
-] as const;
-
 const styles = StyleSheet.create({
   plate: {},
-  band: { height: PLATE_BAND, overflow: 'hidden' },
+  /* Rounded, Apple's (the Apple pass, 2026-11-05); its four registration
+     marks are gone. */
+  band: {
+    height: PLATE_BAND,
+    overflow: 'hidden',
+    borderRadius: Radius.card,
+    borderCurve: 'continuous',
+  },
   slice: { position: 'absolute', top: 0, bottom: 0, overflow: 'hidden' },
   /* Android 12+ draws it; elsewhere the dim alone carries "not played". */
   unplayed: { filter: [{ grayscale: 0.96 }] },
   seam: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 1 },
-  mark: { position: 'absolute', width: MARK, height: MARK },
-  markH: { position: 'absolute', left: 0, right: 0, top: (MARK - 0.75) / 2, height: 0.75 },
-  markV: { position: 'absolute', top: 0, bottom: 0, left: (MARK - 0.75) / 2, width: 0.75 },
   who: { flexDirection: 'row', alignSelf: 'flex-start', gap: Spacing.x8, maxWidth: '100%' },
   /* The stamp's centre on the picture's foot. */
   whoOnBand: { marginTop: -STAMP_BOX / 2, marginLeft: STAMP_X - STAMP_BOX / 2 },
@@ -241,5 +224,5 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   footLeft: { flex: 1 },
-  strike: { position: 'absolute', left: 0, right: 0, bottom: 6, height: 1 },
+  tag: { paddingHorizontal: Spacing.x8, paddingVertical: 2, borderRadius: Radius.pill },
 });

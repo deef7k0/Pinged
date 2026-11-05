@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Linking,
@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/button';
 import { CARD_INSET, cardShape } from '@/components/ui/card-material';
 import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
+import { useBarConfirm } from '@/hooks/use-bar-confirm';
 import { PageScrollView } from '@/components/ui/page-scroll';
 import { Poster } from '@/components/ui/poster';
 import { LoadingState, Screen } from '@/components/ui/screen';
@@ -102,7 +103,6 @@ export default function ScanScreen() {
               : null
         }
         onCode={setCode}
-        onReset={() => setCode(null)}
         onUseCamera={Platform.OS === 'web' || cameraFailed ? null : () => setManual(false)}
       />
     );
@@ -122,7 +122,6 @@ export default function ScanScreen() {
         code={code}
         torch={torch}
         onCode={setCode}
-        onReset={() => setCode(null)}
         onManual={() => setManual(true)}
         onMountError={() => setCameraFailed(true)}
       />
@@ -140,7 +139,15 @@ export default function ScanScreen() {
         <FrostedTopBar
           dismiss
           right={
-            cameraReady && !code ? (
+            code ? (
+              /* Scan another — a key in the bar (the Apple pass, 2026-11-05),
+                 where every result ended on a ghost button. */
+              <TopBarDisc
+                icon={cameraReady ? 'scan-outline' : 'refresh'}
+                label={cameraReady ? 'Scan another' : 'Look up another'}
+                onPress={() => setCode(null)}
+              />
+            ) : cameraReady ? (
               <TopBarDisc
                 icon={torch ? 'flash' : 'flash-outline'}
                 label={torch ? 'Turn the torch off' : 'Turn the torch on'}
@@ -163,14 +170,12 @@ function CameraScanner({
   code,
   torch,
   onCode,
-  onReset,
   onManual,
   onMountError,
 }: {
   code: string | null;
   torch: boolean;
   onCode: (gtin: string) => void;
-  onReset: () => void;
   onManual: () => void;
   onMountError: () => void;
 }) {
@@ -205,10 +210,10 @@ function CameraScanner({
     onCode(gtin);
   }
 
-  function scanAgain() {
-    held.current = false;
-    onReset();
-  }
+  /* "Scan another" (the bar's key) clears the code; the camera reads again. */
+  useEffect(() => {
+    if (!code) held.current = false;
+  }, [code]);
 
   /* The window a barcode is lined up in: wide and short, the shape of the thing
      it is for. Fixed proportions of the display, capped for tablets. */
@@ -264,7 +269,7 @@ function CameraScanner({
           code ? { backgroundColor: theme.background } : null,
         ]}>
         {code ? (
-          <LookupResult code={code} onScanAgain={scanAgain} />
+          <LookupResult code={code} />
         ) : (
           <Button
             title="Type the barcode instead"
@@ -351,18 +356,22 @@ function ManualEntry({
   code,
   reason,
   onCode,
-  onReset,
   onUseCamera,
 }: {
   code: string | null;
   /** Why the camera is not being used, when that was not the reader's choice. */
   reason: string | null;
   onCode: (gtin: string) => void;
-  onReset: () => void;
   onUseCamera: (() => void) | null;
 }) {
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  /* "Look it up" is the ✓ in the bar while the field is up (the Apple pass,
+     2026-11-05); a result has no commit. */
+  useBarConfirm(
+    code ? null : { label: 'Look it up', onPress: () => lookUp(), disabled: !input.trim() }
+  );
 
   function lookUp() {
     /* Typed input has no symbology, so an 8-digit code is read as EAN-8. A UPC-E
@@ -398,13 +407,7 @@ function ManualEntry({
         </View>
 
         {code ? (
-          <LookupResult
-            code={code}
-            onScanAgain={() => {
-              setInput('');
-              onReset();
-            }}
-          />
+          <LookupResult code={code} />
         ) : (
           <>
             <TextField
@@ -423,7 +426,6 @@ function ManualEntry({
               error={error}
               hint="The digits printed under the bars on the back of the box."
             />
-            <Button title="Look it up" fullWidth disabled={!input.trim()} onPress={lookUp} />
             {onUseCamera && (
               <Button
                 title="Use the camera"
@@ -444,7 +446,7 @@ function ManualEntry({
 // The answer
 // ---------------------------------------------------------------------------
 
-function LookupResult({ code, onScanAgain }: { code: string; onScanAgain: () => void }) {
+function LookupResult({ code }: { code: string }) {
   const theme = useTheme();
   const router = useRouter();
   const lookup = useQuery({
@@ -480,31 +482,23 @@ function LookupResult({ code, onScanAgain }: { code: string; onScanAgain: () => 
         </Text>
         <View style={styles.stack}>
           <Button title="Try again" fullWidth onPress={() => void lookup.refetch()} />
-          <Button title="Scan another" variant="ghost" fullWidth onPress={onScanAgain} />
         </View>
       </View>
     );
   }
 
   return (
-    <ResultBody
-      result={lookup.data}
-      shown={shown}
-      onScanAgain={onScanAgain}
-      onSearch={() => router.push('/add-copy')}
-    />
+    <ResultBody result={lookup.data} shown={shown} onSearch={() => router.push('/add-copy')} />
   );
 }
 
 function ResultBody({
   result,
   shown,
-  onScanAgain,
   onSearch,
 }: {
   result: BarcodeLookup;
   shown: string;
-  onScanAgain: () => void;
   onSearch: () => void;
 }) {
   const router = useRouter();
@@ -538,27 +532,17 @@ function ResultBody({
             fullWidth
             onPress={() => router.push({ pathname: '/game/[id]', params: { id: release.game_id } })}
           />
-          <Button title="Scan another" variant="ghost" fullWidth onPress={onScanAgain} />
         </View>
       </View>
     );
   }
 
   if (result.kind === 'pending') {
-    return (
-      <PendingResult
-        barcode={result.barcode}
-        claims={result.claims}
-        shown={shown}
-        onScanAgain={onScanAgain}
-      />
-    );
+    return <PendingResult barcode={result.barcode} claims={result.claims} shown={shown} />;
   }
 
   if (result.kind === 'identified') {
-    return (
-      <IdentifiedResult barcode={result.barcode} match={result.match} onScanAgain={onScanAgain} />
-    );
+    return <IdentifiedResult barcode={result.barcode} match={result.match} />;
   }
 
   return (
@@ -577,7 +561,6 @@ function ResultBody({
             router.push({ pathname: '/add-release', params: { barcode: result.barcode } })
           }
         />
-        <Button title="Scan again" variant="secondary" fullWidth onPress={onScanAgain} />
         <Button title="Search manually" variant="ghost" fullWidth onPress={onSearch} />
       </View>
     </View>
@@ -597,12 +580,10 @@ function PendingResult({
   barcode,
   claims,
   shown,
-  onScanAgain,
 }: {
   barcode: string;
   claims: ContributionWithRelations[];
   shown: string;
-  onScanAgain: () => void;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -697,7 +678,6 @@ function PendingResult({
             onPress={() => router.push({ pathname: '/add-release', params: { barcode } })}
           />
         )}
-        <Button title="Scan another" variant="ghost" fullWidth onPress={onScanAgain} />
       </View>
     </PageScrollView>
   );
@@ -716,15 +696,7 @@ function PendingResult({
  * The source is named on the card. It is a third party's answer, and a reader
  * deciding whether to trust it should know whose.
  */
-function IdentifiedResult({
-  barcode,
-  match,
-  onScanAgain,
-}: {
-  barcode: string;
-  match: CatalogueMatch;
-  onScanAgain: () => void;
-}) {
+function IdentifiedResult({ barcode, match }: { barcode: string; match: CatalogueMatch }) {
   const router = useRouter();
 
   /* The cover and IGDB's own title. The card is useful without them — ScanDex's
@@ -776,7 +748,6 @@ function IdentifiedResult({
           fullWidth
           onPress={() => router.push({ pathname: '/add-release', params: { ...prefill, barcode } })}
         />
-        <Button title="Scan another" variant="ghost" fullWidth onPress={onScanAgain} />
       </View>
     </View>
   );

@@ -40,10 +40,10 @@ export type ToastRecord = ToastOptions & {
 
 /** reacticx's lifetime: four seconds. */
 export const TOAST_LIFETIME = 4000;
-/** reacticx shows three; a fourth waits behind them, unseen. */
-export const TOAST_VISIBLE = 3;
-/** The most kept at once — the oldest go first past this. */
-const TOAST_KEPT = 5;
+/** One at a time, iOS's (the Apple pass, 2026-11-05): a new one replaces it. */
+export const TOAST_VISIBLE = 1;
+/** Kept at once: the one shown. reacticx stacked three of five. */
+const TOAST_KEPT = 1;
 
 let records: ToastRecord[] = [];
 let nextId = 1;

@@ -1,19 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
-import { useCanReport, reportHref } from '@/components/report-flag';
-import { Avatar } from '@/components/ui/avatar';
+import { COMMENT_INDENT, CommentRow } from '@/components/comment-row';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
 import { PageFlatList } from '@/components/ui/page-scroll';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
-import { RichText } from '@/components/ui/rich-text';
 import { TextField } from '@/components/ui/text-field';
-import { ControlHeight, FontFamily, Spacing } from '@/constants/theme';
+import { ControlHeight, Spacing } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -23,7 +21,7 @@ import {
   type CommentWithAuthor,
   type TargetType,
 } from '@/lib/api';
-import { displayNameFor, timeAgo } from '@/lib/format';
+import { displayNameFor } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 import { toast } from '@/lib/toast';
 
@@ -142,22 +140,22 @@ export default function CommentsScreen() {
           contentContainerStyle={threads.length === 0 ? styles.empty : styles.content}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          ItemSeparatorComponent={() => <View style={{ height: Spacing.x16 }} />}
+          ItemSeparatorComponent={ThreadRule}
           renderItem={({ item }) => (
-            <View style={styles.thread}>
+            <View>
               <CommentRow
                 comment={item.comment}
                 canDelete={item.comment.user_id === userId}
                 onReply={() => setReplyTo(item.comment)}
                 onDelete={() => remove.mutate(item.comment.id)}
               />
+              {/* Replies indented by a face and its gap, no rule beside them. */}
               {item.replies.length > 0 && (
-                <View style={[styles.replies, { borderLeftColor: theme.border }]}>
+                <View style={styles.replies}>
                   {item.replies.map((reply) => (
                     <CommentRow
                       key={reply.id}
                       comment={reply}
-                      compact
                       canDelete={reply.user_id === userId}
                       onReply={() => setReplyTo(item.comment)}
                       onDelete={() => remove.mutate(reply.id)}
@@ -168,7 +166,11 @@ export default function CommentsScreen() {
             </View>
           )}
           ListEmptyComponent={
-            <EmptyState title="No comments yet" message="Be the first to say something." />
+            <EmptyState
+              icon="chatbubble-ellipses-outline"
+              title="No comments yet"
+              message="Be the first to say something."
+            />
           }
         />
 
@@ -229,76 +231,10 @@ export default function CommentsScreen() {
   );
 }
 
-function CommentRow({
-  comment,
-  compact,
-  canDelete,
-  onReply,
-  onDelete,
-}: {
-  comment: CommentWithAuthor;
-  compact?: boolean;
-  canDelete: boolean;
-  onReply: () => void;
-  onDelete: () => void;
-}) {
+/* Module scope: an inline component is a new type every render. */
+function ThreadRule() {
   const theme = useTheme();
-  const router = useRouter();
-  const canReport = useCanReport(comment.user_id);
-
-  return (
-    <View style={styles.commentRow}>
-      <Link href={{ pathname: '/profile/[id]', params: { id: comment.user_id } }} asChild>
-        <PressableScale accessibilityRole="button" scaleTo={0.9}>
-          <Avatar
-            uri={comment.profile?.avatar_url}
-            name={displayNameFor(comment.profile)}
-            size={compact ? 26 : 34}
-          />
-        </PressableScale>
-      </Link>
-
-      <View style={styles.commentBody}>
-        <View style={styles.commentHead}>
-          <Text variant="bodySmall" style={styles.strong}>
-            {displayNameFor(comment.profile)}
-          </Text>
-          <Text variant="caption" color="textMuted">
-            {timeAgo(comment.created_at)}
-          </Text>
-        </View>
-
-        <RichText variant="body" color="textSecondary">
-          {comment.body}
-        </RichText>
-
-        <View style={styles.commentActions}>
-          <Text variant="caption" color="textMuted" onPress={onReply}>
-            Reply
-          </Text>
-          {canDelete && (
-            <Text variant="caption" style={{ color: theme.danger }} onPress={onDelete}>
-              Delete
-            </Text>
-          )}
-          {canReport && (
-            <Text
-              variant="caption"
-              color="textMuted"
-              accessibilityRole="button"
-              accessibilityLabel={`Report ${displayNameFor(comment.profile)}’s comment`}
-              onPress={() =>
-                router.push(
-                  reportHref({ kind: 'comment', targetId: comment.id, authorId: comment.user_id })
-                )
-              }>
-              Report
-            </Text>
-          )}
-        </View>
-      </View>
-    </View>
-  );
+  return <View style={[styles.rule, { backgroundColor: theme.border }]} />;
 }
 
 /** The send key's edge: the composer field's own height, so the two align. */
@@ -308,18 +244,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { padding: Spacing.x16, paddingBottom: Spacing.x24 },
   empty: { flexGrow: 1 },
-  thread: { gap: Spacing.x12 },
-  replies: {
-    marginLeft: Spacing.x24,
-    paddingLeft: Spacing.x12,
-    borderLeftWidth: 1,
-    gap: Spacing.x12,
-  },
-  commentRow: { flexDirection: 'row', gap: Spacing.x12 },
-  commentBody: { flex: 1, gap: Spacing.x4 },
-  commentHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8 },
-  commentActions: { flexDirection: 'row', gap: Spacing.x16, marginTop: 2 },
-  strong: { fontFamily: FontFamily.semibold },
+  replies: { marginLeft: COMMENT_INDENT },
+  rule: { height: StyleSheet.hairlineWidth, marginLeft: COMMENT_INDENT },
   composer: { padding: Spacing.x12, gap: Spacing.x8, borderTopWidth: StyleSheet.hairlineWidth },
   replyingTo: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8 },
   composerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.x8 },

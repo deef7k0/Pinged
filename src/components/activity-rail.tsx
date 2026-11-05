@@ -9,7 +9,7 @@ import { Text } from '@/components/ui/text';
 import { RAIL_FOOT } from '@/constants/cover-rail';
 import type { EditionKind } from '@/constants/game-editions';
 import { scoreColor } from '@/constants/score';
-import { FontFamily } from '@/constants/theme';
+import { Typeface } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { CachedGame, LogWithRelations } from '@/lib/database.types';
 import { displayNameFor } from '@/lib/format';
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
   /* Shrinks, so a long name truncates and never widens the cover's column. */
   words: { flex: 1, minWidth: 0 },
   /* Families, not weights: Android synthesises none for a custom font. */
-  name: { fontFamily: FontFamily.semibold },
+  name: { fontFamily: Typeface.semibold },
   verdict: { flexDirection: 'row', alignItems: 'center', gap: 3, height: RAIL_FOOT.line },
-  score: { fontFamily: FontFamily.bold, fontVariant: ['tabular-nums'] },
+  score: { fontFamily: Typeface.bold, fontVariant: ['tabular-nums'] },
 });

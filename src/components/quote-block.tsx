@@ -1,7 +1,7 @@
 import { Text as RNText, StyleSheet, type StyleProp, type TextStyle } from 'react-native';
 
 import { PULL_QUOTE, quoteMarkSize, type PullQuoteSize } from '@/constants/pull-quote';
-import { FontFamily, withAlpha } from '@/constants/theme';
+import { Typeface, withAlpha } from '@/constants/theme';
 import { useTypedCount } from '@/hooks/use-typed-count';
 import { normaliseQuote } from '@/lib/review-quote';
 
@@ -76,5 +76,5 @@ export function QuoteBlock({
 }
 
 const styles = StyleSheet.create({
-  quote: { fontFamily: FontFamily.regular, textAlign: 'center', includeFontPadding: false },
+  quote: { fontFamily: Typeface.regular, textAlign: 'center', includeFontPadding: false },
 });

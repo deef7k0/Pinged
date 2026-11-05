@@ -429,20 +429,16 @@ export function CollectionHeader({
         {/*
           The description: the reference's `DescriptionView`, three lines and
           then its More, opening in place (`<ExpandableText>`). With nothing
-          written the same slot says so, in the same type and the same place,
-          as the reference's does.
+          written, nothing — Apple Music's (the Apple pass, 2026-11-05); it
+          said "No description".
         */}
-        <View style={[styles.about, { paddingVertical: sections.cardGap }]}>
-          {description ? (
+        {description ? (
+          <View style={[styles.about, { paddingVertical: sections.cardGap }]}>
             <ExpandableText rich lines={DESCRIPTION_LINES} subject="the description">
               {description}
             </ExpandableText>
-          ) : (
-            <Text variant="body" color="textSecondary">
-              No description
-            </Text>
-          )}
-        </View>
+          </View>
+        ) : null}
       </View>
     </View>
   );

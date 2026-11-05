@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
-import { memo, useCallback, useEffect, useMemo, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { GameDisc } from '@/components/game-disc';
@@ -28,6 +28,7 @@ import { recallGame } from '@/lib/games/seen-games';
 import type { GameSoundtrack, SoundCloudTrack } from '@/lib/soundcloud/types';
 import { formatDuration, formatRunningTime } from '@/lib/soundtrack-pick';
 import { useAuth } from '@/store/auth';
+import { firstPlayable, shuffled } from '@/lib/player-queue';
 import { player, usePlayer, type PlayerPhase, type PlayerQueue } from '@/store/player';
 import { Loader } from '@/components/ui/loader';
 import { toast } from '@/lib/toast';
@@ -74,7 +75,7 @@ const ROW_KEY = 36;
  * One game, so `<AccentProvider>`, like its page, its log form and its review.
  */
 export default function SoundtrackScreen() {
-  const params = useLocalSearchParams<{ id: string; title?: string }>();
+  const params = useLocalSearchParams<{ id: string; title?: string; play?: string }>();
   const id = params.id;
 
   /*
@@ -105,6 +106,7 @@ export default function SoundtrackScreen() {
         /* The developer decides whose upload counts as official, so the
            soundtrack is not asked for until the game has said who that is —
            or has failed to, in which case the name alone has to do. */
+        playAt={params.play ? Number(params.play) : null}
         gameSettled={!game.isPending}
         gameError={game.isLoadingError && !title ? game.error : null}
         onRetryGame={() => game.refetch()}
@@ -119,6 +121,8 @@ type SoundtrackProps = {
   developer: string | null;
   coverUrl: string | null;
   heroUrl: string | null;
+  /** A track pressed on the game page's Soundtrack tab: played once it is here. */
+  playAt: number | null;
   gameSettled: boolean;
   gameError: unknown;
   onRetryGame: () => void;
@@ -130,6 +134,7 @@ function Soundtrack({
   developer,
   coverUrl,
   heroUrl,
+  playAt,
   gameSettled,
   gameError,
   onRetryGame,
@@ -156,6 +161,16 @@ function Soundtrack({
     () => (soundtrack ? { owner, gameId, gameTitle: title, tracks: soundtrack.tracks } : null),
     [soundtrack, owner, gameId, title]
   );
+
+  /* The track somebody pressed on the game page, once, when the queue is
+     here — a press, so it is the one stream this spends. */
+  const played = useRef(false);
+  useEffect(() => {
+    if (played.current || playAt === null || !queue) return;
+    played.current = true;
+    const track = queue.tracks[playAt];
+    if (track && track.access !== 'blocked') player.play(queue, playAt);
+  }, [playAt, queue]);
 
   const starred = useQuery({
     queryKey: ['starred-song', userId],
@@ -254,6 +269,7 @@ function Soundtrack({
           : undefined
       }>
       <TrackList
+        queue={queue}
         soundtrack={soundtrack}
         title={title}
         coverUrl={coverUrl}
@@ -329,6 +345,7 @@ function Shell({
 }
 
 type TrackListProps = {
+  queue: PlayerQueue;
   soundtrack: GameSoundtrack;
   title: string;
   coverUrl: string | null;
@@ -341,6 +358,7 @@ type TrackListProps = {
 };
 
 function TrackList({
+  queue,
   soundtrack,
   title,
   coverUrl,
@@ -373,6 +391,7 @@ function TrackList({
       {...ArtRowWindow}
       ListHeaderComponent={
         <SoundtrackHeader
+          queue={queue}
           soundtrack={soundtrack}
           title={title}
           coverUrl={coverUrl}
@@ -380,6 +399,7 @@ function TrackList({
           spinning={spinning}
         />
       }
+      ListFooterComponent={<SoundtrackFooter soundtrack={soundtrack} />}
       renderItem={({ item, index }) => (
         <TrackRow
           track={item}
@@ -397,6 +417,7 @@ function TrackList({
 }
 
 type SoundtrackHeaderProps = {
+  queue: PlayerQueue;
   soundtrack: GameSoundtrack;
   title: string;
   coverUrl: string | null;
@@ -414,15 +435,15 @@ type SoundtrackHeaderProps = {
  * the playlist are.
  */
 function SoundtrackHeader({
+  queue,
   soundtrack,
   title,
   coverUrl,
   heroUrl,
   spinning,
 }: SoundtrackHeaderProps) {
-  const count = soundtrack.tracks.length;
-  const length = formatRunningTime(soundtrack.tracks.map((track) => track.durationMs));
   const playlist = soundtrack.source === 'playlist' ? soundtrack.playlist : null;
+  const first = firstPlayable(queue.tracks);
 
   return (
     <View style={styles.header}>
@@ -440,25 +461,62 @@ function SoundtrackHeader({
           {title}
         </Text>
         <Text variant="bodySmall" color="textMuted" style={styles.centred}>
-          {['Soundtrack', `${count} ${count === 1 ? 'track' : 'tracks'}`, length]
-            .filter(Boolean)
-            .join(' · ')}
+          {playlist ? `Soundtrack · ${playlist.uploader.name}` : 'Soundtrack'}
         </Text>
       </View>
 
-      <View style={styles.credit}>
-        <Text variant="bodySmall" color="textSecondary" style={styles.centred}>
-          {playlist
-            ? `“${playlist.title}”, a playlist by ${playlist.uploader.name}`
-            : 'No single upload had the whole soundtrack. These are tracks that name the game, most played first.'}
-        </Text>
+      {/* Apple Music's two capsules under an album's name: Play from the top,
+          Shuffle in an order of its own (the Apple pass, 2026-11-05). A
+          stream is still asked for only when one of them is pressed. */}
+      {first !== -1 && (
+        <View style={styles.capsules}>
+          <View style={styles.capsule}>
+            <Button
+              title="Play"
+              icon="play"
+              variant="secondary"
+              onPress={() => player.play(queue, first)}
+            />
+          </View>
+          <View style={styles.capsule}>
+            <Button
+              title="Shuffle"
+              icon="shuffle"
+              variant="secondary"
+              onPress={() => player.play({ ...queue, tracks: shuffled(queue.tracks) }, 0)}
+            />
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
 
+/**
+ * Under the last track, as an album page ends: how many tracks and how long,
+ * then whose upload it is — the credit — with SoundCloud's mark and the link.
+ */
+function SoundtrackFooter({ soundtrack }: { soundtrack: GameSoundtrack }) {
+  const count = soundtrack.tracks.length;
+  const length = formatRunningTime(soundtrack.tracks.map((track) => track.durationMs));
+  const playlist = soundtrack.source === 'playlist' ? soundtrack.playlist : null;
+
+  return (
+    <View style={styles.footer}>
+      <Text variant="bodySmall" color="textSecondary">
+        {[`${count} ${count === 1 ? 'track' : 'tracks'}`, length].filter(Boolean).join(', ')}
+      </Text>
+      <Text variant="bodySmall" color="textMuted">
+        {playlist
+          ? `“${playlist.title}”, a playlist by ${playlist.uploader.name}`
+          : 'No single upload had the whole soundtrack. These are tracks that name the game, most played first.'}
+      </Text>
+      <View style={styles.footerMark}>
         <SoundCloudMark
           variant="poweredBy"
           url={playlist?.permalinkUrl}
           label="Open this playlist on SoundCloud"
         />
-
         {playlist?.permalinkUrl && (
           <Button
             title="Open on SoundCloud"
@@ -627,7 +685,15 @@ const styles = StyleSheet.create({
 
   header: { alignItems: 'center', gap: Spacing.x16, marginBottom: Spacing.x20 },
   heading: { alignItems: 'center', gap: Spacing.x4 },
-  credit: { alignItems: 'center', gap: Spacing.x12, paddingHorizontal: Spacing.x16 },
+  capsules: { flexDirection: 'row', gap: Spacing.x12, alignSelf: 'stretch' },
+  capsule: { flex: 1 },
+  footer: { gap: Spacing.x4, paddingTop: Spacing.x24, paddingHorizontal: Spacing.x8 },
+  footerMark: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.x12,
+    marginTop: Spacing.x12,
+  },
   centred: { textAlign: 'center' },
 
   row: {

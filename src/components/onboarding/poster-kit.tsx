@@ -16,7 +16,7 @@ import { PaintFill, inkTransition } from '@/components/ui/paint-fill';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import { POSTER_THEMES, type PosterKey } from '@/constants/poster';
-import { FontFamily, Radius, TapTarget, Type, readableInk, withAlpha } from '@/constants/theme';
+import { Typeface, Radius, TapTarget, Type, readableInk, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { INK_ON_LIGHT } from '@/lib/color';
 import { Loader } from '@/components/ui/loader';
@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 18,
   },
-  bracket: { fontFamily: FontFamily.light, fontSize: 64, lineHeight: 74 },
+  bracket: { fontFamily: Typeface.light, fontSize: 64, lineHeight: 74 },
   noteText: { flex: 1, textAlign: 'center' },
   button: {
     height: 56,

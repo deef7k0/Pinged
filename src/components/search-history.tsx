@@ -92,7 +92,7 @@ export function SearchHistory({
                   "Games" under every row would be noise; "in Studios" is a fact
                   the reader needs to understand why tapping it changes what is
                   being searched. */}
-              {entry.scope !== 'games' && (
+              {entry.scope !== 'games' && entry.scope !== 'top' && (
                 <Text variant="caption" color="textMuted">
                   in {scopeInfo(entry.scope).label}
                 </Text>

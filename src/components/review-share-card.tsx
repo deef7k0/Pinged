@@ -6,7 +6,7 @@ import { Image, Text as RNText, StyleSheet, View } from 'react-native';
 import { QuoteBlock } from '@/components/quote-block';
 import { labelFor, scoreColor } from '@/constants/score';
 import { SHARE_CARD, shareCardRamp, shareInkToken, shareTintOn } from '@/constants/share-card';
-import { FontFamily, ensureContrast, withAlpha } from '@/constants/theme';
+import { Typeface, ensureContrast, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ReviewShareCardProps = {
@@ -182,7 +182,7 @@ export function ReviewShareCard({
               color={shareTintOn(background, ink)}
             />
           </View>
-          <RNText style={[styles.small, { color: quiet, fontFamily: FontFamily.medium }]}>
+          <RNText style={[styles.small, { color: quiet, fontFamily: Typeface.medium }]}>
             Pinged
           </RNText>
         </View>
@@ -191,7 +191,7 @@ export function ReviewShareCard({
             it reads on whichever background was chosen. */}
         {score !== null && (
           <RNText style={[styles.small, { color: scoreInk }]}>
-            <RNText style={{ fontFamily: FontFamily.bold }}>{score}</RNText>
+            <RNText style={{ fontFamily: Typeface.bold }}>{score}</RNText>
             {`  ${labelFor(score).toUpperCase()}`}
           </RNText>
         )}
@@ -211,8 +211,8 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: SHARE_CARD.artGap },
   art: { width: SHARE_CARD.art, height: SHARE_CARD.art, borderRadius: SHARE_CARD.artRadius },
   titles: { flex: 1, minWidth: 0, gap: SHARE_CARD.titleToCredit },
-  title: { ...SHARE_CARD.title, fontFamily: FontFamily.semibold },
-  credit: { ...SHARE_CARD.credit, fontFamily: FontFamily.regular },
+  title: { ...SHARE_CARD.title, fontFamily: Typeface.semibold },
+  credit: { ...SHARE_CARD.credit, fontFamily: Typeface.regular },
   writer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -227,8 +227,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  initial: { fontSize: 11, lineHeight: 13, fontFamily: FontFamily.bold },
-  byline: { ...SHARE_CARD.byline, fontFamily: FontFamily.regular, flexShrink: 1 },
+  initial: { fontSize: 11, lineHeight: 13, fontFamily: Typeface.bold },
+  byline: { ...SHARE_CARD.byline, fontFamily: Typeface.regular, flexShrink: 1 },
   words: { marginTop: SHARE_CARD.headToText, marginBottom: SHARE_CARD.textToFoot },
   quote: { marginTop: SHARE_CARD.headToText },
   /* Under the quote, centred, and the foot's room under it instead. */
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     marginTop: SHARE_CARD.headToWriter,
     marginBottom: SHARE_CARD.textToFoot,
   },
-  text: { ...SHARE_CARD.text, fontFamily: FontFamily.bold },
+  text: { ...SHARE_CARD.text, fontFamily: Typeface.bold },
   foot: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -255,6 +255,6 @@ const styles = StyleSheet.create({
   small: {
     fontSize: signature.fontSize,
     lineHeight: signature.lineHeight,
-    fontFamily: FontFamily.medium,
+    fontFamily: Typeface.medium,
   },
 });

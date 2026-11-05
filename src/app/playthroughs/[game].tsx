@@ -3,9 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { Button } from '@/components/ui/button';
-import { CARD_INSET, cardShape } from '@/components/ui/card-material';
-import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
+import { GameArtHead } from '@/components/achievement-parts';
+import { INSET_GROUP } from '@/components/ui/inset-group';
+import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
 import { PageFlatList } from '@/components/ui/page-scroll';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
@@ -31,6 +31,7 @@ import { useAuth } from '@/store/auth';
  * a playthrough cannot exist without one.
  */
 export default function PlaythroughsScreen() {
+  const theme = useTheme();
   const router = useRouter();
   const { game: gameId } = useLocalSearchParams<{ game: string }>();
   const userId = useAuth((state) => state.session?.user.id) ?? null;
@@ -63,7 +64,7 @@ export default function PlaythroughsScreen() {
         edges={['bottom']}
         insetHeader
         topBar={<FrostedTopBar back title="Your playthroughs" />}>
-        <EmptyState title="Sign in to log playthroughs" />
+        <EmptyState icon="timer-outline" title="Sign in to log playthroughs" />
       </Screen>
     );
   }
@@ -75,19 +76,30 @@ export default function PlaythroughsScreen() {
     <Screen
       edges={['bottom']}
       insetHeader
-      topBar={<FrostedTopBar back title="Your playthroughs" />}>
+      topBar={
+        <FrostedTopBar
+          back
+          title="Your playthroughs"
+          right={
+            log.data ? (
+              <TopBarDisc icon="add" label="Add a playthrough" onPress={() => open('new')} />
+            ) : undefined
+          }
+        />
+      }>
       <PageFlatList
         data={runs.data ?? []}
         keyExtractor={(run) => run.id}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
-          <View style={styles.head}>
-            {/* The bar says what this is a list of; the page says of which game. */}
-            <Text variant="h1" numberOfLines={2}>
-              {game.data?.title ?? ''}
-            </Text>
-          </View>
+          /* The game's art and name at the head (the Apple pass, 2026-11-05);
+             Add is the + in the bar, where a button ended the list. */
+          <GameArtHead
+            artUrl={game.data?.heroUrl ?? game.data?.coverUrl}
+            title={game.data?.title}
+            background={theme.background}
+          />
         }
         renderItem={({ item, index }) => (
           <RunCard run={item} number={index + 1} onPress={() => open(item.id)} />
@@ -112,23 +124,11 @@ export default function PlaythroughsScreen() {
             />
           ) : (
             <EmptyState
+              icon="timer-outline"
               title="No playthroughs yet"
               message="Played it more than once, or want to remember the platform and dates? Add a run."
             />
           )
-        }
-        ListFooterComponent={
-          log.data ? (
-            <View style={styles.footer}>
-              <Button
-                title="Add a playthrough"
-                icon="add"
-                variant="secondary"
-                fullWidth
-                onPress={() => open('new')}
-              />
-            </View>
-          ) : null
         }
       />
     </Screen>
@@ -181,15 +181,11 @@ function RunCard({
       accessibilityLabel={`Playthrough ${number}${run.platform ? ` on ${run.platform}` : ''}. ${facts}. ${when ?? ''} Edit it.`}
       onPress={onPress}
       scaleTo={0.98}
-      style={StyleSheet.flatten([
-        cardShape,
-        styles.card,
-        { backgroundColor: theme.surface, borderColor: theme.border },
-      ])}>
+      style={StyleSheet.flatten([styles.card, { backgroundColor: theme.surface }])}>
       <View style={styles.cardHead}>
         <Text variant="h4">#{number}</Text>
         {run.platform && (
-          <Text variant="label" color="textSecondary">
+          <Text variant="body" color="textSecondary">
             {run.platform}
           </Text>
         )}
@@ -214,13 +210,19 @@ function RunCard({
 }
 
 const styles = StyleSheet.create({
-  content: { padding: Spacing.x16, paddingBottom: Spacing.x48 },
+  content: { paddingHorizontal: Spacing.x16, paddingBottom: Spacing.x48 },
   head: { gap: Spacing.x4, marginBottom: Spacing.x24 },
   separator: { height: Spacing.x12 },
   footer: { marginTop: Spacing.x24 },
   /* Every card's material (`card-material`): the review card's corner, edge
      and inset. */
-  card: { gap: Spacing.x4, padding: CARD_INSET },
+  /* An inset group's box (the Apple pass): its corner, no edge. */
+  card: {
+    gap: Spacing.x4,
+    padding: INSET_GROUP.inset,
+    borderRadius: INSET_GROUP.radius,
+    borderCurve: 'continuous',
+  },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8 },
   flex: { flex: 1 },
 });

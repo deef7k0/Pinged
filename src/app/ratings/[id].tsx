@@ -5,15 +5,15 @@ import { memo, useRef, useState } from 'react';
 import { StyleSheet, View, type FlatList } from 'react-native';
 
 import { Avatar } from '@/components/ui/avatar';
-import { DropdownButton, type DropdownOption } from '@/components/ui/dropdown-button';
+import { type DropdownOption } from '@/components/ui/dropdown-button';
+import { SortBar } from '@/components/ui/sort-bar';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
 import { PageFlatList } from '@/components/ui/page-scroll';
 import { Pager } from '@/components/ui/pager';
 import { PressableScale } from '@/components/ui/pressable-scale';
-import { ScoreLine } from '@/components/ui/score';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
-import { labelFor } from '@/constants/score';
+import { labelFor, scoreColor } from '@/constants/score';
 import { STATUS_LABEL } from '@/constants/status';
 import { Spacing, TapTarget } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -99,22 +99,23 @@ export default function GameRatersScreen() {
 
   const head = (
     <View style={styles.head}>
-      {/* The bar says what this is a list of; the page says of which game. */}
-      {!!title && (
-        <Text variant="h1" numberOfLines={2}>
-          {title}
-        </Text>
-      )}
+      {/* "Ratings" is the large title; the game is named in the line under
+          it (the Apple pass, 2026-11-05 — it was an h1 over it), and the
+          pager is at the foot only. */}
       <Text variant="body" color="textSecondary">
-        Everyone who scored it on Pinged — with a review, or with a log alone.
+        {title
+          ? `Everyone who scored ${title} on Pinged — with a review, or with a log alone.`
+          : 'Everyone who scored it on Pinged — with a review, or with a log alone.'}
       </Text>
 
-      <DropdownButton label="Sort by" value={sort} options={SORT_OPTIONS} onChange={changeSort} />
+      <SortBar
+        accessibilityLabel="Sort ratings"
+        value={sort}
+        options={SORT_OPTIONS.map((option) => ({ key: option.value, label: option.label }))}
+        onChange={changeSort}
+      />
 
-      {pageCount !== null && pageCount > 1 && (
-        <Pager page={page} pageCount={pageCount} onChange={turnTo} summary={summary} />
-      )}
-      {pageCount === 1 && !!summary && (
+      {!!summary && (
         <Text variant="bodySmall" color="textSecondary">
           {summary}
         </Text>
@@ -205,7 +206,7 @@ const RaterRow = memo(function RaterRow({
     <>
       <Avatar uri={rater.profile?.avatar_url ?? null} name={name} size={AVATAR} />
       <View style={styles.text}>
-        <Text variant="h5" numberOfLines={1}>
+        <Text variant="body" numberOfLines={1}>
           {name}
         </Text>
         <View style={styles.meta}>
@@ -225,7 +226,10 @@ const RaterRow = memo(function RaterRow({
           </Text>
         </View>
       </View>
-      <ScoreLine score={rounded} />
+      {/* The score, Apple's trailing value: the number alone, in its ramp. */}
+      <Text variant="h4" style={{ color: scoreColor(rounded, theme) }}>
+        {rounded}
+      </Text>
     </>
   );
 

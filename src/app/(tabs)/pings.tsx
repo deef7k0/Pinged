@@ -9,13 +9,14 @@ import { PinYours } from '@/components/pings/pin-yours';
 import { PingPlate } from '@/components/pings/ping-plate';
 import { PingSpotlight } from '@/components/pings/ping-spotlight';
 import { Button } from '@/components/ui/button';
-import { DropdownButton, type DropdownOption } from '@/components/ui/dropdown-button';
-import { HeaderFade } from '@/components/ui/frosted-top-bar';
-import { PressGlyph } from '@/components/ui/press-glyph';
-import { PageFlatList, PageScrollView } from '@/components/ui/page-scroll';
+import { type DropdownOption } from '@/components/ui/dropdown-button';
+import { InsetGroup, Row } from '@/components/ui/inset-group';
+import { PullDownRow } from '@/components/ui/pull-down-row';
+import { Tray } from '@/components/ui/tray';
+import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
+import { PageFlatList, PageScrollView, PageWithHeader } from '@/components/ui/page-scroll';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, Screen } from '@/components/ui/screen';
-import { useSelectable } from '@/components/ui/selectable';
 import { Skeleton } from '@/components/ui/surface';
 import { TabBar } from '@/components/ui/tab-bar';
 import { Text } from '@/components/ui/text';
@@ -142,13 +143,18 @@ export default function PingsScreen() {
   );
 
   const theme = useTheme();
+  /* The tabs head the list, under the large title (the Apple pass,
+     2026-11-05) — they were a fixed row between the title and the list. */
+  const tabRow = <TabBar tabs={tabs} value={tab} onChange={setTab} label="Pings" inset={0} />;
   const header =
     tab === 'for_you' ? (
       <View style={styles.header}>
+        {tabRow}
         <Filters value={filters} onChange={setFilters} />
       </View>
     ) : (
       <View style={styles.header}>
+        {tabRow}
         <View style={[styles.boardHead, { borderBottomColor: theme.border }]}>
           <Text variant="label" color="textMuted">
             {BOARD_HEAD[tab]}
@@ -174,13 +180,20 @@ export default function PingsScreen() {
     if (feed.isLoadingError) {
       if (isPingsNotReady(feed.error)) {
         return (
-          <EmptyState
-            title="Pings are on their way"
-            message="Asking the community for games arrives with the database’s next update."
-          />
+          <PageWithHeader header={header} contentContainerStyle={styles.content}>
+            <EmptyState
+              icon="paper-plane-outline"
+              title="Pings are on their way"
+              message="Asking the community for games arrives with the database’s next update."
+            />
+          </PageWithHeader>
         );
       }
-      return <ErrorState error={feed.error} onRetry={() => void feed.refetch()} />;
+      return (
+        <PageWithHeader header={header} contentContainerStyle={styles.content}>
+          <ErrorState error={feed.error} onRetry={() => void feed.refetch()} />
+        </PageWithHeader>
+      );
     }
 
     if (tab === 'for_you' && rows.length > 0) {
@@ -254,33 +267,21 @@ export default function PingsScreen() {
   }
 
   return (
-    /* The tab's name, large at the top left with + at the right — Apple
-       TV's (the owner's references, 2026-11-03) — then the tabs, then the
-       list, which dissolves into them as it scrolls (`<HeaderFade>`). */
-    <Screen edges={['top']}>
-      <View style={styles.titleRow}>
-        <Text variant="largeTitle" accessibilityRole="header">
-          Pings
-        </Text>
-        <PressableScale
-          accessibilityRole="button"
-          accessibilityLabel="New ping"
-          onPress={() => router.push('/new-ping')}
-          scaleTo={0.92}
-          pressedColor={theme.controlPressed}
-          style={StyleSheet.flatten([styles.newKey, { backgroundColor: theme.controlFill }])}>
-          <PressGlyph>
-            <Ionicons name="add" size={24} color={theme.text} />
-          </PressGlyph>
-        </PressableScale>
-      </View>
-      <View style={styles.tabs}>
-        <TabBar tabs={tabs} value={tab} onChange={setTab} label="Pings" />
-      </View>
-      <View style={styles.body}>
-        {body()}
-        <HeaderFade />
-      </View>
+    /* The tab's name, large at the top of the page and folding into the bar
+       as it is read; + in the bar's capsule (the Apple pass, 2026-11-05). It
+       was a fixed row — the title, +, then the tabs — over the list. */
+    <Screen
+      edges={[]}
+      insetHeader
+      topBar={
+        <FrostedTopBar
+          title="Pings"
+          right={
+            <TopBarDisc icon="add" label="New ping" onPress={() => router.push('/new-ping')} />
+          }
+        />
+      }>
+      {body()}
     </Screen>
   );
 }
@@ -292,9 +293,11 @@ function Gap() {
 }
 
 /**
- * The brief's lightweight filters: a genre, a platform, and only requests
- * built on games. Two menus and one toggle, in a row that scrolls with the
- * list — they narrow it, they are not a second navigation.
+ * The brief's lightweight filters — a genre, a platform, and only requests
+ * built on games — behind one key that opens a tray of rows (the Apple pass,
+ * 2026-11-05). The key is white with the count while any is on, and says what
+ * the list is narrowed to beside it. They were two dropdowns and a toggle in
+ * a wrapping row.
  */
 function Filters({
   value,
@@ -304,46 +307,88 @@ function Filters({
   onChange: (next: PingFilters) => void;
 }) {
   const theme = useTheme();
-  const selectable = useSelectable();
-  const look = selectable(value.withRefs);
+  const [open, setOpen] = useState(false);
+  const count = (value.genre ? 1 : 0) + (value.platform ? 1 : 0) + (value.withRefs ? 1 : 0);
+  const narrowed = [
+    value.genre ? GENRE_OPTIONS.find((option) => option.value === value.genre)?.label : null,
+    value.platform
+      ? PLATFORM_OPTIONS.find((option) => option.value === value.platform)?.label
+      : null,
+    value.withRefs ? 'With games' : null,
+  ].filter(Boolean);
 
   return (
     <View style={styles.filters}>
-      <DropdownButton
-        label="Genre"
-        size="small"
-        value={value.genre ?? ANY}
-        options={GENRE_OPTIONS}
-        onChange={(genre) => onChange({ ...value, genre: genre === ANY ? null : genre })}
-      />
-      <DropdownButton
-        label="Platform"
-        size="small"
-        value={value.platform ?? ANY}
-        options={PLATFORM_OPTIONS}
-        onChange={(platform) =>
-          onChange({ ...value, platform: platform === ANY ? null : platform })
-        }
-      />
       <PressableScale
-        accessibilityRole="switch"
-        accessibilityState={{ checked: value.withRefs }}
-        accessibilityLabel="Only pings built on games"
-        onPress={() => onChange({ ...value, withRefs: !value.withRefs })}
-        scaleTo={0.95}
-        pressedColor={look.pressedColor}
-        focusRing={look.focusRing}
-        hitSlop={{ top: 8, bottom: 8 }}
-        style={StyleSheet.flatten([styles.toggle, look.style])}>
+        accessibilityRole="button"
+        accessibilityLabel={count > 0 ? `Filters, ${count} on` : 'Filters'}
+        accessibilityState={{ expanded: open }}
+        onPress={() => setOpen(true)}
+        scaleTo={0.92}
+        pressedColor={count > 0 ? undefined : theme.controlPressed}
+        style={StyleSheet.flatten([
+          styles.filterKey,
+          { backgroundColor: count > 0 ? theme.text : theme.controlFill },
+        ])}>
         <Ionicons
-          name={value.withRefs ? 'checkmark' : 'albums-outline'}
-          size={14}
-          color={theme[look.label]}
+          name="options-outline"
+          size={18}
+          color={count > 0 ? theme.onPrimary : theme.text}
         />
-        <Text variant="bodySmall" color={look.label}>
-          With games
-        </Text>
+        {count > 0 && (
+          <Text variant="h5" style={{ color: theme.onPrimary }}>
+            {count}
+          </Text>
+        )}
       </PressableScale>
+      <Text variant="bodySmall" color="textSecondary" numberOfLines={1} style={styles.flex}>
+        {narrowed.length > 0 ? narrowed.join(' · ') : 'Every genre and platform'}
+      </Text>
+
+      <Tray visible={open} onClose={() => setOpen(false)}>
+        <View style={styles.tray}>
+          <Text variant="h4" accessibilityRole="header" style={styles.trayTitle}>
+            Filter pings
+          </Text>
+          <InsetGroup>
+            <PullDownRow
+              title="Genre"
+              choices={PING_GENRES}
+              value={value.genre}
+              onChange={(genre) => onChange({ ...value, genre })}
+              anyLabel="Any genre"
+            />
+            <PullDownRow
+              title="Platform"
+              choices={PING_PLATFORMS}
+              value={value.platform}
+              onChange={(platform) => onChange({ ...value, platform })}
+              anyLabel="Any platform"
+            />
+            <Row
+              title="Only pings with games"
+              toggle={{
+                value: value.withRefs,
+                onValueChange: (withRefs) => onChange({ ...value, withRefs }),
+              }}
+            />
+          </InsetGroup>
+          <View style={styles.trayActions}>
+            <View style={styles.flex}>
+              <Button
+                title="Clear"
+                variant="secondary"
+                fullWidth
+                disabled={count === 0}
+                onPress={() => onChange(NO_PING_FILTERS)}
+              />
+            </View>
+            <View style={styles.flex}>
+              <Button title="Done" fullWidth onPress={() => setOpen(false)} />
+            </View>
+          </View>
+        </View>
+      </Tray>
     </View>
   );
 }
@@ -362,6 +407,7 @@ function Empty({
   if (filtered) {
     return (
       <EmptyState
+        icon="search"
         title="Nothing matches"
         message="No open pings with those filters right now."
         action={<Button title="Clear filters" variant="secondary" onPress={onClear} />}
@@ -389,8 +435,7 @@ function Empty({
 /** The stage's shapes: a fan, the claim, two lines, the action. */
 function StageSkeleton({ header }: { header: React.ReactElement }) {
   return (
-    <View style={styles.content}>
-      {header}
+    <PageWithHeader header={header} contentContainerStyle={styles.content}>
       <View style={styles.stageSkeleton}>
         <Skeleton width={100} height={Math.round(100 / PosterAspectRatio)} />
         <Skeleton width="70%" height={22} />
@@ -398,15 +443,14 @@ function StageSkeleton({ header }: { header: React.ReactElement }) {
         <Skeleton width="85%" height={38} />
         <Skeleton width="100%" height={52} radius={Radius.pill} />
       </View>
-    </View>
+    </PageWithHeader>
   );
 }
 
 /** Two plates' worth of shimmer, the height of the plates that replace them. */
 function BoardSkeleton({ header, width }: { header: React.ReactElement; width: number }) {
   return (
-    <View style={styles.content}>
-      {header}
+    <PageWithHeader header={header} contentContainerStyle={styles.content}>
       {[0, 1].map((index) => (
         <View key={index} style={styles.plateSkeleton}>
           <Skeleton width={width} height={96} radius={0} />
@@ -415,40 +459,29 @@ function BoardSkeleton({ header, width }: { header: React.ReactElement; width: n
           <Skeleton width="100%" height={13} />
         </View>
       ))}
-    </View>
+    </PageWithHeader>
   );
 }
 
 const styles = StyleSheet.create({
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.x16,
-    paddingTop: Spacing.x8,
-  },
-  newKey: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  body: { flex: 1 },
-  tabs: { paddingTop: Spacing.x8 },
-  content: { paddingHorizontal: Spacing.x16, paddingTop: Spacing.x12, flexGrow: 1, gap: 0 },
+  content: { paddingHorizontal: Spacing.x16, flexGrow: 1, gap: 0 },
   header: { gap: Spacing.x12, marginBottom: Spacing.x20 },
   boardHead: { paddingBottom: Spacing.x8, borderBottomWidth: StyleSheet.hairlineWidth },
-  filters: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.x8 },
-  toggle: {
+  filters: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
+  filterKey: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: Spacing.x4,
-    height: 32,
-    paddingHorizontal: Spacing.x12,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
+    minWidth: 40,
+    height: 40,
+    paddingHorizontal: Spacing.x8,
+    borderRadius: 20,
   },
+  flex: { flex: 1 },
+  tray: { padding: Spacing.x16, gap: Spacing.x16 },
+  trayTitle: { textAlign: 'center' },
+  trayActions: { flexDirection: 'row', gap: Spacing.x12 },
   gap: { height: Spacing.x32 },
   more: { paddingVertical: Spacing.x24, alignItems: 'center' },
   stageSkeleton: { alignItems: 'center', gap: Spacing.x16, paddingTop: Spacing.x12 },

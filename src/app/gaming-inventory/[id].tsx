@@ -65,7 +65,7 @@ export default function GamingInventoryScreen() {
   if (!id) {
     return (
       <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="Inventory" />}>
-        <EmptyState title="Not found" />
+        <EmptyState icon="search" title="Not found" />
       </Screen>
     );
   }
@@ -117,6 +117,7 @@ export default function GamingInventoryScreen() {
             <ErrorState error={inventory.error} />
           ) : !account.data ? (
             <EmptyState
+              icon="logo-steam"
               title="No Steam account linked"
               message={isSelf ? 'Connect Steam from your profile.' : 'Nothing to show.'}
             />
@@ -136,7 +137,7 @@ function SectionHeading({ title, count }: { title: string; count: number }) {
   return (
     <View style={styles.sectionHeading}>
       <Text variant="label" color="textSecondary">
-        {title.toUpperCase()}
+        {title}
       </Text>
       <Text variant="caption" color="textMuted">
         {count}

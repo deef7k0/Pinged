@@ -81,8 +81,6 @@ export function MiniPlayer() {
   const track = useNowPlaying();
   const phase = usePlayer((state) => state.phase);
   const notice = usePlayer((state) => state.notice);
-  const gameId = usePlayer((state) => state.queue?.gameId ?? null);
-  const gameTitle = usePlayer((state) => state.queue?.gameTitle ?? null);
   const hasNext = usePlayer(
     (state) => !!state.queue && nextPlayable(state.queue.tracks, state.index) !== -1
   );
@@ -93,12 +91,10 @@ export function MiniPlayer() {
   const loading = phase === 'loading';
   const onTabs = isTabRoute(segments);
 
+  /* Apple Music's: the bar opens Now Playing, full screen (the Apple pass,
+     2026-11-05); the soundtrack is a key on that screen. */
   function open() {
-    if (!gameId) return;
-    router.push({
-      pathname: '/soundtrack/[id]',
-      params: { id: gameId, title: gameTitle ?? '' },
-    });
+    router.push('/now-playing');
   }
 
   const words = (
@@ -129,18 +125,14 @@ export function MiniPlayer() {
             transitionDuration: reduceMotion ? 0 : MINI_PLAYER_MOVE_MS,
           },
         ]}>
-        {gameId ? (
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel={`${track.title} by ${track.uploader.name}. Open the soundtrack.`}
-            onPress={open}
-            scaleTo={0.99}
-            style={styles.body}>
-            {words}
-          </PressableScale>
-        ) : (
-          <View style={styles.body}>{words}</View>
-        )}
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={`${track.title} by ${track.uploader.name}. Open Now Playing.`}
+          onPress={open}
+          scaleTo={0.99}
+          style={styles.body}>
+          {words}
+        </PressableScale>
 
         <PressableScale
           accessibilityRole="button"

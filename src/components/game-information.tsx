@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Section, useSectionInset } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
-import { FontFamily, Palette, Spacing, withAlpha } from '@/constants/theme';
+import { Typeface, Palette, Spacing, withAlpha } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 
 /**
@@ -29,9 +29,7 @@ export function GameInformation({
       <View style={[styles.box, { marginHorizontal: inset }]}>
         <Text variant="h4">{title}</Text>
         {genres.length > 0 && (
-          <Text style={[styles.genres, { color: accent.quietInk }]}>
-            {genres.join(' · ').toUpperCase()}
-          </Text>
+          <Text style={[styles.genres, { color: accent.quietInk }]}>{genres.join(' · ')}</Text>
         )}
         {!!description && (
           <Text style={[styles.description, { color: accent.quietInk }]}>{description}</Text>
@@ -57,11 +55,11 @@ export const INFO_BOX = {
 const styles = StyleSheet.create({
   box: { ...INFO_BOX, gap: Spacing.x4 },
   genres: {
-    fontFamily: FontFamily.semibold,
+    fontFamily: Typeface.semibold,
     fontSize: 11,
     lineHeight: 15,
     letterSpacing: 0.6,
     marginBottom: Spacing.x4,
   },
-  description: { fontFamily: FontFamily.regular, fontSize: 14, lineHeight: 21 },
+  description: { fontFamily: Typeface.regular, fontSize: 14, lineHeight: 21 },
 });

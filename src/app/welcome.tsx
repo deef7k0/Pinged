@@ -16,7 +16,7 @@ import {
 import { TypedText } from '@/components/onboarding/typed-text';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
-import { FontFamily, TapTarget } from '@/constants/theme';
+import { Typeface, TapTarget } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { INTRO_LINES, MIN_PASSWORD_LENGTH, typingDuration } from '@/lib/onboarding';
 import { signInWithProvider, type OAuthProvider } from '@/lib/oauth';
@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'center',
   },
-  wordmark: { letterSpacing: 2, fontFamily: FontFamily.extraBold, fontSize: 14 },
+  wordmark: { letterSpacing: 2, fontFamily: Typeface.extraBold, fontSize: 14 },
   form: { marginTop: 24, gap: 14 },
   or: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 6 },
   rule: { flex: 1, height: StyleSheet.hairlineWidth },

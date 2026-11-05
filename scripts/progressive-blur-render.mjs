@@ -9,7 +9,7 @@
  * Four panels, a 360dp game page at 3× with its 38% hero: the hero as it was
  * before the tail (the page's own dissolve, `MASTHEAD_FADE`, over the art
  * alone), then Convx's at rest, a little scrolled and scrolled. Each has the
- * game's name set where the masthead sets it — Poppins Bold 22, white — so
+ * game's name set where the masthead sets it — Inter Bold 22, white — so
  * what is behind it can be judged — and measured: before the name is set,
  * every panel prints white's contrast on the ground under it, its mean and
  * its worst (the brightest tenth of it). Bold 22 is large text: WCAG asks 3:1.
@@ -70,10 +70,10 @@ if (!art) throw new Error(`could not decode ${url}`);
 const artSize = { width: art.width(), height: art.height() };
 
 const font = CK.Typeface.MakeFreeTypeFaceFromData(
-  readFileSync(require.resolve('@expo-google-fonts/poppins/700Bold/Poppins_700Bold.ttf')).buffer
+  readFileSync(require.resolve('@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf')).buffer
 );
 const regular = CK.Typeface.MakeFreeTypeFaceFromData(
-  readFileSync(require.resolve('@expo-google-fonts/poppins/400Regular/Poppins_400Regular.ttf'))
+  readFileSync(require.resolve('@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf'))
     .buffer
 );
 

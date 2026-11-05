@@ -99,7 +99,7 @@ export default function AddToListScreen() {
         insetHeader
         modal
         topBar={<FrostedTopBar dismiss title="Add games" />}>
-        <EmptyState title="Collection not found" />
+        <EmptyState icon="search" title="Collection not found" />
       </Screen>
     );
   }

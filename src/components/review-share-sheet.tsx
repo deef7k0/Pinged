@@ -20,7 +20,7 @@ import {
   shareTextWidth,
   shareTintOn,
 } from '@/constants/share-card';
-import { FontFamily, Radius, Spacing, withAlpha } from '@/constants/theme';
+import { Typeface, Radius, Spacing, withAlpha } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useAlbumArtColor } from '@/hooks/use-album-art-color';
 import { useSquareCover } from '@/hooks/use-square-cover';
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  lineText: { ...line, fontFamily: FontFamily.medium },
+  lineText: { ...line, fontFamily: Typeface.medium },
   floating: {
     position: 'absolute',
     left: 0,
@@ -644,7 +644,7 @@ const styles = StyleSheet.create({
   pillLabel: {
     fontSize: pill.fontSize,
     lineHeight: pill.fontSize + 5,
-    fontFamily: FontFamily.medium,
+    fontFamily: Typeface.medium,
   },
   status: { marginTop: Spacing.x16, textAlign: 'center' },
 });

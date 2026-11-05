@@ -28,6 +28,7 @@ const MAX_ENTRIES = 8;
  * "PlayStation 5" is not a search anyone made.
  */
 export const SEARCH_SCOPES = [
+  'top',
   'games',
   'reviews',
   'people',

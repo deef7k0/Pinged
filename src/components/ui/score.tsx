@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { labelFor, scoreColor } from '@/constants/score';
-import { FontFamily, ScoreSizes, Spacing } from '@/constants/theme';
+import { Typeface, ScoreSizes, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ScoreSize = keyof typeof ScoreSizes;
@@ -103,7 +103,7 @@ export function ScoreLine({ score, size = 'inline' }: { score: number; size?: Sc
       accessibilityLabel={`Rated ${Math.round(score)} out of 100 — ${labelFor(score)}`}>
       <ScoreNumber score={score} size={size} />
       <Text variant="label" style={{ color: tint }}>
-        {labelFor(score).toUpperCase()}
+        {labelFor(score)}
       </Text>
     </View>
   );
@@ -112,7 +112,7 @@ export function ScoreLine({ score, size = 'inline' }: { score: number; size?: Sc
 const styles = StyleSheet.create({
   /* Bold, and the only place bold appears below display size: a score has to be
      readable at arm's length and it no longer has a box helping it. */
-  number: { fontFamily: FontFamily.bold },
+  number: { fontFamily: Typeface.bold },
   withLabel: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
   labelBlock: { gap: 1 },
   /* `baseline` rather than `center`: the number is larger than the word, and

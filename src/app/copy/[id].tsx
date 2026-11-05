@@ -148,7 +148,13 @@ export default function CopyScreen() {
   else if (copy.isLoadingError)
     body = <ErrorState error={copy.error} onRetry={() => void copy.refetch()} />;
   else if (!copy.data)
-    body = <EmptyState title="That copy is gone" message="It may have been deleted." />;
+    body = (
+      <EmptyState
+        icon="disc-outline"
+        title="That copy is gone"
+        message="It may have been deleted."
+      />
+    );
   else
     body = (
       <AccentProvider

@@ -1,21 +1,20 @@
 ---
 name: GameLog
-description: A premium, calm, information-dense gaming social platform. A near-black room, soft rounded controls in the language of a premium music player, one blue accent, and a lot of games.
+description: A gaming discovery app in Apple Music and Apple TV's language — a true-black room, Inter at Apple's sizes, capsule controls, colour taken from the games, and a lot of games.
 scheme: dark-only
 target: react-native
 colors:
-  # The owner's pair, measured out of their own reference (2026-10-20): a cool
-  # dark blue-grey page and a card one perceptible step above it. The ladder
-  # climbs from there in the intervals it has always kept — card on page
-  # 1.089:1, elevated on card 1.063, selected on elevated 1.111 — and it has to
+  # Apple Music's and Apple TV's room (the Apple pass, 2026-11-04): a true-black
+  # page, iOS's #1C1C1E for a card, and the ladder climbing from there — card on
+  # page 1.24:1, elevated on card 1.16, selected on elevated 1.17. It has to
   # climb: a control resting on a card is drawn by being lighter than the card.
-  # Nothing on a game's screens uses these for surfaces; those derive them from
-  # the artwork through `accentRoles`.
-  background: "#14171C"
-  surface: "#1B1F28"
+  # It was the owner's blue-grey #14171C / #1B1F28 from 2026-10-20. Nothing on
+  # a game's screens uses these for surfaces: those come from its artwork.
+  background: "#000000"
+  surface: "#1C1C1E"
   # Nested blocks and wells, and the resting fill of a control.
-  surfaceElevated: "#1F2430"
-  surfaceSelected: "#262C3A"
+  surfaceElevated: "#28282A"
+  surfaceSelected: "#333336"
   # The owner's reference, SimpMusic, measured from its code: a field's well is
   # its onSurfaceVariant at 8% (#0F0F0F on black), an action's fill at 12%
   # (#181818 on black). Translucent, so the lift is the same on every floor.
@@ -27,7 +26,11 @@ colors:
   # The segmented control (every in-page tab row): a translucent track and a
   # solid thumb that slides along it — reacticx's SegmentedControl.
   segmentTrack: "rgba(255,255,255,0.08)"
-  segmentThumb: "#3A3F4B"
+  segmentThumb: "#3A3A3C"
+  # The masked tab bar's pill and the chosen words inside it: iOS 26's glass
+  # thumb, white at 22% with white words (2026-11-04; it was a solid #F2F2F2).
+  segmentPill: "rgba(255,255,255,0.22)"
+  segmentPillInk: "#FFFFFF"
   # The resting edge of a choice — a selection card, a filter pill. Choices are
   # outlined; actions are filled.
   outline: "rgba(255,255,255,0.16)"
@@ -40,17 +43,17 @@ colors:
   # The edge of box art: one hairline inside a cover's own corner, over its
   # artwork — #DDEEFF at 35%, the poster outline of the owner's Letterboxd
   # reference. An alpha, not a grey: it lightens the art under it. See § 4.
-  # PlayStation blue, the house accent. Fills only: 3.94:1 on the page, right
-  # under white (5.01:1), wrong for a word. Blue *type* uses `primaryText`,
-  # and so do the house selected and focus states — a 14% wash of the fill
-  # blue over near-black lands darker than a resting control.
-  primary: "#0070CC"
-  onPrimary: "#FFFFFF"
+  # The house accent is white, Apple TV's: the prominent capsule is white with
+  # near-black words, and a game's screens take the game's own colour instead.
+  # (It was PlayStation blue #0070CC; the code moved to white before this file
+  # did — the docs caught up on 2026-11-04.)
+  primary: "#FFFFFF"
+  onPrimary: "#0E0E0E"
   # `primaryText` at 16%: the house `wash`, lighter than the resting control fill.
-  primaryMuted: "rgba(46,147,232,0.16)"
-  accent: "#0070CC"
-  # 6.07:1 on the page, 5.31 on `surfaceElevated`.
-  primaryText: "#2E93E8"
+  primaryMuted: "rgba(255,255,255,0.16)"
+  accent: "#FFFFFF"
+  # The accent as type: white on the house pages.
+  primaryText: "#FFFFFF"
   # Neutral, deliberately: the reference's violet inks are within a few units
   # of these, and these are what the protected case's printed back is set in.
   text: "#F5F5F5"
@@ -108,8 +111,8 @@ colors:
   # A placeholder's fill, and the light that sweeps it. The sweep is measured,
   # not picked: SimpMusic's shimmer line stands at 1.72:1 on its own shimmer
   # background, and this is the colour at that ratio on `skeleton`. See § 22.
-  skeleton: "#1F2430"
-  skeletonSweep: "#40495E"
+  skeleton: "#28282A"
+  skeletonSweep: "#4C4C4F"
   # Ink for gradient ramps over artwork. Not a surface — never fill with it.
   shadowInk: "#000000"
   # Tier-list ramp. Data, not chrome. See § 1.5.
@@ -144,90 +147,96 @@ colors:
   onboardingField: "#161419"
   onboardingEdge: "#2C2A30"
   # Legacy aliases, kept so older call sites keep compiling. Do not use in new code.
-  backgroundElement: "#202020"
-  backgroundSelected: "#2A2A2A"
+  backgroundElement: "#1C1C1E"
+  backgroundSelected: "#2C2C2E"
 typography:
-  # SimpMusic's sizes (`Typo.kt`), one style per step: display = titleLarge 25,
-  # h1 = headlineLarge 23, h2 = headlineMedium 20 (Home's shelf titles), h3 =
-  # titleMedium 18, h4 = labelMedium 16 (the artist page's section headings),
-  # h5 = labelSmall 14 (a chip's word), body = bodyMedium 13, bodySmall 11, and
-  # caption 11 — the reference reads nothing smaller. `h6` and `label` stay at
-  # 10: they are badges. The scale had been zoomed out ~8%; it came back up with
-  # the spacing ladder. Weights are this app's.
-  # `caseTitle` / `caseEdition` are pinned and did not move: see § 2.3.
+  # Apple's text styles in Inter (the Apple pass, 2026-11-04): largeTitle 34,
+  # display = Title 1 28, h2 = Title 2 22 (every section heading), h3 = Title 3
+  # 20, h4 = Headline 17 semibold, h5 = Subheadline 15 semibold, body 15
+  # (Inter at 15 sets as SF does at 16–17), bodySmall = Footnote 13, caption 12.
+  # `label` is a sentence-case footnote; `badge` (and `h6`) are the only capitals,
+  # printed over artwork. Row titles are medium, not bold. They were SimpMusic's
+  # sizes in Poppins (body 13) until then.
+  # `caseTitle` / `caseEdition` keep their sizes (§ 2.3), in Inter.
   largeTitle:
     fontFamily: "Inter_700Bold"
-    fontSize: "32px"
+    fontSize: "34px"
     fontWeight: 700
-    lineHeight: "38px"
-    letterSpacing: "-0.7px"
+    lineHeight: "41px"
+    letterSpacing: "-0.9px"
   display:
     fontFamily: "Inter_700Bold"
-    fontSize: "25px"
+    fontSize: "28px"
+    fontWeight: 700
+    lineHeight: "34px"
+    letterSpacing: "-0.7px"
+  h1:
+    fontFamily: "Inter_700Bold"
+    fontSize: "24px"
     fontWeight: 700
     lineHeight: "30px"
     letterSpacing: "-0.55px"
-  h1:
+  h2:
     fontFamily: "Inter_700Bold"
-    fontSize: "23px"
+    fontSize: "22px"
     fontWeight: 700
     lineHeight: "28px"
-    letterSpacing: "-0.39px"
-  h2:
+    letterSpacing: "-0.45px"
+  h3:
     fontFamily: "Inter_700Bold"
     fontSize: "20px"
     fontWeight: 700
     lineHeight: "25px"
-    letterSpacing: "-0.22px"
-  h3:
-    fontFamily: "Inter_700Bold"
-    fontSize: "18px"
-    fontWeight: 700
-    lineHeight: "23px"
-    letterSpacing: "0"
+    letterSpacing: "-0.35px"
   h4:
-    fontFamily: "Inter_700Bold"
-    fontSize: "16px"
-    fontWeight: 700
-    lineHeight: "21px"
-    letterSpacing: "0"
+    fontFamily: "Inter_600SemiBold"
+    fontSize: "17px"
+    fontWeight: 600
+    lineHeight: "22px"
+    letterSpacing: "-0.25px"
   h5:
-    fontFamily: "Inter_700Bold"
-    fontSize: "14px"
-    fontWeight: 700
-    lineHeight: "19px"
-    letterSpacing: "0"
+    fontFamily: "Inter_600SemiBold"
+    fontSize: "15px"
+    fontWeight: 600
+    lineHeight: "20px"
+    letterSpacing: "-0.15px"
   h6:
     fontFamily: "Inter_700Bold"
     fontSize: "10px"
     fontWeight: 700
     lineHeight: "14px"
-    letterSpacing: "0.22px"
+    letterSpacing: "0.2px"
   body:
+    fontFamily: "Inter_400Regular"
+    fontSize: "15px"
+    fontWeight: 400
+    lineHeight: "21px"
+    letterSpacing: "-0.15px"
+  prose:
+    fontFamily: "Inter_400Regular"
+    fontSize: "16px"
+    fontWeight: 400
+    lineHeight: "24px"
+    letterSpacing: "-0.15px"
+  bodySmall:
     fontFamily: "Inter_400Regular"
     fontSize: "13px"
     fontWeight: 400
-    lineHeight: "19px"
-    letterSpacing: "0"
-  prose:
-    fontFamily: "Inter_400Regular"
-    fontSize: "14px"
-    fontWeight: 400
-    lineHeight: "22px"
-    letterSpacing: "0"
-  bodySmall:
-    fontFamily: "Inter_400Regular"
-    fontSize: "11px"
-    fontWeight: 400
-    lineHeight: "15px"
-    letterSpacing: "0"
+    lineHeight: "18px"
+    letterSpacing: "-0.05px"
   caption:
     fontFamily: "Inter_400Regular"
-    fontSize: "11px"
+    fontSize: "12px"
     fontWeight: 400
-    lineHeight: "14px"
-    letterSpacing: "0.2px"
+    lineHeight: "16px"
+    letterSpacing: "0px"
   label:
+    fontFamily: "Inter_600SemiBold"
+    fontSize: "13px"
+    fontWeight: 600
+    lineHeight: "18px"
+    letterSpacing: "0px"
+  badge:
     fontFamily: "Inter_500Medium"
     fontSize: "10px"
     fontWeight: 500
@@ -237,38 +246,38 @@ typography:
   # 13 semibold, the reference's titleSmall: the small label in a 52dp pill.
   button:
     fontFamily: "Inter_600SemiBold"
-    fontSize: "13px"
+    fontSize: "16px"
     fontWeight: 600
-    lineHeight: "18px"
-    letterSpacing: "0"
+    lineHeight: "21px"
+    letterSpacing: "-0.2px"
   # A form field's label, small and medium weight, above the field.
   fieldLabel:
     fontFamily: "Inter_500Medium"
-    fontSize: "12px"
+    fontSize: "13px"
     fontWeight: 500
-    lineHeight: "16px"
-    letterSpacing: "0"
+    lineHeight: "18px"
+    letterSpacing: "0px"
   # What is typed into a field. No lineHeight on purpose: on Android a
   # lineHeight on a TextInput clips descenders.
   fieldText:
     fontFamily: "Inter_400Regular"
-    fontSize: "13px"
+    fontSize: "16px"
     fontWeight: 400
-    letterSpacing: "0"
+    letterSpacing: "-0.2px"
   # The name on a selection card.
   optionTitle:
     fontFamily: "Inter_500Medium"
-    fontSize: "13px"
+    fontSize: "15px"
     fontWeight: 500
-    lineHeight: "18px"
-    letterSpacing: "0"
+    lineHeight: "20px"
+    letterSpacing: "-0.15px"
   # The title of a row or a card in a list — the reference's titleSmall.
   itemTitle:
-    fontFamily: "Inter_600SemiBold"
-    fontSize: "13px"
-    fontWeight: 600
-    lineHeight: "18px"
-    letterSpacing: "0"
+    fontFamily: "Inter_500Medium"
+    fontSize: "15px"
+    fontWeight: 500
+    lineHeight: "20px"
+    letterSpacing: "-0.15px"
   # Preserved — the game case keeps its own type. See § 2.3. Do not use elsewhere
   # and do not fold these into the scale above.
   caseTitle:
@@ -286,8 +295,8 @@ typography:
     fontFamily: "Inter_500Medium"
     fontSize: "14px"
     fontWeight: 500
-    lineHeight: "20px"
-    letterSpacing: "0.1px"
+    lineHeight: "19px"
+    letterSpacing: "-0.1px"
   # Onboarding, and nothing else (§ 27.1). ExtraBold and Geist Mono are one
   # weight each, loaded by path; "Inter for everything" still holds elsewhere.
   posterHeadline:
@@ -327,46 +336,54 @@ typography:
   # ---------------------------------------------------------------------------
   reviewTitle:
     fontFamily: "Inter_700Bold"
-    fontSize: "20px"
+    fontSize: "22px"
     fontWeight: 700
-    lineHeight: "24px"
-    letterSpacing: "-0.22px"
+    lineHeight: "27px"
+    letterSpacing: "-0.45px"
   reviewTitleSmall:
-    fontFamily: "Inter_700Bold"
-    fontSize: "16px"
-    fontWeight: 700
-    lineHeight: "20px"
+    fontFamily: "Inter_600SemiBold"
+    fontSize: "17px"
+    fontWeight: 600
+    lineHeight: "22px"
+    letterSpacing: "-0.25px"
   reviewHeadlineSmall:
-    fontFamily: "Inter_700Bold"
-    fontSize: "11px"
-    fontWeight: 700
-    lineHeight: "15px"
+    fontFamily: "Inter_600SemiBold"
+    fontSize: "13px"
+    fontWeight: 600
+    lineHeight: "18px"
+    letterSpacing: "0px"
   # 14/22, the reading step. It ran 14/23 as a serif; Inter holds its lines
   # apart on less.
   reviewProse:
     fontFamily: "Inter_400Regular"
-    fontSize: "14px"
+    fontSize: "16px"
     fontWeight: 400
-    lineHeight: "22px"
+    lineHeight: "24px"
+    letterSpacing: "-0.15px"
   reviewExcerpt:
     fontFamily: "Inter_400Regular"
-    fontSize: "13px"
+    fontSize: "15px"
     fontWeight: 400
-    lineHeight: "20px"
+    lineHeight: "21px"
+    letterSpacing: "-0.15px"
   reviewYear:
     fontFamily: "Inter_300Light"
-    fontSize: "14px"
+    fontSize: "15px"
     fontWeight: 300
-    lineHeight: "19px"
+    lineHeight: "20px"
+    letterSpacing: "0px"
   reviewByline:
-    fontFamily: "Inter_600SemiBold"
-    fontSize: "12px"
-    fontWeight: 600
-    lineHeight: "17px"
-  reviewMeta:
     fontFamily: "Inter_600SemiBold"
     fontSize: "13px"
     fontWeight: 600
+    lineHeight: "18px"
+    letterSpacing: "0px"
+  reviewMeta:
+    fontFamily: "Inter_500Medium"
+    fontSize: "15px"
+    fontWeight: 500
+    lineHeight: "20px"
+    letterSpacing: "0px"
     lineHeight: "18px"
 spacing:
   # STEP NAMES. `x16` is the page margin and is 15, SimpMusic's, not 16; every
@@ -400,23 +417,25 @@ rounded:
   lg: "8px"
   # Chips, filters, tabs, search, badges, progress tracks, avatar rings.
   pill: "999px"
-  # Role aliases.
-  image: "4px"
+  # Role aliases. Every one drawn continuous (`borderCurve`), except the
+  # protected case's, since the Apple pass (2026-11-04): covers 8, cards 16,
+  # sheets 26.
+  image: "8px"
   # Pressable controls that are not buttons — toggles, segments. Buttons are
   # full pills (`pill`); icon buttons are circles: size / 2, not a token.
   control: "20px"
   # Every card — and so every notice, selection card and menu row — has the
   # review card's corner since 2026-10-20 ("all the cards in the app with that
   # style of the review ones"). `cardLarge` (18) was deleted with that.
-  card: "12px"
+  card: "16px"
   # The review card's corner, measured off the owner's references
   # (2026-10-20): about 3% of the card's width in both. The same as `card`.
-  review: "12px"
+  review: "16px"
   # Every field — text, text area, select, search: the reference's 18. Squarer
   # than a button's full pill, so a field and its button read as two objects.
   input: "18px"
   # Bottom sheets (top corners), dialogs and menus.
-  sheet: "24px"
+  sheet: "26px"
   # Preserved — the game case keeps its own radii. See § 4.1. Do not fold these
   # into the scale above.
   caseImage: "12px"
@@ -681,6 +700,58 @@ gameCase:
 > wins.
 
 ---
+
+## The Apple pass (2026-11-04) — read this first
+
+After a whole-app critique against Apple Music and Apple TV on iOS 26, the
+owner ruled that **Apple's pattern wins over older rulings in this file**,
+with five exceptions that stay: lists of games in pages of ten, the bouncy
+Settings accordion, the mascot loader, covers on rows with nothing printed
+under them, and Liquid glass off by default. Where a section below
+disagrees with this one, this one is current. What changed in the
+foundations (the frontmatter above is updated to match):
+
+- **The room is true black.** `background` `#000000`, cards `#1C1C1E`
+  (iOS's `secondarySystemBackground`), then `#28282A` and `#333336` — the
+  ladder still only climbs, and `textMuted` still clears AA on a control.
+  § 1.1's "never true black" is reversed.
+- **Inter at Apple's sizes.** Large title 34, Title 1 28, Title 2 22 (every
+  section heading), Title 3 20, Headline 17 semibold, Subheadline 15, body
+  15, Footnote 13, caption 12. Row titles are medium, not bold. The game case is set
+  in Inter too; the app's family is `Typeface`.
+- **No small capitals in content.** `label` is a sentence-case footnote;
+  `badge` (10, uppercase, tracked) is for words printed over artwork.
+- **The prominent capsule.** `<Button variant="primary">` (the default) is
+  filled with the accent in force — white on the house pages, the game's
+  primary on a game's — and disabled is the same shape at 35%. "Every action
+  is the same grey pill" (§ 9) is reversed; `secondary` is the grey capsule.
+- **Apple's alert.** `showAlert` is a centred 300-wide card, 30 round, its
+  title and message centred, full-width capsule buttons side by side for two
+  and stacked for more.
+- **One section heading**: `h2` with a chevron straight after the words when
+  the heading leads somewhere — on every page, the profile's widgets
+  included. SimpMusic's 16pt heading with a far-end "More" is gone.
+- **Empty and error states** are `ContentUnavailableView`: a 52pt symbol, a
+  Title 2 heading, one line, one button.
+- **Corners**: covers 8, cards 16, sheets 26, drawn continuous — except the
+  protected case's.
+- **In-page tabs**: the masked pill is white at 22% with white words, not a
+  solid white block.
+
+**The Overview's order is fixed**: Information and Details stay near the
+top, after the trailers and screenshots — never moved to the foot, Apple TV's
+order notwithstanding (the owner, 2026-11-04).
+
+Then, the same day — the forms layer and the chrome: an iOS **switch**
+(`ui/switch`), **grouped rows** (`ui/inset-group`: a 26-round `surface`
+group, inset hairlines, tinted glyph tiles, a footer for the explanation),
+**choices as checklist rows** (a trailing checkmark, no radio, no outline),
+**a modal's commit as the ✓ in its bar** (`confirm`, `useBarConfirm`), a
+**52dp bar row with every title centred** at 17 semibold, the back key a
+filled disc on every page, and tab labels at 10 medium.
+
+Still to come: large titles that collapse into the bar on every root page,
+the log form's status as a pull-down, then the community and utility pages.
 
 ## 0. Design Language Summary
 

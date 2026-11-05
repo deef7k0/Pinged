@@ -92,15 +92,13 @@ export const Colors = {
      * The page. Never true black: #000 on OLED smears on scroll and kills the
      * sense of depth the surface steps are built on.
      *
-     * **The owner's colour** (2026-10-20), and it is measured out of their own
-     * reference rather than named: the page in that screenshot is this hex
-     * exactly, and the card on it is `surface`'s. It is where the room was
-     * before the near-black experiment — the retired #14171b, one blue level
-     * up — so the floor is lighter than it was (luminance 0.0084 against
-     * 0.0032) and everything above it moved with it. Every ink still clears AA
-     * on both this and a card; `review-card.test.ts` holds that.
+     * **True black, Apple Music's and Apple TV's room** (2026-11-04, the
+     * owner's answer to the Apple critique: "True black"). It was the owner's
+     * blue-grey #14171C from 2026-10-20, measured out of a reference; before
+     * that a near-black, and before that #14171b. Every ink still clears AA on
+     * both this and a card; `review-card.test.ts` holds that.
      */
-    background: '#14171C',
+    background: '#000000',
     /**
      * Home's page fill, and only Home's — an experiment with the room's floor,
      * kept to one screen so the rest of the app is unaffected. Change it here.
@@ -110,12 +108,13 @@ export const Colors = {
      * step on Home as everywhere else — which is what the review card's test
      * checks against both.
      */
-    homeBackground: '#14171C',
+    homeBackground: '#000000',
     /**
      * **Cards** — every one in the app, the review card and the collection
-     * card included, and the tab bar. One perceptible step off the page:
-     * 1.089:1 on `background`. The owner's colour (2026-10-20), measured from
-     * the same reference as the page.
+     * card included, and the tab bar. iOS's `secondarySystemBackground` in
+     * dark mode, #1C1C1E — the step Apple Music and Apple TV set a grouped
+     * list or a card on over their black page (2026-11-04). It was the
+     * owner's #1B1F28 over #14171C, one blue-grey step up.
      *
      * A card is *above* the page now. It was below it for one pass — the
      * review card was its own near-black `reviewCard`, a shade under the room
@@ -133,23 +132,23 @@ export const Colors = {
      * it for their surfaces: those run on `accentRoles`, which derives them from
      * the artwork. See CLAUDE.md, "The room is dark".
      */
-    surface: '#1B1F28',
+    surface: '#1C1C1E',
     /**
      * Nested surfaces, and the resting fill of a control — a secondary button,
      * an icon button, an unselected chip. The reference's "interactive surface".
      *
-     * It moved up with the page and the card (2026-10-20): a control inside a
-     * card has to stay visible against it, and at its old #15171D it would
-     * have been *darker* than the card it sits on. 1.063:1 over `surface`,
-     * which is the step it has always kept.
+     * A control inside a card has to stay lighter than the card it sits on,
+     * so the ladder climbs from `surface`. #28282A, a hair under iOS's
+     * `tertiarySystemBackground` (#2C2C2E): at Apple's own value `textMuted`
+     * on a control falls to 4.3:1, and it has to hold AA (`review-card.test`).
      */
-    surfaceElevated: '#1F2430',
+    surfaceElevated: '#28282A',
     /**
      * Pressed and neutral-selected fill: one step above a resting control.
-     * 1.111:1 over `surfaceElevated`, as before — the whole ladder shifted,
-     * none of its intervals did.
+     * One step above a resting control, between iOS's `systemGray5` and
+     * `systemGray6`: 1.17:1 over `surfaceElevated`.
      */
-    surfaceSelected: '#262C3A',
+    surfaceSelected: '#333336',
     /**
      * The well of a text field, a select field and the search bar — the owner's
      * reference, SimpMusic's name field: its `onSurfaceVariant` at 8%, which
@@ -183,14 +182,17 @@ export const Colors = {
      * `textSecondary` on the track over the page 6.6:1.
      */
     segmentTrack: 'rgba(255, 255, 255, 0.08)',
-    segmentThumb: '#3A3F4B',
+    segmentThumb: '#3A3A3C',
     /**
      * reacticx's masked tab bar (2026-11-04): the pill that slides along the
-     * track — its demo's #F2F2F2 — and the near-black the chosen tab's words
-     * are inside it, 17:1. The words outside it stay `textSecondary`.
+     * track, and the ink of the chosen tab's words inside it. White at 22%
+     * with white words — iOS 26's segmented thumb — since the Apple pass of
+     * the same day: the reference demo's solid #F2F2F2 was the loudest object
+     * on every page that had tabs, louder than the page's one white button.
+     * The words outside it stay `textSecondary`.
      */
-    segmentPill: '#F2F2F2',
-    segmentPillInk: '#0B0C0F',
+    segmentPill: 'rgba(255, 255, 255, 0.22)',
+    segmentPillInk: '#FFFFFF',
     /**
      * The resting edge of a *choice* — a selection card, a filter or sort pill,
      * an unchosen segment: the reference's `onSurfaceVariant` at 20%. Choices
@@ -466,20 +468,17 @@ export const Colors = {
 
     /** Scrim over hero artwork so text stays legible on any cover. */
     scrim: 'rgba(0, 0, 0, 0.6)',
-    /** Skeleton placeholder fill: a control's resting step, so it reads on a card. */
-    skeleton: '#1F2430',
+    /** Skeleton placeholder fill: a control's resting step (`surfaceElevated`), so it reads on a card. */
+    skeleton: '#28282A',
     /**
      * The light that sweeps a skeleton — SimpMusic's `shimmerLine` over its
      * `shimmerBackground` (`ui/shimmer`, `Modifier.shimmer()`).
      *
-     * Measured, not picked. The reference's background is `0x7E383737`, which
-     * over its own `#121212` panel composites to a relative luminance of
-     * 0.0178 — and `skeleton` here is 0.0177, which is luck worth keeping. Its
-     * line, `#4D4848`, stands at 1.72:1 on that; this is the colour at the
-     * same ratio on `skeleton`, so the sweep reads exactly as strongly as the
-     * reference's does. Any brighter and a loading list glitters.
+     * Measured, not picked: SimpMusic's line stands at 1.72:1 on its own
+     * shimmer background, and this is the colour at the same ratio on
+     * `skeleton`. Any brighter and a loading list glitters.
      */
-    skeletonSweep: '#40495E',
+    skeletonSweep: '#4C4C4F',
 
     /**
      * Ink for gradient ramps over artwork, and the palette's only true black.
@@ -575,8 +574,8 @@ export const Colors = {
     shareInkLight: '#FFFFFF',
 
     /** Legacy aliases kept so older call sites keep compiling. */
-    backgroundElement: '#202020',
-    backgroundSelected: '#2A2A2A',
+    backgroundElement: '#1C1C1E',
+    backgroundSelected: '#2C2C2E',
   },
 } as const;
 
@@ -940,83 +939,56 @@ function buildAccentRoles(hue: string, tonal: boolean): AccentRoles {
 }
 
 /**
- * Poppins, in four weights, and nothing else.
+ * The app's one family: **Inter**, for everything — the Apple pass of
+ * 2026-11-04 ("Inter, Apple sizes"). Inter is the closest open face to SF
+ * Pro, the face Apple Music and Apple TV are set in. It replaced Poppins
+ * (SimpMusic's font, 2026-10-17 to 2026-11-04), which had replaced Inter.
  *
- * **Weight is a family here, not a `fontWeight`.** React Native on Android will
- * not synthesise a bold from a custom font: `fontFamily: 'Poppins_400Regular'`
- * plus `fontWeight: '700'` renders regular, silently, and the bug only shows on
- * one platform. Every weight is therefore a separate loaded family, and nothing
- * in the app should set `fontWeight` on text again — reach for one of these.
- *
- * Four weights because the system uses three: 400 for reading, 500 for small
- * dense metadata, 600 for anything that has to be picked out of a page. 700 is
- * reserved for the two largest steps, which are page titles.
- *
- * ## The two italics, and why they are not `fontStyle`
- *
- * Exactly the same trap as weight, and it caught this app once already: an
- * empty-state line on the review screen carried `fontStyle: 'italic'` over
- * `Inter_400Regular` (Poppins' predecessor here) and rendered upright on
- * Android, because a custom family has no oblique to synthesise from either.
- * Italic is a *family* here too.
- *
- * They exist for **user-written emphasis and nothing else** — `*italic*` and
- * `**bold**` in a collection's description, via `<RichText>`. No token on the
- * type scale reaches for them, and none should: the scale separates by size and
- * weight, and an italic step would be a third axis for chrome that has no use
- * for one. Two faces rather than four because emphasis inside body copy is the
- * only place they appear, and body copy is regular or bold.
- */
-/**
- * The app's one family: Poppins, for everything — SimpMusic's own font, at
- * the owner's direction (2026-10-17).
- *
- * **It replaced Inter, which had replaced a second family before it.** Source
- * Serif 4 set reviews and nothing else until the owner had it removed
- * ("remove the specific font for reviews and just use the normal one"), and
- * Inter was that normal one from then on. SimpMusic's `Typo.kt` wires its
- * whole type scale to one bundled file, `poppins_medium`, and leans on
- * Android's fake-bold for every heavier weight it asks for — this app brings
- * in Poppins' own weight files instead, the way Inter's were, so `fontWeight`
- * keeps meaning something rather than silently flattening to medium.
- *
- * **Every weight is its own family name.** Android will not synthesise a bold or
- * an oblique from a custom font, so `fontWeight: '700'` on Poppins silently
- * renders regular. Reach for a family, never a weight.
+ * **Every weight is its own family name.** Android will not synthesise a bold
+ * or an oblique from a custom font, so `fontWeight: '700'` on Inter silently
+ * renders regular, and `fontStyle: 'italic'` renders upright. Reach for a
+ * family, never a weight or a style. The two italics are for user-written
+ * emphasis (`<RichText>`) and nothing else.
  *
  * `light` exists for one thing: the release year beside a review's title, where
  * a year has to recede from a bold title without getting smaller.
  */
-export const FontFamily = {
-  light: 'Poppins_300Light',
-  regular: 'Poppins_400Regular',
-  medium: 'Poppins_500Medium',
-  semibold: 'Poppins_600SemiBold',
-  bold: 'Poppins_700Bold',
-  italic: 'Poppins_400Regular_Italic',
-  boldItalic: 'Poppins_600SemiBold_Italic',
-  /**
-   * Onboarding's two, and nothing else's (the owner's reference, 2026-10-15).
-   * ExtraBold sets its headlines — lowercase, very large, tracked tight; the
-   * mono sets the small instruction over them ("choose one"). Each is one
-   * weight, imported by its own path in the root layout. Geist Mono is its
-   * own reference, not SimpMusic's, and stayed through the Poppins switch.
-   */
-  extraBold: 'Poppins_800ExtraBold',
+export const Typeface = {
+  light: 'Inter_300Light',
+  regular: 'Inter_400Regular',
+  medium: 'Inter_500Medium',
+  semibold: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
+  italic: 'Inter_400Regular_Italic',
+  boldItalic: 'Inter_600SemiBold_Italic',
+  /** Onboarding's headlines and a review's quote. */
+  extraBold: 'Inter_800ExtraBold',
+  /** Onboarding's small instruction over a headline, and nothing else's. */
   mono: 'GeistMono_400Regular',
+} as const;
+
+/**
+ * The protected game case's name for the family. `<GameCaseBack>` imports it
+ * by this name; it is Inter, the app's, like everything else (the owner,
+ * 2026-11-04: "the case doesn't need poppins"). Anywhere else, use `Typeface`.
+ */
+export const FontFamily = {
+  regular: Typeface.regular,
+  medium: Typeface.medium,
+  bold: Typeface.bold,
 } as const;
 
 export const Fonts = Platform.select({
   ios: {
-    sans: FontFamily.regular,
+    sans: Typeface.regular,
     serif: 'ui-serif',
-    rounded: FontFamily.regular,
+    rounded: Typeface.regular,
     mono: 'ui-monospace',
   },
   default: {
-    sans: FontFamily.regular,
+    sans: Typeface.regular,
     serif: 'serif',
-    rounded: FontFamily.regular,
+    rounded: Typeface.regular,
     mono: 'monospace',
   },
 });
@@ -1095,8 +1067,12 @@ export const Radius = {
   /** Chips, filters, tabs, search, badges, progress tracks, avatar rings. */
   pill: 999,
 
-  /** Game covers, screenshots, thumbnails — anything rectangular and pictorial. */
-  image: 4,
+  /**
+   * Game covers, screenshots, thumbnails — anything rectangular and pictorial.
+   * 8, Apple Music's artwork corner on a shelf (2026-11-04; it was 4). Drawn
+   * with `borderCurve: 'continuous'` wherever it is drawn.
+   */
+  image: 8,
   /**
    * Pressable controls that are not buttons — toggles, segments, the log
    * form's status pills. Buttons themselves are full pills (`pill`), as the
@@ -1117,8 +1093,11 @@ export const Radius = {
    * cards, 8 (scaled) for the game page's section cards and 18 for the `Card`
    * panel variant (`cardLarge`, deleted with that). The material that goes with
    * it — the fill, the hairline edge, the inset — is `useCardMaterial`.
+   *
+   * 16 since the Apple pass (2026-11-04; it was 12): Apple Music's and the
+   * App Store's cards, drawn continuous.
    */
-  card: 12,
+  card: 16,
   /**
    * A **review card**'s corner, and since 2026-10-20 every card's: `card` is
    * the same number. Kept as its own name because the review card is the
@@ -1131,7 +1110,7 @@ export const Radius = {
    * 9–11dp. It was `lg` (8), and the owner asked for the reference's ratio:
    * "look at the round corner ratio of the card".
    */
-  review: 12,
+  review: 16,
   /**
    * Every field — text, text area, select, search: the reference's 18dp.
    * Squarer than a button's full pill, so a field and the button that submits
@@ -1143,7 +1122,7 @@ export const Radius = {
    * anything that sits *above* the page. The roundest interface shape, because
    * everything inside it is less round.
    */
-  sheet: 24,
+  sheet: 26,
 
   /*
    * Preserved — the physical game case keeps its own radii. See DESIGN.md § 5.3.
@@ -1175,21 +1154,18 @@ export const Radius = {
  * becomes -0.64, 0.08em on 11 becomes 0.88. Changing a step's size means
  * recomputing its tracking.
  *
- * ## The sizes are SimpMusic's
+ * ## The sizes are Apple's (2026-11-04)
  *
- * Each step is one of the owner's reference's styles (`Typo.kt`), at its sp:
- * `display` its `titleLarge` (25, an album's name), `h1` `headlineLarge` (23),
- * `h2` `headlineMedium` (20, Home's shelf titles — "Quick picks"), `h3`
- * `titleMedium` (18, a sheet's or a screen's title), `h4` `labelMedium` (16,
- * the artist page's section headings and a setting's name), `h5` `labelSmall`
- * (14, a chip's and a tab's word), `body` `bodyMedium` (13) and `bodySmall`
- * its `bodySmall` (11). `caption` is 11 too — the reference sets nothing
- * smaller that is meant to be read. `h6` and `label` stay at 10: they are
- * badges, which the reference draws smaller still (its LIVE badge is 9).
- *
- * The scale had been zoomed out ~8% with the spacing ladder; it came back up
- * with it. Weights stayed this app's: SimpMusic registers one Poppins file and
- * lets Compose synthesise the rest, which says nothing worth copying.
+ * The Apple pass ("Inter, Apple sizes"): each step is one of iOS's text
+ * styles, set in Inter — `largeTitle` 34, `display` Title 1 (28), `h2` Title
+ * 2 (22, every section heading), `h3` Title 3 (20), `h4` Headline (17
+ * semibold), `h5` Subheadline emphasised (15), `body` 15 — Inter at 15 sets
+ * as wide and as tall as SF at 16–17, its x-height being larger —
+ * `bodySmall` Footnote (13), `caption` Caption 1 (12). `h6` and `badge` stay
+ * at 10: they are words printed over artwork. Tracking tightens as the size
+ * grows, as SF's does. A row's title is medium, not bold: Inter Regular is
+ * lighter than SF Regular on a dark page, and bold belongs to headings and
+ * figures. The sizes were SimpMusic's (`Typo.kt`, body 13) from 2026-10-12.
  */
 export const Type = {
   /**
@@ -1197,20 +1173,20 @@ export const Type = {
    * reference (2026-11-02), where it stands about 1.7 times the section
    * heading (`h2`). Nowhere else: a pushed screen's name is its bar's title.
    */
-  largeTitle: { fontSize: 32, lineHeight: 38, fontFamily: FontFamily.bold, letterSpacing: -0.7 },
-  display: { fontSize: 25, lineHeight: 30, fontFamily: FontFamily.bold, letterSpacing: -0.55 },
-  h1: { fontSize: 23, lineHeight: 28, fontFamily: FontFamily.bold, letterSpacing: -0.39 },
-  h2: { fontSize: 20, lineHeight: 25, fontFamily: FontFamily.bold, letterSpacing: -0.22 },
-  h3: { fontSize: 18, lineHeight: 23, fontFamily: FontFamily.bold },
-  h4: { fontSize: 16, lineHeight: 21, fontFamily: FontFamily.bold },
-  h5: { fontSize: 14, lineHeight: 19, fontFamily: FontFamily.bold },
-  h6: { fontSize: 10, lineHeight: 14, fontFamily: FontFamily.bold, letterSpacing: 0.22 },
+  largeTitle: { fontSize: 34, lineHeight: 41, fontFamily: Typeface.bold, letterSpacing: -0.9 },
+  display: { fontSize: 28, lineHeight: 34, fontFamily: Typeface.bold, letterSpacing: -0.7 },
+  h1: { fontSize: 24, lineHeight: 30, fontFamily: Typeface.bold, letterSpacing: -0.55 },
+  h2: { fontSize: 22, lineHeight: 28, fontFamily: Typeface.bold, letterSpacing: -0.45 },
+  h3: { fontSize: 20, lineHeight: 25, fontFamily: Typeface.bold, letterSpacing: -0.35 },
+  h4: { fontSize: 17, lineHeight: 22, fontFamily: Typeface.semibold, letterSpacing: -0.25 },
+  h5: { fontSize: 15, lineHeight: 20, fontFamily: Typeface.semibold, letterSpacing: -0.15 },
+  h6: { fontSize: 10, lineHeight: 14, fontFamily: Typeface.bold, letterSpacing: 0.2 },
 
-  body: { fontSize: 13, lineHeight: 19, fontFamily: FontFamily.regular },
+  body: { fontSize: 15, lineHeight: 21, fontFamily: Typeface.regular, letterSpacing: -0.15 },
   /* Long-form reading — an article or review body, not UI copy. Deliberately
      looser than `body`: those two screens are the ones people actually read. */
-  prose: { fontSize: 14, lineHeight: 22, fontFamily: FontFamily.regular },
-  bodySmall: { fontSize: 11, lineHeight: 15, fontFamily: FontFamily.regular },
+  prose: { fontSize: 16, lineHeight: 24, fontFamily: Typeface.regular, letterSpacing: -0.15 },
+  bodySmall: { fontSize: 13, lineHeight: 18, fontFamily: Typeface.regular, letterSpacing: -0.05 },
 
   /*
    * 11, the reference's smallest reading size (`bodySmall`) and iOS's
@@ -1219,11 +1195,23 @@ export const Type = {
    * and a badge that grew would no longer fit the covers it sits on. Do not
    * shrink either.
    */
-  caption: { fontSize: 11, lineHeight: 14, fontFamily: FontFamily.regular, letterSpacing: 0.2 },
-  label: {
+  caption: { fontSize: 12, lineHeight: 16, fontFamily: Typeface.regular },
+  /**
+   * A quiet fact or a group's heading — "Played on", "12 games · by Ada",
+   * "From Steam": iOS's footnote, semibold, **sentence case**. It was 10pt
+   * uppercase with 0.8 tracking — the most Letterboxd token in the app — and
+   * the Apple pass (2026-11-04) took the capitals off. Words printed over
+   * artwork, where a capital badge belongs, are `badge`.
+   */
+  label: { fontSize: 13, lineHeight: 18, fontFamily: Typeface.semibold },
+  /**
+   * A word or two printed over artwork — an edition, LIVE, a rank: 10,
+   * uppercase, tracked. The one place capitals are set.
+   */
+  badge: {
     fontSize: 10,
     lineHeight: 13,
-    fontFamily: FontFamily.medium,
+    fontFamily: Typeface.medium,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
@@ -1232,37 +1220,37 @@ export const Type = {
    * Control text. 13 semibold — the reference's `titleSmall`, the small label in
    * the middle of a 52dp pill.
    */
-  button: { fontSize: 13, lineHeight: 18, fontFamily: FontFamily.semibold },
+  button: { fontSize: 16, lineHeight: 21, fontFamily: Typeface.semibold, letterSpacing: -0.2 },
   /**
    * A tab's label — Material's `labelLarge`, which SimpMusic's filter chips
    * (every tab row under its top bars) are set in: 14, medium, sentence case.
    */
-  tab: { fontSize: 14, lineHeight: 20, fontFamily: FontFamily.medium, letterSpacing: 0.1 },
+  tab: { fontSize: 14, lineHeight: 19, fontFamily: Typeface.medium, letterSpacing: -0.1 },
   /**
    * A form field's label, set *above* the field: small and medium weight, the
    * reference's 11sp Poppins Medium translated to Inter at the 12 it needs to
    * read the same. The field under it is the object; the label names it.
    */
-  fieldLabel: { fontSize: 12, lineHeight: 16, fontFamily: FontFamily.medium },
+  fieldLabel: { fontSize: 13, lineHeight: 18, fontFamily: Typeface.medium },
   /**
    * What is typed into a field. **No `lineHeight`, on purpose**: on Android a
    * line height on a `TextInput` clips descenders and fights the vertical
    * centring the field's min-height does. 13, the reference's.
    */
-  fieldText: { fontSize: 13, fontFamily: FontFamily.regular },
+  fieldText: { fontSize: 16, fontFamily: Typeface.regular, letterSpacing: -0.2 },
   /**
    * The name on a selection card — the reference's Server option. Medium, not
    * bold: a choice is read, not announced, and the circle beside it carries
    * which one is on.
    */
-  optionTitle: { fontSize: 13, lineHeight: 18, fontFamily: FontFamily.medium },
+  optionTitle: { fontSize: 15, lineHeight: 20, fontFamily: Typeface.medium, letterSpacing: -0.15 },
   /**
    * The title of a row or a card in a list — a game in a collection, a
    * collection in a list of them. The reference's `titleSmall`: 13 semibold,
    * with its supporting line in `bodySmall` under it. Bold is for titles and
    * figures; everything around them is regular and quieter.
    */
-  itemTitle: { fontSize: 13, lineHeight: 18, fontFamily: FontFamily.semibold },
+  itemTitle: { fontSize: 15, lineHeight: 20, fontFamily: Typeface.medium, letterSpacing: -0.15 },
 
   /* -------------------------------------------------------------------------
    * Reviews, and nothing else in the app.
@@ -1285,21 +1273,21 @@ export const Type = {
    * size and tracking on a line one tighter, because it stands alone beside a
    * score rather than over a section.
    */
-  reviewTitle: {
-    fontSize: 20,
-    lineHeight: 24,
-    fontFamily: FontFamily.bold,
-    letterSpacing: -0.22,
-  },
+  reviewTitle: { fontSize: 22, lineHeight: 27, fontFamily: Typeface.bold, letterSpacing: -0.45 },
   /** The same, on a feed card, where it shares a column with the artwork. */
-  reviewTitleSmall: { fontSize: 16, lineHeight: 20, fontFamily: FontFamily.bold },
+  reviewTitleSmall: {
+    fontSize: 17,
+    lineHeight: 22,
+    fontFamily: Typeface.semibold,
+    letterSpacing: -0.25,
+  },
   /**
    * The writer's own headline on a feed card — "One of the best games of all
    * time" — closing the header block beside the box art, under the score and
    * the date. 11 bold: the sans floor is 10, and a headline is one step over a
    * badge.
    */
-  reviewHeadlineSmall: { fontSize: 11, lineHeight: 15, fontFamily: FontFamily.bold },
+  reviewHeadlineSmall: { fontSize: 13, lineHeight: 18, fontFamily: Typeface.semibold },
   /*
    * The prose: 14 on 22, the reading step (`prose`).
    *
@@ -1309,13 +1297,18 @@ export const Type = {
    * 22 on 14 is 1.57 — still the loosest block in the app, as the one thing in
    * it somebody reads rather than scans should be.
    */
-  reviewProse: { fontSize: 14, lineHeight: 22, fontFamily: FontFamily.regular },
+  reviewProse: { fontSize: 16, lineHeight: 24, fontFamily: Typeface.regular, letterSpacing: -0.15 },
   /** The excerpt on a feed card, beside the artwork. */
-  reviewExcerpt: { fontSize: 13, lineHeight: 20, fontFamily: FontFamily.regular },
+  reviewExcerpt: {
+    fontSize: 15,
+    lineHeight: 21,
+    fontFamily: Typeface.regular,
+    letterSpacing: -0.15,
+  },
   /** The release year beside a review's title. Recedes without shrinking. */
-  reviewYear: { fontSize: 14, lineHeight: 19, fontFamily: FontFamily.light },
+  reviewYear: { fontSize: 15, lineHeight: 20, fontFamily: Typeface.light },
   /** "Review by <name>". Sans, because it is a fact about the piece. */
-  reviewByline: { fontSize: 12, lineHeight: 17, fontFamily: FontFamily.semibold },
+  reviewByline: { fontSize: 13, lineHeight: 18, fontFamily: Typeface.semibold },
   /**
    * The playthrough block: platform, hours, platinum, date.
    *
@@ -1328,7 +1321,7 @@ export const Type = {
    * Still under the title and the score, which is the constraint: this reads
    * *after* both, not against them.
    */
-  reviewMeta: { fontSize: 13, lineHeight: 18, fontFamily: FontFamily.semibold },
+  reviewMeta: { fontSize: 15, lineHeight: 20, fontFamily: Typeface.medium },
 
   /*
    * Preserved — the physical game case keeps its own type. See DESIGN.md § 2.3.
@@ -1339,8 +1332,8 @@ export const Type = {
    * placeholder letter by 4, and `h6`'s bold weight widens the uppercase edition
    * badge enough to truncate it on the 108dp case.
    */
-  caseTitle: { fontSize: 24, lineHeight: 30, fontFamily: FontFamily.bold },
-  caseEdition: { fontSize: 12, lineHeight: 16, fontFamily: FontFamily.medium },
+  caseTitle: { fontSize: 24, lineHeight: 30, fontFamily: Typeface.bold },
+  caseEdition: { fontSize: 12, lineHeight: 16, fontFamily: Typeface.medium },
 
   /*
    * Onboarding — the owner's reference, matched by eye against its screenshots
@@ -1352,18 +1345,18 @@ export const Type = {
   posterHeadline: {
     fontSize: 40,
     lineHeight: 42,
-    fontFamily: FontFamily.extraBold,
+    fontFamily: Typeface.extraBold,
     letterSpacing: -1.2,
   },
   /** The small instruction over a headline — "choose one" — and the
    *  "import + auto-sync" line in a row. */
-  posterLabel: { fontSize: 12, lineHeight: 16, fontFamily: FontFamily.mono },
+  posterLabel: { fontSize: 12, lineHeight: 16, fontFamily: Typeface.mono },
   /** The one sentence inside the brackets. */
-  posterNote: { fontSize: 13, lineHeight: 18, fontFamily: FontFamily.semibold },
+  posterNote: { fontSize: 13, lineHeight: 18, fontFamily: Typeface.semibold },
   /** The pill's label, a step over `button`: the reference's pills are 56 high. */
-  posterButton: { fontSize: 15, lineHeight: 20, fontFamily: FontFamily.semibold },
+  posterButton: { fontSize: 15, lineHeight: 20, fontFamily: Typeface.semibold },
   /** What is typed into an onboarding field. */
-  posterField: { fontSize: 16, lineHeight: 21, fontFamily: FontFamily.regular },
+  posterField: { fontSize: 16, lineHeight: 21, fontFamily: Typeface.regular },
 } as const;
 
 /**

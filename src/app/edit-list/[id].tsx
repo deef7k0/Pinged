@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
-import { Button } from '@/components/ui/button';
+import { CollectionArtTile, CollectionTitleField } from '@/components/collection-form';
+import { collectionCover } from '@/components/collection-header';
+import { InsetGroup } from '@/components/ui/inset-group';
+
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
 import { PageScrollView } from '@/components/ui/page-scroll';
 import { RICH_TEXT_HINT } from '@/components/ui/rich-text';
@@ -11,7 +14,7 @@ import { ErrorState, LoadingState, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
-import { getList, updateListDetails } from '@/lib/api';
+import { getList, updateListDetails, type ListCover } from '@/lib/api';
 import { useAuth } from '@/store/auth';
 import { toast } from '@/lib/toast';
 
@@ -95,6 +98,7 @@ export default function EditListScreen() {
       userId={userId}
       initialTitle={list.data.title}
       initialDescription={list.data.description ?? ''}
+      cover={collectionCover(list.data)}
     />
   );
 }
@@ -104,11 +108,13 @@ function EditForm({
   userId,
   initialTitle,
   initialDescription,
+  cover,
 }: {
   listId: string;
   userId: string;
   initialTitle: string;
   initialDescription: string;
+  cover: ListCover | null;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -135,7 +141,18 @@ function EditForm({
       padded
       insetHeader
       modal
-      topBar={<FrostedTopBar dismiss title="Edit collection" />}>
+      topBar={
+        <FrostedTopBar
+          dismiss
+          title="Edit collection"
+          confirm={{
+            label: 'Save',
+            onPress: () => save.mutate(),
+            loading: save.isPending,
+            disabled: !title.trim() || !dirty,
+          }}
+        />
+      }>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -143,38 +160,35 @@ function EditForm({
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <TextField
-            label="Title"
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Best horror games"
-            maxLength={100}
-          />
-
-          <TextField
-            label="About"
-            value={description}
-            onChangeText={setDescription}
-            placeholder="What ties these together?"
-            multiline
-            maxLength={1000}
-            hint={RICH_TEXT_HINT}
-            style={styles.about}
-          />
+          {/* New collection's head (the Apple pass, 2026-11-05): the art,
+              the name under it, the description as a row that grows. */}
+          <View style={styles.head}>
+            <CollectionArtTile cover={cover} />
+            <CollectionTitleField
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Collection name"
+              maxLength={100}
+            />
+          </View>
+          <InsetGroup footer={RICH_TEXT_HINT}>
+            <TextField
+              variant="row"
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Description"
+              accessibilityLabel="Description"
+              multiline
+              maxLength={1000}
+              style={styles.about}
+            />
+          </InsetGroup>
 
           {save.isError && (
             <Text variant="bodySmall" color="danger">
               {save.error instanceof Error ? save.error.message : 'Could not save.'}
             </Text>
           )}
-
-          <Button
-            title="Save"
-            onPress={() => save.mutate()}
-            loading={save.isPending}
-            disabled={!title.trim() || !dirty}
-            fullWidth
-          />
         </PageScrollView>
       </KeyboardAvoidingView>
     </Screen>
@@ -183,8 +197,8 @@ function EditForm({
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  content: { gap: Spacing.x16, paddingVertical: Spacing.x24 },
-  /* Deep enough to write several paragraphs in without the field feeling like a
-     slot. Capped so it cannot push the Save button off a short screen. */
-  about: { minHeight: 160, maxHeight: 300 },
+  content: { gap: Spacing.x24, paddingVertical: Spacing.x24 },
+  head: { gap: Spacing.x12 },
+  /* Grows with what is written, to a cap. */
+  about: { maxHeight: 300 },
 });

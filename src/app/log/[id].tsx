@@ -11,16 +11,14 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import Animated, { useReducedMotion } from 'react-native-reanimated';
 
 import { ChoiceChips } from '@/components/choice-chips';
 import { LogCard } from '@/components/log-card';
-import { ProgressPills } from '@/components/progress-pills';
+import { ProgressStatus } from '@/components/progress-status';
 import { Button } from '@/components/ui/button';
 import { useCardMaterial } from '@/components/ui/card-material';
 import { DropdownButton, type DropdownOption } from '@/components/ui/dropdown-button';
 import { GameCaseDisplay } from '@/components/game-case-display';
-import { PaintFill, PaintGlyph, inkTransition } from '@/components/ui/paint-fill';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import {
   ReviewMetricsEditor,
@@ -33,6 +31,7 @@ import { PageScrollView } from '@/components/ui/page-scroll';
 import { EmptyState, ErrorState, Screen } from '@/components/ui/screen';
 import { ScoreInput } from '@/components/ui/score-input';
 import { Text } from '@/components/ui/text';
+import { Switch } from '@/components/ui/switch';
 import { TextField } from '@/components/ui/text-field';
 import {
   PROGRESS_CHOICES,
@@ -41,16 +40,7 @@ import {
   type ProgressChoice,
 } from '@/constants/progress';
 import { averageMetrics, countMetrics, parseReviewMetrics } from '@/constants/review-metrics';
-import {
-  ControlHeight,
-  Radius,
-  Spacing,
-  TapTarget,
-  Type,
-  ensureContrast,
-  readableInk,
-  withAlpha,
-} from '@/constants/theme';
+import { ControlHeight, Radius, Spacing, TapTarget, Type } from '@/constants/theme';
 import { AccentProvider } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -154,7 +144,7 @@ export default function LogGameScreen() {
   if (!game.data) {
     return (
       <Screen edges={['bottom']} insetHeader modal topBar={<FrostedTopBar dismiss />}>
-        <EmptyState title="Game not found" />
+        <EmptyState icon="search" title="Game not found" />
       </Screen>
     );
   }
@@ -737,6 +727,12 @@ function LogForm({ game, existing, draft, userId }: LogFormProps) {
         <FrostedTopBar
           dismiss
           onBack={confirmDismiss}
+          confirm={{
+            label: saveLabel,
+            onPress: () => save.mutate(),
+            loading: save.isPending,
+            disabled: !!blocked,
+          }}
           title={
             writingReview
               ? existing
@@ -811,9 +807,9 @@ function LogForm({ game, existing, draft, userId }: LogFormProps) {
             <Text variant="label" color="textMuted" accessibilityRole="header">
               Progress
             </Text>
-            {/* The poster palette's solid pills — the owner's reference
-                (2026-10-15). See `<ProgressPills>` for how choosing reads. */}
-            <ProgressPills
+            {/* One Status row and its pull-down (the Apple pass, 2026-11-05);
+                the seven poured pills were here. See `<ProgressStatus>`. */}
+            <ProgressStatus
               value={progress}
               onChange={setProgress}
               level={level}
@@ -931,13 +927,12 @@ function LogForm({ game, existing, draft, userId }: LogFormProps) {
 
               {/* Self-reported for every platform — no console publishes a
                   trophy API. A platinum still implies 100%. */}
-              <FormRow label="Trophies" hint="Self-reported">
-                <Toggle
-                  icon="trophy"
+              <FormRow label="Platinum" hint="Self-reported">
+                <Switch
                   label="Platinum"
                   tint={theme.platinum}
                   value={platinum}
-                  onPress={() => setPlatinum((current) => !current)}
+                  onValueChange={setPlatinum}
                 />
               </FormRow>
             </View>
@@ -1017,18 +1012,19 @@ function LogForm({ game, existing, draft, userId }: LogFormProps) {
               tint — it aliases onto a token that already means "read this
               before you act" — and the label says the word too.
             */}
-            <View style={styles.spoilers}>
-              <Toggle
-                icon="eye-off"
-                label="Contains spoilers"
-                tint={theme.danger}
-                value={spoilers}
-                onPress={() => setSpoilers((current) => !current)}
-              />
-              <Text variant="bodySmall" color="textMuted" style={styles.flex}>
-                Readers see a notice instead of your words until they open them.
-              </Text>
+            <View style={[styles.rows, styles.spoilerRows, { borderColor: theme.border }]}>
+              <FormRow label="Contains spoilers" first>
+                <Switch
+                  label="Contains spoilers"
+                  tint={theme.danger}
+                  value={spoilers}
+                  onValueChange={setSpoilers}
+                />
+              </FormRow>
             </View>
+            <Text variant="bodySmall" color="textSecondary">
+              Readers see a notice instead of your words until they open them.
+            </Text>
           </View>
 
           {existing && (
@@ -1045,6 +1041,12 @@ function LogForm({ game, existing, draft, userId }: LogFormProps) {
             review card in the review writing screen at the bottom". Drawn from
             the form as it changes, with the choice of what it shows beside it.
           */}
+          {mutationError && (
+            <Text variant="bodySmall" color="danger">
+              {mutationError instanceof Error ? mutationError.message : 'Could not save.'}
+            </Text>
+          )}
+
           <View style={styles.reviewSection}>
             {/* The card as a list will draw it — Home's, a profile's, Search's —
                 built from what is on this form, as it changes. Not pressable:
@@ -1075,39 +1077,6 @@ function LogForm({ game, existing, draft, userId }: LogFormProps) {
             )}
           </View>
         </PageScrollView>
-
-        {/*
-          The primary action, pinned.
-
-          It used to sit at the end of the scroll, which put it roughly 1400dp
-          from the top with advanced metrics open — so the ten-second status
-          change cost a full-screen scroll, and the only permanently reachable
-          control was the one that discards. A shelf rather than a floating
-          button: the form runs under it and the hairline is where it stops.
-        */}
-        {/* `borderStrong`, not `border`. The 5% hairline is for an edge inside a
-            surface, where the surface step is already doing the separating; this
-            rule sits on the page itself and at 5% it measured 1.12:1 — invisible,
-            which left the form's last line dissolving at an arbitrary height. */}
-        <View
-          style={[
-            styles.footer,
-            { backgroundColor: theme.background, borderTopColor: theme.borderStrong },
-          ]}>
-          {mutationError && (
-            <Text variant="bodySmall" color="danger">
-              {mutationError instanceof Error ? mutationError.message : 'Could not save.'}
-            </Text>
-          )}
-
-          <Button
-            title={saveLabel}
-            onPress={() => save.mutate()}
-            loading={save.isPending}
-            disabled={!!blocked}
-            fullWidth
-          />
-        </View>
       </KeyboardAvoidingView>
     </Screen>
   );
@@ -1208,50 +1177,6 @@ function FormRow({
   );
 }
 
-function Toggle({
-  icon,
-  label,
-  tint,
-  value,
-  onPress,
-  disabled,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  tint: string;
-  value: boolean;
-  onPress: () => void;
-  disabled?: boolean;
-}) {
-  const theme = useTheme();
-  const reduceMotion = useReducedMotion();
-  const ink = value ? readableInk(tint) : ensureContrast(tint, theme.background, 4.5);
-
-  return (
-    /* In the toggle's own meaning colour — platinum, or the spoiler warning's
-       red — rather than the accent: the colour says *what* is on. Outlined in
-       it at rest, poured solid when on: the owner's rule for every outlined
-       control (2026-10-15), the same as the progress pills above. */
-    <PressableScale
-      accessibilityRole="switch"
-      accessibilityState={{ checked: value, disabled: !!disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      scaleTo={0.97}
-      focusRing={withAlpha(tint, 0.3)}
-      style={StyleSheet.flatten([
-        styles.toggle,
-        { borderColor: tint, opacity: disabled ? 0.6 : 1 },
-      ])}>
-      <PaintFill on={value} color={tint} cornerRadius={Radius.control} />
-      <PaintGlyph name={icon} size={18} color={ink} />
-      <Animated.Text style={[Type.bodySmall, { color: ink }, inkTransition(reduceMotion)]}>
-        {label}
-      </Animated.Text>
-    </PressableScale>
-  );
-}
-
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   /* `x64` at the foot per DESIGN.md § 25. The pinned footer is a sibling of the
@@ -1306,29 +1231,8 @@ const styles = StyleSheet.create({
   quote: { minHeight: 64 },
   // Tall by default: a short box invites a short review.
   reviewBody: { minHeight: 200 },
-  spoilers: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
-  toggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.x8,
-    paddingVertical: Spacing.x12,
-    paddingHorizontal: Spacing.x16,
-    minHeight: TapTarget,
-    borderRadius: Radius.control,
-    borderWidth: 1.5,
-    /* The paint is clipped to the control. */
-    overflow: 'hidden',
-  },
+  spoilerRows: { marginTop: Spacing.x4 },
   /* Bled back out to the display edge: `<Screen padded>` insets its children by
      `x16`, and a rule that stops 12dp short of both edges reads as a stray line
      rather than as the top of a shelf. */
-  footer: {
-    gap: Spacing.x8,
-    paddingTop: Spacing.x16,
-    paddingBottom: Spacing.x8,
-    marginHorizontal: -Spacing.x16,
-    paddingHorizontal: Spacing.x16,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
 });

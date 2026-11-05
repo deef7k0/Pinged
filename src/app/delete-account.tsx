@@ -1,15 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from 'expo-router';
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 
-import { Button } from '@/components/ui/button';
+import { showPrompt } from '@/components/ui/dialog';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
+import { InsetGroup, Row } from '@/components/ui/inset-group';
 import { PageScrollView } from '@/components/ui/page-scroll';
 import { EmptyState, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
-import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
 import { deleteMyAccount } from '@/lib/api';
 import { queryClient } from '@/lib/query-client';
@@ -30,7 +29,6 @@ import { useAuth } from '@/store/auth';
 export default function DeleteAccountScreen() {
   const userId = useAuth((state) => state.session?.user.id) ?? null;
   const username = useAuth((state) => state.profile?.username) ?? null;
-  const [typed, setTyped] = useState('');
 
   const remove = useMutation({
     mutationFn: async () => {
@@ -57,82 +55,83 @@ export default function DeleteAccountScreen() {
     );
   }
 
-  const confirmed =
+  const matches = (typed: string) =>
     !!username && typed.trim().replace(/^@/, '').toLowerCase() === username.toLowerCase();
+
+  /* The username is typed into an Apple alert (the Apple pass, 2026-11-05)
+     — a stronger stop than a second tap for something that cannot be undone.
+     It was a field on the page over a red button. */
+  function confirm() {
+    showPrompt(
+      'Delete your account?',
+      username
+        ? `This cannot be undone. Type your username, ${username}, to confirm.`
+        : 'This cannot be undone. Type your username to confirm.',
+      {
+        placeholder: username ?? 'Username',
+        confirm: { text: 'Delete', style: 'destructive' },
+        accepts: matches,
+        onSubmit: () => remove.mutate(),
+      }
+    );
+  }
 
   return (
     <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="Delete account" />}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}>
-        <PageScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}>
-          <Text variant="h3">This deletes your account for good</Text>
-          <View style={styles.block}>
-            <Text variant="h5">What goes, at once</Text>
-            <Text variant="body" color="textSecondary">
-              Your profile and pictures, your logs, scores, reviews, collections, comments, wall
-              posts, likes, follows, friendships, physical copies, linked gaming accounts, reports,
-              blocks and rating statistics — and other people’s likes and comments on your writing.
-            </Text>
-          </View>
-          <View style={styles.block}>
-            <Text variant="h5">What stays, without your name</Text>
-            <Text variant="body" color="textSecondary">
-              Releases you added to the barcode catalogue and the box photos you sent for them. Game
-              averages are worked out again without your ratings.
-            </Text>
-          </View>
-          <Link href={{ pathname: '/legal/[doc]', params: { doc: 'privacy' } }}>
-            <Text variant="bodySmall" color="primaryText">
-              Read the privacy policy
-            </Text>
-          </Link>
+      <PageScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Text variant="body" color="textSecondary" style={styles.lead}>
+          This deletes your account for good. You can make a new account later, but nothing of this
+          one comes back.
+        </Text>
 
-          <TextField
-            label={username ? `Type your username, ${username}, to confirm` : 'Type your username'}
-            value={typed}
-            onChangeText={setTyped}
-            autoCapitalize="none"
-            autoCorrect={false}
-            accessibilityLabel="Your username, to confirm"
+        <InsetGroup header="What’s deleted, at once">
+          <Row
+            title="Your profile and everything you made"
+            subtitle="Pictures, logs, scores, reviews, collections, comments, wall posts, likes, follows, friendships, physical copies, linked gaming accounts, reports, blocks and rating statistics — and other people’s likes and comments on your writing."
           />
+        </InsetGroup>
 
-          {remove.isError && (
-            <Text variant="bodySmall" color="danger">
-              {remove.error instanceof Error ? remove.error.message : 'That did not work.'}
-            </Text>
-          )}
-
-          <Button
-            title="Delete my account"
-            variant="danger"
-            fullWidth
-            disabled={!confirmed}
-            loading={remove.isPending}
-            onPress={() => remove.mutate()}
+        <InsetGroup
+          header="What stays, without your name"
+          footer={
+            <Link href={{ pathname: '/legal/[doc]', params: { doc: 'privacy' } }}>
+              <Text variant="bodySmall" color="primaryText">
+                Read the privacy policy
+              </Text>
+            </Link>
+          }>
+          <Row
+            title="The barcode catalogue"
+            subtitle="Releases you added and the box photos you sent for them. Game averages are worked out again without your ratings."
           />
-          <Text variant="caption" color="textMuted" style={styles.centred}>
-            This cannot be undone. You can make a new account later, but nothing of this one comes
-            back.
+        </InsetGroup>
+
+        {remove.isError && (
+          <Text variant="bodySmall" color="danger" style={styles.lead}>
+            {remove.error instanceof Error ? remove.error.message : 'That did not work.'}
           </Text>
-        </PageScrollView>
-      </KeyboardAvoidingView>
+        )}
+
+        <InsetGroup>
+          <Row
+            title={remove.isPending ? 'Deleting…' : 'Delete my account'}
+            destructive
+            centred
+            disabled={remove.isPending || !username}
+            onPress={confirm}
+          />
+        </InsetGroup>
+      </PageScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  centred: { textAlign: 'center' },
   content: {
-    paddingHorizontal: Spacing.x24,
-    paddingTop: Spacing.x16,
+    paddingHorizontal: Spacing.x16,
+    paddingTop: Spacing.x8,
     paddingBottom: Spacing.x48,
     gap: Spacing.x24,
   },
-  block: { gap: Spacing.x4 },
+  lead: { paddingHorizontal: Spacing.x16 },
 });

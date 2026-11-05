@@ -10,7 +10,7 @@ import { INFO_BOX } from '@/components/game-information';
 import { InfoCard } from '@/components/ui/info-card';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
-import { FontFamily, Spacing, TapTarget } from '@/constants/theme';
+import { Typeface, Spacing, TapTarget } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { FACET_INFO, facetParams, type Facet, type FacetKind } from '@/lib/games/facets';
 import { getGameDetails, type GameDetails } from '@/lib/games/igdb';
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   values: { flexDirection: 'row', flexWrap: 'wrap', columnGap: Spacing.x4, rowGap: 2 },
   /* Bold, in the full ink: the owner's sign that a word goes somewhere. The
      family, not a weight — Android synthesises none for a custom font. */
-  value: { fontFamily: FontFamily.bold },
+  value: { fontFamily: Typeface.bold },
   toggle: {
     flexDirection: 'row',
     alignItems: 'center',

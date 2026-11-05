@@ -99,6 +99,13 @@ export const TILE_PAD = { start: 12, top: 12, bottom: 12, end: 72 } as const;
 /** `maxLines = 2`, `TextOverflow.Ellipsis`. */
 export const NAME_LINES = 2;
 
+/**
+ * The name's size: 14 on 19, semibold — a step under the app's row title
+ * (15), because the longest one-word names ("Platformer", "Adventure") have
+ * 75dp beside the turned cover on a 360dp phone and Inter at 15 takes 76.
+ */
+export const NAME_TYPE = { fontSize: 14, lineHeight: 19 } as const;
+
 /** `angledGradientBackground(…, degrees = 45f)`. */
 export const GRADIENT_ANGLE = 45;
 

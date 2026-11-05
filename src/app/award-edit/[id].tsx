@@ -3,13 +3,13 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 
-import { Button } from '@/components/ui/button';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
 import { PageScrollView } from '@/components/ui/page-scroll';
 import { Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/theme';
+import { useBarConfirm } from '@/hooks/use-bar-confirm';
 import { addAwardCategory, getAwards, renameAward, setAwardNote } from '@/lib/api';
 import { toast } from '@/lib/toast';
 
@@ -140,6 +140,17 @@ function AwardForm({
   const [value, setValue] = useState(initial);
   const trimmed = value.trim();
 
+  /* Save is the ✓ in the bar (the Apple pass, 2026-11-05) — it was a
+     full-width button under the field. The note is the one field that may
+     legitimately be emptied — clearing it is how you take back what you
+     wrote. A label cannot be blank. */
+  useBarConfirm({
+    label: 'Save',
+    onPress: () => onSubmit(isNote ? value : trimmed),
+    loading: pending,
+    disabled: !isNote && !trimmed,
+  });
+
   return (
     <>
       {isNote ? (
@@ -177,15 +188,6 @@ function AwardForm({
           autoFocus
         />
       )}
-
-      {/* The note is the one field that may legitimately be emptied — clearing
-          it is how you take back what you wrote. A label cannot be blank. */}
-      <Button
-        title="Save"
-        onPress={() => onSubmit(value)}
-        disabled={pending || (!isNote && !trimmed)}
-        fullWidth
-      />
     </>
   );
 }

@@ -6,7 +6,7 @@ import { RefreshControl, StyleSheet, View } from 'react-native';
 import { ArticleCard } from '@/components/news-cards';
 import { EventResults } from '@/components/search/event-results';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
-import { PageFlatList } from '@/components/ui/page-scroll';
+import { PageFlatList, PageWithHeader } from '@/components/ui/page-scroll';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
 import { TabBar } from '@/components/ui/tab-bar';
 import { ArtRowWindow } from '@/constants/list-window';
@@ -45,18 +45,34 @@ export default function NewsScreen() {
     staleTime: 10 * 60_000,
   });
 
+  const tabs = (
+    <View style={styles.tabs}>
+      <TabBar tabs={TABS} value={tab} onChange={setTab} label="News sections" inset={0} />
+    </View>
+  );
+
   function body() {
-    if (tab === 'events') return <EventResults />;
-    if (news.isLoading) return <LoadingState />;
+    if (tab === 'events') return <EventResults header={tabs} />;
+    if (news.isLoading)
+      return (
+        <PageWithHeader header={tabs} contentContainerStyle={styles.content}>
+          <LoadingState />
+        </PageWithHeader>
+      );
     if (news.isLoadingError)
-      return <ErrorState error={news.error} onRetry={() => void news.refetch()} />;
+      return (
+        <PageWithHeader header={tabs} contentContainerStyle={styles.content}>
+          <ErrorState error={news.error} onRetry={() => void news.refetch()} />
+        </PageWithHeader>
+      );
     const articles = news.data ?? [];
     return (
       <PageFlatList
+        ListHeaderComponent={tabs}
         data={articles}
         keyExtractor={keyOf}
         renderItem={renderArticle}
-        contentContainerStyle={articles.length === 0 ? styles.empty : styles.content}
+        contentContainerStyle={styles.content}
         {...ArtRowWindow}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -72,13 +88,7 @@ export default function NewsScreen() {
   }
 
   return (
-    <Screen
-      edges={['bottom']}
-      insetHeader
-      topBar={<FrostedTopBar back title="News" largeTitle={false} />}>
-      <View style={styles.tabs}>
-        <TabBar tabs={TABS} value={tab} onChange={setTab} label="News sections" />
-      </View>
+    <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="News" />}>
       {body()}
     </Screen>
   );
@@ -88,7 +98,11 @@ const keyOf = (article: Article) => article.id;
 const renderArticle = ({ item }: { item: Article }) => <ArticleCard article={item} />;
 
 const styles = StyleSheet.create({
-  tabs: { paddingTop: Spacing.x8 },
-  content: { padding: Spacing.x16, gap: Spacing.x12, paddingBottom: Spacing.x48 },
-  empty: { flexGrow: 1 },
+  tabs: { paddingBottom: Spacing.x4 },
+  content: {
+    paddingHorizontal: Spacing.x16,
+    gap: Spacing.x12,
+    paddingBottom: Spacing.x48,
+    flexGrow: 1,
+  },
 });

@@ -18,7 +18,7 @@ import { editionLabel } from '@/constants/game-editions';
 import { GAME_LABEL_TEXT } from '@/constants/game-labels';
 import { PROGRESS_META, progressChoiceFor } from '@/constants/progress';
 import { clampScore, labelFor, scoreColor } from '@/constants/score';
-import { FontFamily, Palette, Spacing, withAlpha } from '@/constants/theme';
+import { Typeface, Palette, Spacing, withAlpha } from '@/constants/theme';
 import { useGameLabel } from '@/hooks/use-game-labels';
 import { useLogoInk } from '@/hooks/use-logo-ink';
 import { useTheme } from '@/hooks/use-theme';
@@ -678,7 +678,7 @@ const styles = StyleSheet.create({
   },
   /* Where Apple TV sets the film's logo: the name, large and heavy. */
   title: {
-    fontFamily: FontFamily.extraBold,
+    fontFamily: Typeface.extraBold,
     /* A step under its first 32 (the owner's, 2026-11-03: "a little bit
        smaller"). */
     fontSize: 28,
@@ -689,7 +689,7 @@ const styles = StyleSheet.create({
     ...SHADOW,
   },
   genres: {
-    fontFamily: FontFamily.regular,
+    fontFamily: Typeface.regular,
     fontSize: 15,
     lineHeight: 20,
     textAlign: 'center',
@@ -714,7 +714,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.x8,
   },
-  pillLabel: { fontFamily: FontFamily.semibold, fontSize: 17, lineHeight: 22 },
+  pillLabel: { fontFamily: Typeface.semibold, fontSize: 17, lineHeight: 22 },
   round: {
     width: PILL_HEIGHT,
     height: PILL_HEIGHT,
@@ -724,7 +724,7 @@ const styles = StyleSheet.create({
   },
   aboutBox: {},
   about: {
-    fontFamily: FontFamily.regular,
+    fontFamily: Typeface.regular,
     fontSize: ABOUT_SIZE,
     lineHeight: ABOUT_LINE,
     color: SOFT,
@@ -739,13 +739,13 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: ABOUT_LINE + 2,
-    paddingHorizontal: Spacing.x8 + 2,
-    borderRadius: (ABOUT_LINE + 2) / 2,
+    paddingLeft: Spacing.x8,
     justifyContent: 'center',
-    backgroundColor: withAlpha(Palette.white, 0.2),
+    /* Bare bold words over the fade (the Apple pass, 2026-11-05) — Apple
+       TV's MORE; it sat on a translucent pill. */
   },
   moreLabel: {
-    fontFamily: FontFamily.bold,
+    fontFamily: Typeface.bold,
     fontSize: 13,
     lineHeight: 17,
     letterSpacing: 0.4,
@@ -760,16 +760,16 @@ const styles = StyleSheet.create({
     marginTop: Spacing.x4,
   },
   factPart: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x4 },
-  fact: { fontFamily: FontFamily.regular, fontSize: 15, lineHeight: 20, color: QUIET },
-  figure: { fontFamily: FontFamily.semibold, fontVariant: ['tabular-nums'] },
+  fact: { fontFamily: Typeface.regular, fontSize: 15, lineHeight: 20, color: QUIET },
+  figure: { fontFamily: Typeface.semibold, fontVariant: ['tabular-nums'] },
   box: {
     borderWidth: 1.2,
     borderRadius: 4,
     paddingHorizontal: 5,
     paddingVertical: 1,
   },
-  boxLabel: { fontFamily: FontFamily.bold, fontSize: 11, lineHeight: 15, color: QUIET },
+  boxLabel: { fontFamily: Typeface.bold, fontSize: 11, lineHeight: 15, color: QUIET },
   developedRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 4 },
-  developed: { fontFamily: FontFamily.regular, fontSize: 14, lineHeight: 20, color: QUIET },
-  developedName: { fontFamily: FontFamily.bold, color: SOFT },
+  developed: { fontFamily: Typeface.regular, fontSize: 14, lineHeight: 20, color: QUIET },
+  developedName: { fontFamily: Typeface.bold, color: SOFT },
 });

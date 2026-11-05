@@ -52,6 +52,7 @@ import {
   type ListItem,
 } from '@/lib/api';
 import { sortGames, type GameSort } from '@/lib/games';
+import { seededRandom } from '@/lib/games/recommend-rules';
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/components/ui/dialog';
 import { toast } from '@/lib/toast';
@@ -114,6 +115,8 @@ export default function ListDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const userId = useAuth((state) => state.session?.user.id);
   const [sort, setSort] = useState<GameSort>('default');
+  /** A shuffle's seed while the games are in a random order (Shuffle), else null. */
+  const [shuffleSeed, setShuffleSeed] = useState<number | null>(null);
   const [layout, setLayout] = useState<CollectionLayout>('grid');
   const [pickingCover, setPickingCover] = useState(false);
   /* The owner's menu: opened from the top right of the screen, drawn with the
@@ -371,6 +374,18 @@ export default function ListDetailScreen() {
       ).map((entry) => entry.item),
     [items, sort]
   );
+  /* Shuffle: the sorted order dealt again by the seed — deterministic for one
+     seed, so a re-render does not reshuffle. */
+  const shown = useMemo(() => {
+    if (shuffleSeed === null) return ordered;
+    const next = seededRandom(shuffleSeed);
+    const deck = ordered.slice();
+    for (let i = deck.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(next() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    return deck;
+  }, [ordered, shuffleSeed]);
 
   if (list.isLoading) {
     return (
@@ -391,7 +406,7 @@ export default function ListDetailScreen() {
   if (!list.data) {
     return (
       <Screen edges={['bottom']} topBar={<FrostedTopBar back glass />}>
-        <EmptyState title="List not found" />
+        <EmptyState icon="search" title="List not found" />
       </Screen>
     );
   }
@@ -567,10 +582,24 @@ export default function ListDetailScreen() {
         <View style={styles.controls}>
           <CollectionToolbar
             sort={sort}
-            onSort={setSort}
+            onSort={(next) => {
+              setShuffleSeed(null);
+              setSort(next);
+            }}
             layout={layout}
             onLayout={setLayout}
             showSort={!isTierList && !isAwards}
+            onSurprise={() => {
+              const games = items.filter((item) => item.game);
+              const pick = games[Math.floor(Math.random() * games.length)];
+              if (pick?.game) router.push({ pathname: '/game/[id]', params: { id: pick.game.id } });
+            }}
+            onShuffle={
+              !isTierList && !isAwards
+                ? () => setShuffleSeed(Math.floor(Math.random() * 2 ** 31))
+                : undefined
+            }
+            shuffled={shuffleSeed !== null}
           />
         </View>
       )}
@@ -685,7 +714,7 @@ export default function ListDetailScreen() {
             renderItem={() => (
               <CaptionedGrid
                 listId={data.id}
-                items={ordered}
+                items={shown}
                 isOwner={isOwner}
                 width={width - Spacing.x16 * 2}
               />
@@ -715,7 +744,7 @@ export default function ListDetailScreen() {
         <Screen {...screenProps}>
           <PageFlatList
             settle={handoff}
-            data={ordered}
+            data={shown}
             key="collection-rows"
             keyExtractor={(item) => item.game_id}
             {...ArtRowWindow}
@@ -789,7 +818,7 @@ export default function ListDetailScreen() {
         <Screen {...screenProps}>
           <PageFlatList
             settle={handoff}
-            data={ordered}
+            data={shown}
             key="collection-grid"
             numColumns={GRID_COLUMNS}
             keyExtractor={keyExtractor}
@@ -992,6 +1021,7 @@ export default function ListDetailScreen() {
           )}
           ListEmptyComponent={
             <EmptyState
+              icon="albums-outline"
               title="Nothing in this list yet"
               message={isOwner ? 'Search for a game and tap it to add it here.' : undefined}
               action={

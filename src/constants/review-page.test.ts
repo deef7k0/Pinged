@@ -9,7 +9,7 @@ import {
   HERO_FADE,
   LIKE_ROW,
   PLATFORM_TOP,
-  POPPINS_METRICS,
+  FONT_METRICS,
   REFERENCE_SCALE,
   REPLIES_TOP,
   REVIEW_MARGIN,
@@ -46,9 +46,9 @@ const PX = {
 const dp = (px: number) => px * REFERENCE_SCALE;
 
 const xTop = (line: ReviewLine, baseline: number) =>
-  baseline - POPPINS_METRICS.xHeight[line.weight] * line.size;
+  baseline - FONT_METRICS.xHeight[line.weight] * line.size;
 const capTop = (line: ReviewLine, baseline: number) =>
-  baseline - POPPINS_METRICS.capHeight[line.weight] * line.size;
+  baseline - FONT_METRICS.capHeight[line.weight] * line.size;
 
 /**
  * The page on the screenshot's 360dp phone, laid out the way the screen lays
@@ -177,11 +177,11 @@ describe('the review', () => {
 });
 
 describe('the composer', () => {
-  /* A field with no line height is as tall as Poppins' box: its top and foot. */
-  const field = (POPPINS_METRICS.top.regular + POPPINS_METRICS.bottom.regular) * COMPOSER.text;
+  /* A field with no line height is as tall as the font's box: its top and foot. */
+  const field = (FONT_METRICS.top.regular + FONT_METRICS.bottom.regular) * COMPOSER.text;
 
   it('starts its words where the screenshot’s placeholder sits', () => {
-    const baseline = COMPOSER.inputTop + POPPINS_METRICS.top.regular * COMPOSER.text;
+    const baseline = COMPOSER.inputTop + FONT_METRICS.top.regular * COMPOSER.text;
     near(baseline, dp(PX.composer.placeholderBaseline - PX.composer.top), 'placeholder');
   });
 
@@ -199,15 +199,15 @@ describe('the composer', () => {
 
 describe('baselineIn', () => {
   it('keeps the descent and cuts the ascent of a line tighter than the font', () => {
-    assert.equal(baselineIn({ size: 15, line: 19, weight: 'bold' }), 19 - 0.35 * 15);
+    assert.equal(baselineIn({ size: 15, line: 17, weight: 'bold' }), 17 - 0.241 * 15);
   });
 
   it('sits on the ascent when the font fits and its box does not', () => {
-    assert.equal(baselineIn({ size: 13, line: 19, weight: 'regular' }), 1.05 * 13);
+    assert.equal(baselineIn({ size: 15, line: 19, weight: 'regular' }), 0.969 * 15);
   });
 
   it('shares out a loose line evenly round the box', () => {
     const line = { size: 10, line: 40, weight: 'regular' } as const;
-    assert.equal(baselineIn(line), (40 + 10.65 - 5.72) / 2);
+    assert.equal(baselineIn(line), (40 + 11.08 - 3.22) / 2);
   });
 });

@@ -3,7 +3,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
-import { MultiChoiceChips } from '@/components/choice-chips';
+import { useBarConfirm } from '@/hooks/use-bar-confirm';
+import { ChecklistGroup, chosenLine } from '@/components/ui/checklist-group';
+import { InsetGroup, Row } from '@/components/ui/inset-group';
 import { GamePicker } from '@/components/game-picker';
 import { Button } from '@/components/ui/button';
 import { CARD_INSET, cardShape } from '@/components/ui/card-material';
@@ -78,7 +80,7 @@ export default function SuggestSimilarScreen() {
     body = game.isLoadingError ? (
       <ErrorState error={game.error} onRetry={() => void game.refetch()} />
     ) : (
-      <EmptyState title="Game not found" />
+      <EmptyState icon="search" title="Game not found" />
     );
   } else if (!otherId) {
     body = (
@@ -106,7 +108,7 @@ export default function SuggestSimilarScreen() {
     body = other.isLoadingError ? (
       <ErrorState error={other.error} onRetry={() => void other.refetch()} />
     ) : (
-      <EmptyState title="Game not found" />
+      <EmptyState icon="search" title="Game not found" />
     );
   } else {
     body = (
@@ -163,6 +165,8 @@ function SuggestForm({
 
   const [reasons, setReasons] = useState<SimilarityReason[]>(existingVote?.reasons ?? []);
   const [comment, setComment] = useState(existingVote?.comment ?? '');
+  /** The twelve reasons, pushed over the form as a checklist. */
+  const [choosing, setChoosing] = useState(false);
 
   const submit = useMutation({
     mutationFn: () => suggestSimilarGame(game, other, reasons, comment),
@@ -177,6 +181,31 @@ function SuggestForm({
       router.back();
     },
   });
+
+  useBarConfirm(
+    choosing
+      ? /* The checklist's ✓ returns to the form, its picks kept. */
+        { label: 'Done', onPress: () => setChoosing(false) }
+      : {
+          label: existingVote ? 'Save' : pairExists ? 'Agree' : 'Recommend',
+          onPress: () => submit.mutate(),
+          loading: submit.isPending,
+        }
+  );
+
+  if (choosing) {
+    return (
+      <PageScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ChecklistGroup
+          title="What makes them alike"
+          choices={REASON_CHOICES}
+          value={reasons}
+          onChange={setReasons}
+          max={MAX_SIMILARITY_REASONS}
+        />
+      </PageScrollView>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -221,49 +250,41 @@ function SuggestForm({
 
         {/* Structured first, because these are what get counted — "32 players
             say the combat" needs everyone choosing from the same twelve. The
-            free text below is where the nuance goes. */}
-        <MultiChoiceChips
-          label="What makes them alike"
-          choices={SIMILARITY_REASONS.map((reason) => ({
-            value: reason,
-            label: SIMILARITY_REASON_LABEL[reason],
-          }))}
-          value={reasons}
-          onChange={setReasons}
-          max={MAX_SIMILARITY_REASONS}
-        />
-
-        <TextField
-          label="In a line · optional"
-          value={comment}
-          onChangeText={setComment}
-          multiline
-          maxLength={MAX_COMMENT}
-          placeholder="Feels like Hades if the House of Hades were a settlement you had to build."
-          hint={`${comment.length}/${MAX_COMMENT}`}
-        />
+            free text is where the nuance goes. One row pushing a checklist
+            (the Apple pass, 2026-11-05) — it was twelve chips. */}
+        <InsetGroup
+          footer={`Choose up to ${MAX_SIMILARITY_REASONS}. Reasons are optional, but they are what makes a recommendation useful.`}>
+          <Row
+            title="What makes them alike"
+            value={chosenLine(reasons, REASON_CHOICES, 'None yet')}
+            onPress={() => setChoosing(true)}
+          />
+          <TextField
+            variant="row"
+            value={comment}
+            onChangeText={setComment}
+            multiline
+            maxLength={MAX_COMMENT}
+            accessibilityLabel="In a line, optional"
+            placeholder="In a line · optional"
+            hint={comment.length > 0 ? `${comment.length}/${MAX_COMMENT}` : undefined}
+          />
+        </InsetGroup>
 
         {submit.isError && (
           <Text variant="bodySmall" color="danger">
             {submit.error instanceof Error ? submit.error.message : 'Could not save that.'}
           </Text>
         )}
-
-        <Button
-          title={existingVote ? 'Save' : pairExists ? 'Agree' : 'Recommend'}
-          fullWidth
-          loading={submit.isPending}
-          onPress={() => submit.mutate()}
-        />
-        {reasons.length === 0 && (
-          <Text variant="caption" color="textMuted" style={styles.centred}>
-            Reasons are optional, but they are what makes a recommendation useful.
-          </Text>
-        )}
       </PageScrollView>
     </KeyboardAvoidingView>
   );
 }
+
+const REASON_CHOICES = SIMILARITY_REASONS.map((reason) => ({
+  value: reason,
+  label: SIMILARITY_REASON_LABEL[reason],
+}));
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },

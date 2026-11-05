@@ -1,6 +1,5 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Link, useNavigation, useRouter } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   RefreshControl,
@@ -12,25 +11,24 @@ import {
 
 import { ActivityRail } from '@/components/activity-rail';
 import { CoverRailSkeleton, GameCoverRail } from '@/components/game-rail';
-import { BandError, INLINE_LINK_SLOP } from '@/components/home/band-error';
-import { HOME_HEADER_ROW, HomeHeader } from '@/components/home/home-header';
+import { BandError } from '@/components/home/band-error';
+import { HomeChips } from '@/components/home/home-chips';
+import { HomeHeader } from '@/components/home/home-header';
 import { HomeGlow } from '@/components/home/home-glow';
 import { MoodBody, MoodLead, useMoodFeed } from '@/components/home/mood-feed';
 import { MoodTiles } from '@/components/home/mood-tiles';
 import { DiscoverCarousel, DiscoverCarouselSkeleton } from '@/components/home/discover-carousel';
 import { HomeSection } from '@/components/home-section';
-import { ArticleCard, PastEventCard } from '@/components/news-cards';
+import { ARTICLE_ROW_HEIGHT, ArticleCard, PastEventCard } from '@/components/news-cards';
 import { Arrive, stagger } from '@/components/ui/arrive';
 import { SurpriseEntry } from '@/components/surprise-entry';
 import { Button } from '@/components/ui/button';
-import { PageScrollView } from '@/components/ui/page-scroll';
-import { PressableScale } from '@/components/ui/pressable-scale';
+import { PageLargeTitle, PageScrollView } from '@/components/ui/page-scroll';
 import { EmptyState, Screen } from '@/components/ui/screen';
-import { Avatar } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/surface';
-import { Text } from '@/components/ui/text';
 import { useTabBarClearance } from '@/components/app-tab-bar';
 import { footHeight } from '@/constants/cover-rail';
+import { TOP_BAR_ROW } from '@/constants/top-bar';
 import { HeroAspectRatio, Spacing } from '@/constants/theme';
 import { extractSeedColor } from '@/hooks/use-album-art-color';
 import { useGameColours } from '@/hooks/use-game-colours';
@@ -46,7 +44,6 @@ import { ALL, feedFor, sameView, type HomeView } from '@/lib/home-view';
 import { GLOW_OVERFLOW, glowTone } from '@/lib/home-glow';
 import { generateDynamicTheme } from '@/theme/dynamic-color';
 import { getGamingNews, getNewReleases, getUpcomingReleases } from '@/lib/news';
-import { displayNameFor } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 
 /**
@@ -101,14 +98,14 @@ function newsCardHeight(width: number): number {
  * (2026-10-22): its glow "with the same effect and size", "their exact top
  * bar", and its tabs with moods. Read from its source, not its screens:
  *
- * - **The top bar is `<HomeHeader>`**: All, Mood and Genre, Create and
- *   the bell on one row, fixed over the page, clear at the top and the
- *   page's colour once the page is under it. The reference puts the avatar
- *   there too; the owner had it brought back onto the page (2026-10-22) as
- *   the "Welcome back" row it was — on All — so the chips have the row to
- *   themselves. The bell was beside the name until the owner had it moved
- *   into the bar, in Settings' place (2026-10-28); Settings is the profile
- *   tab's alone.
+ * - **The top bar is `<HomeHeader>`** — Apple's, since the Apple pass
+ *   (2026-11-05): "Home" large at the top of the page, folding into the bar
+ *   as the page is read, and one capsule at the right — your face, Create,
+ *   the bell. All, Mood and Genre are capsules on a row under the title,
+ *   scrolling with the page; Mood and Genre are pull-downs. The "Welcome
+ *   back," row is gone (the face is in the bar), and so is the "Search every
+ *   game on IGDB" link that ended the page. Settings is the profile tab's
+ *   alone.
  * - **The glow is `<HomeGlow>`**: the background of the page's first block —
  *   the bar's room and the first section — and 140dp past it, scrolling with
  *   the page. Its colour is the Material 3 primary of the first game in the
@@ -181,8 +178,6 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const { width } = useWindowDimensions();
   const userId = useAuth((state) => state.session?.user.id);
-  const profile = useAuth((state) => state.profile);
-  const name = displayNameFor(profile);
   const colours = useGameColours();
 
   /*
@@ -193,7 +188,7 @@ export default function HomeScreen() {
    */
   const scroller = useRef<ScrollView>(null);
   /* The bar's room at the top of the page: the status bar and the row. */
-  const barHeight = useTopBarInset() + HOME_HEADER_ROW;
+  const barHeight = useTopBarInset() + TOP_BAR_ROW;
 
   useEffect(() => {
     const unsubscribe = navigation.addListener(
@@ -459,9 +454,10 @@ export default function HomeScreen() {
       background={theme.homeBackground}
       /* Fixed over the page; the page keeps its room clear at the top of the
          first block. A slot, not a child — see `<Screen topBar>`. */
-      topBar={<HomeHeader view={view} onViewChange={changeView} />}>
+      topBar={<HomeHeader />}>
       <PageScrollView
         ref={scroller}
+        ownLargeTitle
         /*
          * Bands resolve at different times and some of them are over a thousand
          * dp tall. Without this, a band landing above the viewport teleports
@@ -491,48 +487,23 @@ export default function HomeScreen() {
           The room is the bar's, and `LEAD_GAP` more.
         */}
         <View
-          style={[styles.lead, { paddingTop: barHeight + LEAD_GAP }]}
+          style={[styles.lead, { paddingTop: barHeight }]}
           onLayout={(event) => {
             const height = Math.round(event.nativeEvent.layout.height);
             setLeadHeight((was) => (was === height ? was : height));
           }}>
           <HomeGlow tone={tone} height={leadHeight > 0 ? leadHeight + GLOW_OVERFLOW : 0} />
 
+          {/* The page's name and what it shows, folding up under the bar. */}
+          <View style={styles.masthead}>
+            <PageLargeTitle style={styles.title} />
+            <HomeChips view={view} onChange={changeView} />
+          </View>
+
           {inFeed ? (
             <MoodLead feed={feed} />
           ) : (
             <>
-              {/*
-                Who you are and a way into your profile — the row the
-                reference's avatar replaced, brought back by the owner
-                (2026-10-22) to give the chips the bar. The bell that ended
-                it is in the bar now, where Settings was (2026-10-28). On All only: a mood or a
-                genre is a page about games, and opens on its strapline. Two
-                lines rather than one because "Welcome back, Ada" buries the
-                name inside a sentence.
-              */}
-              {profile && (
-                <View style={styles.welcome}>
-                  <Text variant="h4" color="textSecondary">
-                    Welcome back,
-                  </Text>
-                  <View style={styles.welcomeUser}>
-                    <Link href="/(tabs)/profile" asChild>
-                      <PressableScale
-                        accessibilityRole="link"
-                        accessibilityLabel={`Signed in as ${name}. Open your profile.`}
-                        scaleTo={0.98}
-                        style={styles.welcomeLink}>
-                        <Avatar uri={profile.avatar_url} name={name} size={40} />
-                        <Text variant="h1" numberOfLines={1} style={styles.welcomeName}>
-                          {name}
-                        </Text>
-                      </PressableScale>
-                    </Link>
-                  </View>
-                </View>
-              )}
-
               {/*
                 The one way into the app that asks for nothing.
 
@@ -671,7 +642,7 @@ export default function HomeScreen() {
               <View style={styles.stack}>
                 {news.isLoading ? (
                   Array.from({ length: NEWS_PREVIEW }).map((_, index) => (
-                    <Skeleton key={index} width="100%" height={newsCardHeight(width)} />
+                    <Skeleton key={index} width="100%" height={ARTICLE_ROW_HEIGHT} />
                   ))
                 ) : news.isLoadingError ? (
                   <BandError label="News could not load." onRetry={() => news.refetch()} />
@@ -719,20 +690,6 @@ export default function HomeScreen() {
             its own hue with a game's cover tilted into the corner — under All
             and under every mood and genre. */}
         <MoodTiles onView={changeView} />
-
-        <Link href="/(tabs)/search" asChild>
-          <PressableScale
-            accessibilityRole="link"
-            accessibilityLabel="Search every game on IGDB"
-            hitSlop={INLINE_LINK_SLOP}
-            scaleTo={0.98}
-            style={styles.footer}>
-            <Text variant="bodySmall" style={{ color: theme.primaryText }}>
-              Search every game on IGDB
-            </Text>
-            <Ionicons name="chevron-forward" size={14} color={theme.primaryText} />
-          </PressableScale>
-        </Link>
       </PageScrollView>
     </Screen>
   );
@@ -772,23 +729,14 @@ const styles = StyleSheet.create({
      band under the block, because the scroller's own content gap is the same
      thirty-two. */
   lead: { gap: Spacing.x32 },
-  welcome: { paddingHorizontal: Spacing.x16, gap: Spacing.x8 },
-  welcomeUser: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
-  /* Shrinks rather than pushing the row wide — a long display name truncates. */
-  welcomeLink: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
-  welcomeName: { flex: 1 },
+  /* The title and the chips, LEAD_GAP over the first section (the block's
+     own gap is 32). */
+  masthead: { marginBottom: LEAD_GAP - Spacing.x32 },
+  title: { paddingBottom: Spacing.x4 },
   /* `EmptyState` centres on `flex: 1`, which resolves to nothing inside a
      content-driven scroll container. The explicit height is what gives it space
      to centre in. */
   firstRun: { minHeight: 260, justifyContent: 'center' },
   stack: { paddingHorizontal: Spacing.x16, gap: Spacing.x12 },
   inset: { paddingHorizontal: Spacing.x16 },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: Spacing.x4,
-    paddingHorizontal: Spacing.x16,
-    paddingTop: Spacing.x8,
-  },
 });

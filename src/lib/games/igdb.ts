@@ -6,6 +6,7 @@ import { supabase } from '../supabase';
 import { precisionOf, type DatePrecision } from './calendar';
 import { chooseHero } from './hero-art';
 import { chooseLogo } from './logo-art';
+import { foundedYear, roleOf, type StudioAbout } from './studio-about';
 import { rememberGame } from './seen-games';
 import {
   freshFrom,
@@ -758,7 +759,15 @@ export async function getGameEditions(
 export type CompanyIdentity = { id: number; name: string; slug: string | null };
 
 /** A company's identity, and the ids of every game it developed or published. */
-export type StudioCompany = { identity: CompanyIdentity | null; gameIds: number[] };
+export type StudioCompany = {
+  identity: CompanyIdentity | null;
+  gameIds: number[];
+  /**
+   * What the studio page says about the company (`lib/games/studio-about`).
+   * Optional: a row saved on the device before it was asked for has none.
+   */
+  about?: StudioAbout;
+};
 
 /**
  * The first half of a studio's catalogue: who the company is, and which games.
@@ -788,16 +797,32 @@ export async function getStudioCompany(
   signal?: AbortSignal
 ): Promise<StudioCompany> {
   const raw = await igdbQuery<
-    { id: number; name?: string; slug?: string; developed?: number[]; published?: number[] }[]
+    {
+      id: number;
+      name?: string;
+      slug?: string;
+      developed?: number[];
+      published?: number[];
+      description?: string;
+      start_date?: number;
+      start_date_format?: number;
+      country?: number;
+    }[]
   >(
     'companies',
-    `fields name, slug, developed, published; where id = ${companyId}; limit 1;`,
+    `fields name, slug, developed, published, description, start_date, start_date_format, country; where id = ${companyId}; limit 1;`,
     signal
   );
   const first = raw?.[0];
   return {
     identity: first?.name ? { id: first.id, name: first.name, slug: first.slug ?? null } : null,
     gameIds: [...new Set([...(first?.developed ?? []), ...(first?.published ?? [])])],
+    about: {
+      description: first?.description?.trim() || null,
+      founded: foundedYear(first?.start_date, first?.start_date_format),
+      country: first?.country ?? null,
+      role: roleOf(first?.developed?.length ?? 0, first?.published?.length ?? 0),
+    },
   };
 }
 

@@ -19,6 +19,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
+import { Loader } from '@/components/ui/loader';
 import { MarqueeText } from '@/components/ui/marquee-text';
 import { PressGlyph } from '@/components/ui/press-glyph';
 import { GlassSurface, useLiquidGlass } from '@/components/ui/liquid-glass';
@@ -33,6 +34,7 @@ import {
   HEADER_FADE,
   TOP_BAR_DISC,
   TOP_BAR_DISC_ROOM,
+  TOP_BAR_DISC_TOP,
   TOP_BAR_EDGE,
   TOP_BAR_GLYPH,
   TOP_BAR_KEY,
@@ -40,7 +42,6 @@ import {
   TOP_BAR_ROW,
   TOP_BAR_SIDE,
   TOP_BAR_TITLE_GAP,
-  TOP_BAR_TITLE_INSET,
   barTitleOpacity,
   discShift,
   glassIn,
@@ -51,7 +52,12 @@ import {
 import { useTopBarInset } from '@/hooks/use-header-height';
 import { usePulse } from '@/hooks/use-pulse';
 import { useScreenChrome } from '@/hooks/use-screen-chrome';
+import { useAccent } from '@/hooks/use-accent';
+import { useSlotConfirm, type ConfirmAction } from '@/hooks/use-bar-confirm';
 import { useTheme } from '@/hooks/use-theme';
+import { filledRoles } from '@/lib/filled';
+
+export type { ConfirmAction };
 
 const DISC = TOP_BAR_DISC;
 
@@ -192,10 +198,17 @@ export type FrostedTopBarProps = {
    */
   header?: number;
   /**
-   * Centre the title on the screen instead of starting it after the chevron.
-   * Somebody else's profile, whose bar mirrors your own tab's.
+   * Kept for the callers that asked for it: every bar's title is centred now,
+   * as an iOS navigation bar's is (2026-11-04).
    */
   centerTitle?: boolean;
+  /**
+   * A modal's commit — Save, Send, Done — as iOS 26's ✓ in the bar's far
+   * corner: a disc filled with the accent in force. It replaces the
+   * full-width button a form used to end on. `label` is what a screen reader
+   * hears; `disabled` dims it; `loading` turns it into a spinner.
+   */
+  confirm?: ConfirmAction;
   /**
    * Which kind this is, for the rare page whose inset does not say: `'art'`
    * for discs over artwork, `'bar'` for a bar from the start.
@@ -244,6 +257,11 @@ export type FrostedTopBarProps = {
    * would land under the tabs.
    */
   largeTitle?: boolean;
+  /**
+   * A quiet line under the large title — the Profile tab's @handle. Only
+   * where there is a large title; the bar's own small name has none.
+   */
+  subtitle?: string;
 };
 
 export const FrostedTopBar = memo(function FrostedTopBar({
@@ -253,8 +271,8 @@ export const FrostedTopBar = memo(function FrostedTopBar({
   title,
   right,
   header,
-  centerTitle = false,
   variant,
+  confirm,
   intensity = 60,
   glass = false,
   handoff,
@@ -267,8 +285,19 @@ export const FrostedTopBar = memo(function FrostedTopBar({
     if (router.canGoBack()) router.back();
   }
 
+  /* A form inside the screen may have registered its commit instead. */
+  const registered = useSlotConfirm();
+  const commit = confirm ?? registered;
   const showLeading = back || dismiss;
-  if (!showLeading && !right && !title) return null;
+  if (!showLeading && !right && !title && !commit) return null;
+  /* The commit sits at the far end, after any other control. */
+  const trailing =
+    commit || right ? (
+      <>
+        {right}
+        {commit && <ConfirmKey {...commit} />}
+      </>
+    ) : undefined;
 
   const leading = showLeading
     ? {
@@ -288,7 +317,7 @@ export const FrostedTopBar = memo(function FrostedTopBar({
       <GlassBar
         leading={leading}
         title={title}
-        right={right}
+        right={trailing}
         header={header}
         handoff={handoff}
         intensity={intensity}
@@ -297,13 +326,55 @@ export const FrostedTopBar = memo(function FrostedTopBar({
   }
 
   return kind === 'art' ? (
-    <ArtBar leading={leading} title={title} right={right} header={header} intensity={intensity} />
+    <ArtBar
+      leading={leading}
+      title={title}
+      right={trailing}
+      header={header}
+      intensity={intensity}
+    />
   ) : (
-    <PlainBar leading={leading} title={title} right={right} centerTitle={centerTitle} />
+    <PlainBar leading={leading} title={title} right={trailing} />
   );
 });
 
 type Leading = { icon: IconName; label: string; onPress: () => void; nudge: number } | null;
+
+/**
+ * iOS 26's commit in a sheet's bar: a disc filled with the accent in force —
+ * white on the house pages, the game's own primary on a game's — holding a
+ * check in the fill's ink. Disabled, the same disc at 35%.
+ */
+function ConfirmKey({ onPress, label, disabled = false, loading = false }: ConfirmAction) {
+  const accent = useAccent();
+  const filled = filledRoles(accent);
+  const inert = disabled || loading;
+
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: inert, busy: loading }}
+      onPress={onPress}
+      disabled={inert}
+      scaleTo={0.9}
+      hitSlop={(TOP_BAR_KEY - TOP_BAR_KEY_FILL) / 2}
+      pressedColor={disabled ? undefined : filled.pressed}
+      style={StyleSheet.flatten([
+        styles.key,
+        styles.confirm,
+        { backgroundColor: filled.fill, opacity: disabled ? 0.35 : 1 },
+      ])}>
+      {loading ? (
+        <Loader size="small" color={filled.ink} />
+      ) : (
+        <PressGlyph>
+          <Ionicons name="checkmark" size={TOP_BAR_GLYPH} color={filled.ink} />
+        </PressGlyph>
+      )}
+    </PressableScale>
+  );
+}
 type IconName = keyof typeof Ionicons.glyphMap;
 
 /** The page's scroll offset, or a still zero outside a `<Screen>`. */
@@ -320,12 +391,10 @@ function PlainBar({
   leading,
   title,
   right,
-  centerTitle,
 }: {
   leading: Leading;
   title?: string;
   right?: ReactNode;
-  centerTitle: boolean;
 }) {
   const theme = useTheme();
   const chrome = useScreenChrome();
@@ -371,14 +440,22 @@ function PlainBar({
        nothing under it to reach — the page kept this room clear. */
     <View style={[styles.layer, { height: inset + TOP_BAR_ROW }]}>
       <Frost progress={frost} pulse={pulse} tint={chrome?.background ?? theme.background} />
-      <BarRow inset={inset} leading={leading} right={right}>
-        {centerTitle ? (
-          <BarTitle title={title} leading={!!leading} centre />
-        ) : (
-          <Animated.View style={[styles.titleSlot, titleStyle]}>
-            <BarTitle title={title} leading={!!leading} centre={false} />
+      <BarRow
+        inset={inset}
+        leading={leading}
+        right={right}
+        centre={(side) => (
+          <Animated.View
+            style={[styles.centred, { left: side, right: side }, titleStyle]}
+            pointerEvents="none">
+            {!!title && (
+              <Text variant="h4" numberOfLines={1} accessibilityRole="header">
+                {title}
+              </Text>
+            )}
           </Animated.View>
-        )}
+        )}>
+        <View style={styles.title} />
       </BarRow>
     </View>
   );
@@ -472,7 +549,7 @@ function ArtBar({
         the artwork beneath it.
       */}
       <Animated.View
-        style={[styles.layer, { paddingTop: inset + TOP_BAR_EDGE }, discsStyle]}
+        style={[styles.layer, { paddingTop: inset + TOP_BAR_DISC_TOP }, discsStyle]}
         pointerEvents={pinned ? 'none' : 'box-none'}
         accessibilityElementsHidden={pinned}
         importantForAccessibility={pinned ? 'no-hide-descendants' : 'auto'}>
@@ -499,9 +576,9 @@ function ArtBar({
             {/* The reference's `basicMarquee`: a game's or a collection's name
                 is not ours to shorten. Mounted only while the bar is in — a
                 marquee is a loop, and this one would run behind the artwork. */}
-            <View style={[styles.title, { marginLeft: leading ? TOP_BAR_TITLE_GAP : TITLE_ALONE }]}>
+            <View style={[styles.title, { marginHorizontal: TOP_BAR_TITLE_GAP }]}>
               {pinned && !!title && (
-                <MarqueeText text={title} variant="h3" accessibilityRole="header" />
+                <MarqueeText text={title} variant="h4" align="center" accessibilityRole="header" />
               )}
             </View>
           </BarRow>
@@ -765,58 +842,37 @@ function BarRow({
   inset,
   leading,
   right,
+  centre,
   children,
 }: {
   inset: number;
   leading: Leading;
   right?: ReactNode;
+  /**
+   * A title centred on the display, given how far in it must start at both
+   * ends to clear the wider of the two sides — as an iOS navigation bar
+   * centres its title and truncates it before it reaches a control.
+   */
+  centre?: (side: number) => ReactNode;
   children: ReactNode;
 }) {
+  const [rightWidth, setRightWidth] = useState(0);
+  const leftWidth = leading ? TOP_BAR_KEY : 0;
+  const side = TOP_BAR_SIDE + Math.max(leftWidth, rightWidth, TOP_BAR_KEY) + TOP_BAR_TITLE_GAP;
+
   return (
     <TopBarForm.Provider value="bar">
       <View style={[styles.row, { marginTop: inset }]}>
+        {centre?.(side)}
         {leading && <BarKey {...leading} />}
         {children}
-        {!!right && <BarGroup>{right}</BarGroup>}
-      </View>
-    </TopBarForm.Provider>
-  );
-}
-
-function BarTitle({
-  title,
-  leading,
-  centre,
-}: {
-  title?: string;
-  leading: boolean;
-  centre: boolean;
-}) {
-  if (centre) {
-    return (
-      <>
-        <View style={styles.title} />
-        {!!title && (
-          <View style={styles.centred} pointerEvents="none">
-            <Text variant="h3" numberOfLines={1} accessibilityRole="header">
-              {title}
-            </Text>
+        {!!right && (
+          <View onLayout={(event) => setRightWidth(Math.ceil(event.nativeEvent.layout.width))}>
+            <BarGroup>{right}</BarGroup>
           </View>
         )}
-      </>
-    );
-  }
-
-  return (
-    <View style={[styles.title, { marginLeft: leading ? TOP_BAR_TITLE_GAP : TITLE_ALONE }]}>
-      {!!title && (
-        /* `h3`: the reference's `titleMedium`, 18 — "a sheet's or a screen's
-           title" in this app's scale. */
-        <Text variant="h3" numberOfLines={1} accessibilityRole="header">
-          {title}
-        </Text>
-      )}
-    </View>
+      </View>
+    </TopBarForm.Provider>
   );
 }
 
@@ -935,10 +991,13 @@ function BarKey({ icon, label, onPress, nudge = 0 }: TopBarDiscProps) {
       onPress={onPress}
       scaleTo={0.9}
       hitSlop={(TOP_BAR_KEY - TOP_BAR_KEY_FILL) / 2}
-      /* Held, the 40dp circle M3 calls the state layer. It rests on white at
-         nothing so there is a colour for the press to ease in from. */
+      /* iOS 26 draws a bar's back as a disc on every page, not only over
+         artwork: the grey control fill at rest, a step brighter when held. */
       pressedColor={theme.controlPressed}
-      style={StyleSheet.flatten([styles.key, { backgroundColor: withAlpha(theme.text, 0) }])}>
+      style={StyleSheet.flatten([
+        styles.key,
+        { backgroundColor: liquid ? withAlpha(theme.text, 0) : theme.controlFill },
+      ])}>
       {liquid && <GlassSurface radius={TOP_BAR_KEY_FILL / 2} flat overPage />}
       <PressGlyph>
         <Ionicons
@@ -1065,7 +1124,6 @@ function sheenSpot(x: number, y: number): string {
 }
 
 /** The title's start when no control is in front of it, less the row's own padding. */
-const TITLE_ALONE = TOP_BAR_TITLE_INSET - TOP_BAR_SIDE;
 
 const styles = StyleSheet.create({
   /*
@@ -1109,6 +1167,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /* The commit sits a hair in from the group before it. */
+  confirm: { marginLeft: 0 },
   key: {
     width: TOP_BAR_KEY_FILL,
     height: TOP_BAR_KEY_FILL,
@@ -1180,6 +1240,5 @@ const styles = StyleSheet.create({
   fill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   /* reacticx's header ground runs `tail` past the bar's foot, fading out. */
   fade: { position: 'absolute', top: 0, left: 0, right: 0, bottom: -HEADER_FADE.tail },
-  titleSlot: { flex: 1, minWidth: 0, flexDirection: 'row' },
   headerFade: { position: 'absolute', top: 0, left: 0, right: 0, height: HEADER_FADE.tail },
 });

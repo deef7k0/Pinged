@@ -77,14 +77,14 @@ export function GamePrice({ gameId, selected, title }: GamePriceProps) {
                 separately loaded Medium family and carries its weight for real. */}
             {deal.cut > 0 && (
               <View style={[styles.discount, { backgroundColor: theme.surface }]}>
-                <Text variant="label" style={{ color: theme.success }}>
+                <Text variant="badge" style={{ color: theme.success }}>
                   −{deal.cut}%
                 </Text>
               </View>
             )}
             {deal.isAllTimeLow && (
               <View style={[styles.discount, { backgroundColor: theme.surface }]}>
-                <Text variant="label" style={{ color: theme.identityGold }}>
+                <Text variant="badge" style={{ color: theme.identityGold }}>
                   LOWEST
                 </Text>
               </View>

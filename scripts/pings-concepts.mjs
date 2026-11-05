@@ -18,9 +18,9 @@
  *
  * Real: every colour is parsed out of `src/constants/theme.ts` at run time, so
  * a still cannot drift from the app's palette; every type step is the `Type`
- * scale's own size and leading; every line is broken where Poppins' own
+ * scale's own size and leading; every line is broken where Inter' own
  * advance widths break it, read out of the TTFs the app ships
- * (`node_modules/@expo-google-fonts/poppins`), and rendered in Poppins through
+ * (`node_modules/@expo-google-fonts/inter`), and rendered in Inter through
  * a temporary fontconfig so librsvg sets the same face the phone does; and the
  * cover art is the real thing, fetched from IGDB through the deployed Edge
  * Function with the project's anon key.
@@ -56,7 +56,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, '.impeccable', 'mocks', 'pings');
-const POPPINS = join(ROOT, 'node_modules', '@expo-google-fonts', 'poppins');
+const FONT_DIR = join(ROOT, 'node_modules', '@expo-google-fonts', 'inter');
 
 /* -------------------------------------------------------------------------
  * The frame
@@ -130,7 +130,7 @@ const BORDER = readAlphaToken('border', 'rgba(255,255,255,0.07)');
 const OUTLINE = readAlphaToken('outline', 'rgba(255,255,255,0.16)');
 
 /* -------------------------------------------------------------------------
- * The type scale, parsed out of the same file, and Poppins' real widths
+ * The type scale, parsed out of the same file, and Inter's real widths
  * ---------------------------------------------------------------------- */
 function readType() {
   const source = readFileSync(join(ROOT, 'src', 'constants', 'theme.ts'), 'utf8');
@@ -140,7 +140,7 @@ function readType() {
   for (const [, name, body] of block.matchAll(/^ {2}([a-zA-Z0-9]+):\s*\{([^}]*)\}/gm)) {
     const size = body.match(/fontSize:\s*([\d.]+)/);
     const line = body.match(/lineHeight:\s*([\d.]+)/);
-    const family = body.match(/FontFamily\.(\w+)/);
+    const family = body.match(/Typeface\.(\w+)/);
     const tracking = body.match(/letterSpacing:\s*(-?[\d.]+)/);
     if (!size) continue;
     steps[name] = {
@@ -156,7 +156,7 @@ function readType() {
 }
 const T = readType();
 
-/** `FontFamily`'s keys → the weight directory in the Poppins package. */
+/** `Typeface`'s keys → the weight directory in the Inter package. */
 const WEIGHT_DIR = {
   light: '300Light',
   regular: '400Regular',
@@ -168,19 +168,19 @@ const WEIGHT_DIR = {
 
 /** …and → the family name fontconfig reports for that file. */
 const WEIGHT_FAMILY = {
-  light: 'Poppins Light',
-  regular: 'Poppins',
-  medium: 'Poppins Medium',
-  semibold: 'Poppins SemiBold',
-  bold: 'Poppins',
-  extraBold: 'Poppins ExtraBold',
+  light: 'Inter Light',
+  regular: 'Inter',
+  medium: 'Inter Medium',
+  semibold: 'Inter SemiBold',
+  bold: 'Inter',
+  extraBold: 'Inter ExtraBold',
 };
 const WEIGHT_BOLD = new Set(['bold']);
 
 /**
- * Poppins' advance widths, straight out of the TTF — enough TrueType to answer
+ * Inter's advance widths, straight out of the TTF — enough TrueType to answer
  * "how wide is this string", so a line breaks here where it breaks on the
- * phone. The same reading `src/lib/testkit/poppins-font.ts` does for the
+ * phone. The same reading `src/lib/testkit/app-font.ts` does for the
  * tests, kept local so this script runs under plain node.
  */
 const advanceCache = new Map();
@@ -189,7 +189,7 @@ function advanceTable(weight) {
   const known = advanceCache.get(dir);
   if (known) return known;
 
-  const font = readFileSync(join(POPPINS, dir, `Poppins_${dir}.ttf`));
+  const font = readFileSync(join(FONT_DIR, dir, `Inter_${dir}.ttf`));
   const tables = new Map();
   for (let index = 0; index < font.readUInt16BE(4); index++) {
     const at = 12 + index * 16;
@@ -197,7 +197,7 @@ function advanceTable(weight) {
   }
   const table = (tag) => {
     const offset = tables.get(tag);
-    if (offset === undefined) throw new Error(`Poppins ${dir} has no ${tag} table`);
+    if (offset === undefined) throw new Error(`Inter ${dir} has no ${tag} table`);
     return offset;
   };
 
@@ -216,7 +216,7 @@ function advanceTable(weight) {
       subtable = cmap + font.readUInt32BE(at + 4);
     }
   }
-  if (!subtable) throw new Error(`Poppins ${dir} has no Unicode cmap`);
+  if (!subtable) throw new Error(`Inter ${dir} has no Unicode cmap`);
   const format = font.readUInt16BE(subtable);
 
   const glyphOf = (code) => {
@@ -316,17 +316,17 @@ function rect(x, y, w, h, fill, options = {}) {
  * One line of type, positioned by its *baseline from the box's top* the way a
  * text view sets it: the line box is `step.line` tall and the glyphs sit
  * centred in it, so the baseline is the half-leading plus the ascent.
- * Poppins' ascent is 1.05em and its descent 0.35em.
+ * Inter's ascent is 0.969em and its descent 0.241em.
  */
 function text(x, y, content, step, fill, options = {}) {
-  const ascent = step.size * 1.05;
-  const descent = step.size * 0.35;
+  const ascent = step.size * 0.969;
+  const descent = step.size * 0.241;
   const baseline = y + (step.line - (ascent + descent)) / 2 + ascent;
   const anchor = options.anchor ? ` text-anchor="${options.anchor}"` : '';
   const tracking = step.tracking ? ` letter-spacing="${step.tracking}"` : '';
   const weight = WEIGHT_BOLD.has(step.weight) ? ' font-weight="700"' : '';
   const opacity = options.opacity !== undefined ? ` opacity="${options.opacity}"` : '';
-  return `<text x="${x}" y="${baseline.toFixed(2)}" font-family="${WEIGHT_FAMILY[step.weight] ?? 'Poppins'}"${weight} font-size="${step.size}"${tracking} fill="${fill}"${anchor}${opacity}>${escape(content)}</text>`;
+  return `<text x="${x}" y="${baseline.toFixed(2)}" font-family="${WEIGHT_FAMILY[step.weight] ?? 'Inter'}"${weight} font-size="${step.size}"${tracking} fill="${fill}"${anchor}${opacity}>${escape(content)}</text>`;
 }
 
 /** A run of wrapped lines, each on its own line box. */
@@ -1161,8 +1161,8 @@ function fontconfig(dir) {
   const fonts = join(dir, 'fonts');
   mkdirSync(fonts, { recursive: true });
   for (const weight of Object.values(WEIGHT_DIR)) {
-    const file = `Poppins_${weight}.ttf`;
-    writeFileSync(join(fonts, file), readFileSync(join(POPPINS, weight, file)));
+    const file = `Inter_${weight}.ttf`;
+    writeFileSync(join(fonts, file), readFileSync(join(FONT_DIR, weight, file)));
   }
   const conf = join(dir, 'fonts.conf');
   writeFileSync(
@@ -1217,7 +1217,7 @@ const sheet = [
   text(
     SHEET_GAP,
     46,
-    'Real tokens, real Poppins metrics, real IGDB covers. People and handles are synthetic.',
+    'Real tokens, real Inter metrics, real IGDB covers. People and handles are synthetic.',
     { ...T.caption, size: 12, line: 16 },
     C.textMuted
   ),

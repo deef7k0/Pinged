@@ -3,11 +3,20 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
+import { GlassSurface, useLiquidGlass } from '@/components/ui/liquid-glass';
+import { Loader } from '@/components/ui/loader';
 import { PageFlatList } from '@/components/ui/page-scroll';
 import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
@@ -15,6 +24,7 @@ import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/sc
 import { Text } from '@/components/ui/text';
 import { TextField } from '@/components/ui/text-field';
 import { PosterAspectRatio, Radius, Spacing, withAlpha } from '@/constants/theme';
+import { useAccent } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
 import {
   getPingablePeople,
@@ -86,7 +96,11 @@ export default function SendPingScreen() {
   if (!target) {
     return (
       <Screen edges={['bottom']} insetHeader modal topBar={bar}>
-        <EmptyState title="Nothing to ping" message="This link doesn’t point at anything." />
+        <EmptyState
+          icon="paper-plane-outline"
+          title="Nothing to ping"
+          message="This link doesn’t point at anything."
+        />
       </Screen>
     );
   }
@@ -100,6 +114,9 @@ export default function SendPingScreen() {
 
 function SendFlow({ target }: { target: PingTarget }) {
   const theme = useTheme();
+  const accent = useAccent();
+  const liquid = useLiquidGlass();
+  const filled = { fill: theme.text, ink: theme.onPrimary };
   const router = useRouter();
   const queryClient = useQueryClient();
   const userId = useAuth((state) => state.session?.user.id) ?? null;
@@ -153,12 +170,16 @@ function SendFlow({ target }: { target: PingTarget }) {
     <PersonRow person={item} selected={chosen.has(item.id)} onToggle={toggle} />
   );
   const tooLong = message.length > DIRECT_PING_MESSAGE_MAX;
+  /* The people pinged most recently come first (`pingable_people`), so the
+     rail is the people you send to. Hidden while searching. */
+  const recent = search.trim() ? [] : (people.data ?? []).slice(0, RAIL_COUNT);
 
   let list: React.ReactNode;
   if (people.isPending) list = <LoadingState />;
   else if (people.isLoadingError) {
     list = isPingsNotReady(people.error) ? (
       <EmptyState
+        icon="paper-plane-outline"
         title="Pings are on their way"
         message="They arrive with the database’s next update."
       />
@@ -174,7 +195,13 @@ function SendFlow({ target }: { target: PingTarget }) {
         extraData={chosen}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        ItemSeparatorComponent={PersonRule}
         contentContainerStyle={shown.length === 0 ? styles.emptyList : styles.list}
+        ListHeaderComponent={
+          recent.length > 1 ? (
+            <RecentRail people={recent} chosen={chosen} onToggle={toggle} />
+          ) : null
+        }
         ListEmptyComponent={
           search.trim() ? (
             <EmptyState
@@ -183,6 +210,7 @@ function SendFlow({ target }: { target: PingTarget }) {
             />
           ) : (
             <EmptyState
+              icon="paper-plane-outline"
               title="No one to ping yet"
               message="People choose who can ping them — anyone who follows them, people they follow back, or friends. Follow someone and they’ll show up here."
             />
@@ -215,30 +243,60 @@ function SendFlow({ target }: { target: PingTarget }) {
 
       <View style={styles.flex}>{list}</View>
 
-      <View
-        style={[styles.foot, { borderTopColor: theme.border, backgroundColor: theme.background }]}>
-        <TextField
-          value={message}
-          onChangeText={setMessage}
-          placeholder="Add a line (optional)"
-          maxLength={DIRECT_PING_MESSAGE_MAX + 20}
-          accessibilityLabel="A line to go with it"
-          error={tooLong ? `${DIRECT_PING_MESSAGE_MAX} characters at most.` : null}
-          returnKeyType="done"
-        />
-        {send.isError && (
-          <Text variant="bodySmall" color="danger">
-            {send.error instanceof Error ? send.error.message : 'Could not send that.'}
+      {/*
+        The line and the send, docked over the keyboard as one capsule —
+        Messages' (the Apple pass, 2026-11-05). It was a field and a
+        full-width "Ping 3 people" button in a band at the foot.
+      */}
+      <View style={styles.foot}>
+        {(send.isError || tooLong) && (
+          <Text variant="bodySmall" color="danger" style={styles.footNote}>
+            {tooLong
+              ? `${DIRECT_PING_MESSAGE_MAX} characters at most.`
+              : send.error instanceof Error
+                ? send.error.message
+                : 'Could not send that.'}
           </Text>
         )}
-        <Button
-          title={sendLabel(chosen.size)}
-          icon="paper-plane"
-          fullWidth
-          loading={send.isPending}
-          disabled={chosen.size === 0 || tooLong}
-          onPress={() => send.mutate()}
-        />
+        <View
+          style={[
+            styles.capsule,
+            liquid ? styles.capsuleGlass : { backgroundColor: theme.surfaceElevated },
+            { borderColor: theme.border },
+          ]}>
+          {liquid && <GlassSurface radius={CAPSULE / 2} />}
+          <TextInput
+            value={message}
+            onChangeText={setMessage}
+            placeholder={chosen.size > 0 ? 'Add a line (optional)' : 'Choose who to ping'}
+            placeholderTextColor={theme.textMuted}
+            selectionColor={accent.onSurface}
+            maxLength={DIRECT_PING_MESSAGE_MAX + 20}
+            multiline
+            accessibilityLabel="A line to go with it"
+            style={[styles.input, { color: theme.text }]}
+          />
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={sendLabel(chosen.size)}
+            accessibilityState={{ disabled: chosen.size === 0 || tooLong || send.isPending }}
+            disabled={chosen.size === 0 || tooLong || send.isPending}
+            onPress={() => send.mutate()}
+            scaleTo={0.9}
+            style={StyleSheet.flatten([
+              styles.send,
+              { backgroundColor: send.isPending ? theme.controlFill : filled.fill },
+              (chosen.size === 0 || tooLong) && styles.sendOff,
+            ])}>
+            {send.isPending ? (
+              <Loader size="small" color={theme.text} />
+            ) : (
+              <PressGlyph>
+                <Ionicons name="paper-plane" size={17} color={filled.ink} />
+              </PressGlyph>
+            )}
+          </PressableScale>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -309,11 +367,8 @@ const PersonRow = memo(function PersonRow({
       onPress={() => onToggle(person.id)}
       scaleTo={0.985}
       pressedColor={theme.controlPressed}
-      style={StyleSheet.flatten([
-        styles.person,
-        { backgroundColor: selected ? theme.primaryMuted : withAlpha(theme.text, 0) },
-      ])}>
-      <Avatar uri={person.avatar_url} name={name} size={44} />
+      style={StyleSheet.flatten([styles.person, { backgroundColor: withAlpha(theme.text, 0) }])}>
+      <Avatar uri={person.avatar_url} name={name} size={40} />
       <View style={styles.personText}>
         <Text variant="itemTitle" numberOfLines={1}>
           {name}
@@ -326,7 +381,7 @@ const PersonRow = memo(function PersonRow({
         style={[
           styles.check,
           selected
-            ? { backgroundColor: theme.primary, borderColor: theme.primary }
+            ? { backgroundColor: theme.text, borderColor: theme.text }
             : { borderColor: theme.outline },
         ]}>
         {selected && (
@@ -338,6 +393,73 @@ const PersonRow = memo(function PersonRow({
     </PressableScale>
   );
 });
+
+/** The hairline between people, from where the names start. */
+function PersonRule() {
+  const theme = useTheme();
+  return <View style={[styles.personRule, { backgroundColor: theme.border }]} />;
+}
+
+/** How many faces the rail holds. */
+const RAIL_COUNT = 8;
+const RAIL_FACE = 56;
+
+/**
+ * The people you ping most, as a rail of round faces that tick — the share
+ * sheet's row of people. A tap is the same as ticking their row below.
+ */
+function RecentRail({
+  people,
+  chosen,
+  onToggle,
+}: {
+  people: Profile[];
+  chosen: ReadonlySet<string>;
+  onToggle: (id: string) => void;
+}) {
+  const theme = useTheme();
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      style={styles.rail}
+      contentContainerStyle={styles.railContent}>
+      {people.map((person) => {
+        const name = displayNameFor(person);
+        const selected = chosen.has(person.id);
+        return (
+          <PressableScale
+            key={person.id}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: selected }}
+            accessibilityLabel={name}
+            onPress={() => onToggle(person.id)}
+            scaleTo={0.92}
+            style={styles.railItem}>
+            <View>
+              <Avatar uri={person.avatar_url} name={name} size={RAIL_FACE} />
+              {selected && (
+                <View
+                  style={[
+                    styles.railTick,
+                    { backgroundColor: theme.text, borderColor: theme.background },
+                  ]}>
+                  <PressGlyph pop={selected}>
+                    <Ionicons name="checkmark" size={13} color={theme.onPrimary} />
+                  </PressGlyph>
+                </View>
+              )}
+            </View>
+            <Text variant="caption" numberOfLines={1} style={styles.railName}>
+              {name}
+            </Text>
+          </PressableScale>
+        );
+      })}
+    </ScrollView>
+  );
+}
 
 /** Sent: a tick, who it reached, and — if anybody — who it did not, and why. */
 function Sent({
@@ -376,6 +498,9 @@ function Sent({
   );
 }
 
+/** The message capsule's height at one line. */
+const CAPSULE = 48;
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   head: {
@@ -394,15 +519,29 @@ const styles = StyleSheet.create({
   art: { borderRadius: Radius.image },
   artEmpty: { alignItems: 'center', justifyContent: 'center' },
   whatText: { flex: 1, minWidth: 0, gap: 2 },
-  list: { paddingHorizontal: Spacing.x8, paddingBottom: Spacing.x16 },
+  list: { paddingHorizontal: Spacing.x16, paddingBottom: Spacing.x16 },
   emptyList: { flexGrow: 1 },
   person: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.x12,
-    paddingHorizontal: Spacing.x8,
     paddingVertical: Spacing.x8,
-    borderRadius: Radius.card,
+  },
+  personRule: { height: StyleSheet.hairlineWidth, marginLeft: 40 + Spacing.x12 },
+  rail: { flexGrow: 0, marginHorizontal: -Spacing.x16, marginBottom: Spacing.x12 },
+  railContent: { paddingHorizontal: Spacing.x16, gap: Spacing.x12 },
+  railItem: { width: RAIL_FACE + Spacing.x8, alignItems: 'center', gap: Spacing.x4 },
+  railName: { textAlign: 'center' },
+  railTick: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   personText: { flex: 1, minWidth: 0, gap: 1 },
   check: {
@@ -413,13 +552,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  foot: {
-    paddingHorizontal: Spacing.x16,
-    paddingTop: Spacing.x12,
-    paddingBottom: Spacing.x12,
-    gap: Spacing.x8,
-    borderTopWidth: StyleSheet.hairlineWidth,
+  foot: { paddingHorizontal: Spacing.x12, paddingTop: Spacing.x8, paddingBottom: Spacing.x8 },
+  footNote: { paddingHorizontal: Spacing.x8, paddingBottom: Spacing.x4 },
+  capsule: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    minHeight: CAPSULE,
+    paddingLeft: Spacing.x16,
+    paddingRight: 4,
+    paddingVertical: 4,
+    borderRadius: CAPSULE / 2,
+    borderWidth: StyleSheet.hairlineWidth,
   },
+  capsuleGlass: { borderWidth: 0 },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    lineHeight: 21,
+    maxHeight: 110,
+    paddingTop: 10,
+    paddingBottom: 10,
+    paddingHorizontal: 0,
+  },
+  send: {
+    width: CAPSULE - 8,
+    height: CAPSULE - 8,
+    borderRadius: (CAPSULE - 8) / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: Spacing.x8,
+  },
+  sendOff: { opacity: 0.35 },
   sent: {
     flex: 1,
     alignItems: 'center',

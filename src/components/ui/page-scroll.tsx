@@ -21,6 +21,7 @@ import {
   type ScrollViewProps,
   type SectionListProps,
   View,
+  type ViewStyle,
 } from 'react-native';
 import Animated, {
   Extrapolation,
@@ -132,10 +133,11 @@ function usePageContentSize(own?: (width: number, height: number) => void) {
  * (`ScreenChrome.largeTitle`). Lines itself up with the page's margin
  * wherever the content container starts.
  */
-function LargeTitle() {
+function LargeTitle({ style }: { style?: ViewStyle }) {
   const chrome = useScreenChrome();
   const pulse = usePulse();
   const title = chrome?.largeTitle ?? null;
+  const subtitle = chrome?.largeSubtitle ?? null;
   const drawn = chrome?.largeTitleDrawn;
   const scrollY = chrome?.scrollY;
   const box = useRef<View>(null);
@@ -147,7 +149,7 @@ function LargeTitle() {
     return () => drawn.set(0);
   }, [title, drawn]);
 
-  const style = useAnimatedStyle(() => {
+  const ownStyle = useAnimatedStyle(() => {
     pulse.get();
     const y = scrollY?.get() ?? 0;
     return {
@@ -161,7 +163,7 @@ function LargeTitle() {
   return (
     <Animated.View
       ref={box}
-      style={[styles.largeTitle, { paddingLeft: nudge }, style]}
+      style={[styles.largeTitle, { paddingLeft: nudge }, ownStyle, style]}
       onLayout={() =>
         box.current?.measureInWindow((x) => {
           const want = Math.max(0, Spacing.x16 - x);
@@ -171,9 +173,21 @@ function LargeTitle() {
       <Text variant="largeTitle" numberOfLines={2} accessibilityRole="header">
         {title}
       </Text>
+      {!!subtitle && (
+        <Text variant="body" color="textSecondary" numberOfLines={1}>
+          {subtitle}
+        </Text>
+      )}
     </Animated.View>
   );
 }
+
+/**
+ * The large title, for a page that places it itself — Home, whose bar's room
+ * and glow come first, so the title cannot be the scroller's first child.
+ * Such a page passes `ownLargeTitle` to its `<PageScrollView>`.
+ */
+export const PageLargeTitle = LargeTitle;
 
 /** A list's own header, with the large title above it. */
 function withLargeTitle(header: ComponentType | ReactElement | null | undefined): ReactElement {
@@ -309,12 +323,18 @@ export function PageScrollView({
   scrollEventThrottle = 16,
   onContentSizeChange,
   settle,
+  ownLargeTitle = false,
   onScrollBeginDrag,
   onScrollEndDrag,
   onMomentumScrollEnd,
   children,
   ...props
-}: ScrollViewProps & { ref?: Ref<ScrollView>; settle?: SettleBand }) {
+}: ScrollViewProps & {
+  ref?: Ref<ScrollView>;
+  settle?: SettleBand;
+  /** The page draws `<PageLargeTitle>` where it wants it; this does not. */
+  ownLargeTitle?: boolean;
+}) {
   const node = useRef<Scrollable | null>(null);
   const keep = useCallback(
     (scroller: ScrollView | null) => {
@@ -334,7 +354,7 @@ export function PageScrollView({
       onContentSizeChange={sized}
       {...settling}
       {...props}>
-      <LargeTitle />
+      {!ownLargeTitle && <LargeTitle />}
       {children}
     </ScrollView>
   );
@@ -397,3 +417,31 @@ export function PageSectionList<ItemT, SectionT = DefaultSectionT>({
     />
   );
 }
+
+/**
+ * A page that is only a header and a state — loading, failed, empty — while
+ * its list is not there yet: the large title, the header (a tab row) under
+ * it, then the state filling the rest. So a page whose tabs live in its
+ * list's header keeps them, and its name, before the list arrives.
+ */
+export function PageWithHeader({
+  header,
+  contentContainerStyle,
+  children,
+}: {
+  header?: ReactElement | null;
+  /** The list's own content style, so the header sits where the list puts it. */
+  contentContainerStyle?: ScrollViewProps['contentContainerStyle'];
+  children?: ReactElement | ReactElement[] | null;
+}) {
+  return (
+    <PageScrollView
+      contentContainerStyle={[contentContainerStyle, pageStyles.grow]}
+      showsVerticalScrollIndicator={false}>
+      {header}
+      <View style={pageStyles.grow}>{children}</View>
+    </PageScrollView>
+  );
+}
+
+const pageStyles = { grow: { flexGrow: 1 } } as const;

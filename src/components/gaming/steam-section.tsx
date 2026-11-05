@@ -491,7 +491,7 @@ function Section({
     <View style={styles.block}>
       <View style={styles.blockHead}>
         <Text variant="label" color="textSecondary">
-          {title.toUpperCase()}
+          {title}
         </Text>
         {action}
       </View>

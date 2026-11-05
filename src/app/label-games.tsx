@@ -83,6 +83,7 @@ export default function LabelGamesScreen() {
         modal
         topBar={<FrostedTopBar dismiss title={`Label games ${words.title}`} />}>
         <EmptyState
+          icon="shield-checkmark-outline"
           title="Moderators only"
           message={`${words.title} is set by Pinged’s moderators.`}
         />

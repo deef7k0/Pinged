@@ -144,12 +144,15 @@ export function SectionMore({ label = 'More', accessibilityLabel, onPress }: Sec
 }
 
 /**
- * A section's heading: its name, bold and white, and at the far end a quiet
- * fact about it (`action`) or its way onward (`more`).
+ * A section's heading, Apple's (the Apple pass, 2026-11-04): the name in
+ * `h2` — Title 2, 22 bold — and, where it leads somewhere, a chevron straight
+ * after it ("Trailers ›"), the whole line the door. A quiet fact about it
+ * (`action`) or a trigger that owns what it opens (`moreSlot`) goes at the
+ * far end.
  *
- * `h4`, the reference's `labelMedium`: 16 bold. Not `h2` — that is Home's
- * shelf title (`headlineMedium`, 20), and the artist page sets its section
- * headings a step smaller than Home does.
+ * It was Apple TV's heading on the game page only (`CardlessContext`), and
+ * SimpMusic's artist-page heading everywhere else — `h4` 16 with a small
+ * "More" at the far end. One heading now.
  */
 export function SectionHeader({
   title,
@@ -162,67 +165,37 @@ export function SectionHeader({
   more?: SectionMoreProps;
   /**
    * A More that owns what it opens — a sheet's own trigger, drawn with
-   * `<SectionMore>` — set where `more` would be and spaced the same.
+   * `<SectionMore>` — set at the far end of the row.
    */
   moreSlot?: ReactNode;
 }) {
-  const metrics = useSectionMetrics();
   const inset = useSectionInset();
-  const cardless = useCardless();
-  const hasMore = !!more || !!moreSlot;
 
-  /*
-   * Apple TV's heading, on the game page (`CardlessContext`): the name in
-   * `h2`, and where it leads somewhere a chevron straight after it — "Trailers
-   * ›" — the whole line the door, in place of a More at the far end.
-   */
-  if (cardless) {
-    const words = (
-      <>
-        <Text variant="h2" accessibilityRole="header" numberOfLines={1} style={styles.tvTitle}>
-          {title}
-        </Text>
-        {more && <Ionicons name="chevron-forward" size={20} color={TV_CHEVRON} />}
-      </>
-    );
-    return (
-      <View style={[styles.tvHeader, { paddingHorizontal: inset }]}>
-        {more ? (
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel={more.accessibilityLabel}
-            onPress={more.onPress}
-            hitSlop={TV_SLOP}
-            scaleTo={0.98}
-            style={StyleSheet.flatten(styles.tvDoor)}>
-            {words}
-          </PressableScale>
-        ) : (
-          <View style={styles.tvDoor}>{words}</View>
-        )}
-        <View style={styles.title} />
-        {action}
-        {moreSlot}
-      </View>
-    );
-  }
-
-  return (
-    <View
-      style={[
-        styles.header,
-        {
-          minHeight: metrics.headerHeight,
-          paddingLeft: inset,
-          /* The More brings its own padding, as the reference's button does. */
-          paddingRight: hasMore ? Math.max(0, inset - metrics.moreInset) : inset,
-        },
-      ]}>
-      <Text variant="h4" accessibilityRole="header" style={styles.title}>
+  const words = (
+    <>
+      <Text variant="h2" accessibilityRole="header" numberOfLines={1} style={styles.tvTitle}>
         {title}
       </Text>
+      {more && <Ionicons name="chevron-forward" size={20} color={TV_CHEVRON} />}
+    </>
+  );
+  return (
+    <View style={[styles.tvHeader, { paddingHorizontal: inset }]}>
+      {more ? (
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={more.accessibilityLabel}
+          onPress={more.onPress}
+          hitSlop={TV_SLOP}
+          scaleTo={0.98}
+          style={StyleSheet.flatten(styles.tvDoor)}>
+          {words}
+        </PressableScale>
+      ) : (
+        <View style={styles.tvDoor}>{words}</View>
+      )}
+      <View style={styles.title} />
       {action}
-      {more && <SectionMore {...more} />}
       {moreSlot}
     </View>
   );
@@ -365,7 +338,8 @@ export function ArtRail<T>({
     size: { width: number; height: number },
     context: ArtRailContext
   ) => ReactNode;
-  titleOf?: (item: T) => string;
+  /** A caption under the art; `undefined` for an item leaves that one bare. */
+  titleOf?: (item: T) => string | undefined;
   subtitleOf?: (item: T) => string | null;
   onPressItem?: (item: T) => void;
   /** What a screen reader says for an item; defaults to its title. */

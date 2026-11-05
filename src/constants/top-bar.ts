@@ -31,12 +31,13 @@
  */
 
 /**
- * The bar's row, above the status bar's inset: M3's `TopAppBar` container
- * (`TopAppBarDefaults.TopAppBarExpandedHeight`, 64dp).
+ * The bar's row, above the status bar's inset: 52, an iOS navigation bar's
+ * 44pt row with room for Android's 48dp controls (the Apple pass,
+ * 2026-11-04). It was M3's `TopAppBar` container, 64dp.
  *
  * It is also what `<Screen insetHeader>` reserves — see `useHeaderHeight()`.
  */
-export const TOP_BAR_ROW = 64;
+export const TOP_BAR_ROW = 52;
 
 /** A control in the bar: M3's `IconButton`, 48 to touch… */
 export const TOP_BAR_KEY = 48;
@@ -59,15 +60,22 @@ export const TOP_BAR_TITLE_INSET = 16;
 
 /** A glass disc over artwork: `LiquidGlassIconButton(…, Modifier.size(48.dp))`. */
 export const TOP_BAR_DISC = 48;
-/** How far a disc sits from its corner, on both axes: `padding(12.dp)`. */
+/** How far a disc sits from the side of the display: `padding(12.dp)`. */
 export const TOP_BAR_EDGE = 12;
+/**
+ * How far a disc sits under the status bar: centred in the bar's row, as an
+ * iOS toolbar's buttons are, so a disc over artwork and the bar that follows
+ * it hold their controls at the same height (2026-11-04; it was the 12 from
+ * the side too, when the row was 64).
+ */
+export const TOP_BAR_DISC_TOP = (TOP_BAR_ROW - TOP_BAR_DISC) / 2;
 
 /**
  * What a page that opens on artwork keeps clear for its discs, above the
- * inset: 12 + 48. Not the bar's row — such a page has no bar at rest, and its
+ * inset: 2 + 48. Not the bar's row — such a page has no bar at rest, and its
  * own layout (a review's art, a copy's stage) was measured against this.
  */
-export const TOP_BAR_DISC_ROOM = TOP_BAR_EDGE + TOP_BAR_DISC;
+export const TOP_BAR_DISC_ROOM = TOP_BAR_DISC_TOP + TOP_BAR_DISC;
 
 /**
  * The frost: what is behind the bar, blurred, with the page's own colour

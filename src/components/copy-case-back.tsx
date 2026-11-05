@@ -12,7 +12,7 @@ import {
   type PlatformKey,
 } from '@/constants/platform-cases';
 import { formatPartialDate } from '@/constants/progress';
-import { FontFamily, readableInk } from '@/constants/theme';
+import { Typeface, readableInk } from '@/constants/theme';
 import type { CopyWithRelations } from '@/lib/api';
 import type { CopyArtImage } from '@/lib/api/copy-art';
 import { maskBarcode } from '@/lib/barcode';
@@ -287,12 +287,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   bandHighlight: { position: 'absolute', top: 0, left: 0, right: 0, height: 1 },
-  bandLabel: { fontFamily: FontFamily.bold, letterSpacing: 1 },
+  bandLabel: { fontFamily: Typeface.bold, letterSpacing: 1 },
   body: { flex: 1 },
-  title: { fontFamily: FontFamily.bold, letterSpacing: 0.1 },
+  title: { fontFamily: Typeface.bold, letterSpacing: 0.1 },
   rows: { gap: 5, borderTopWidth: StyleSheet.hairlineWidth },
   row: { gap: 1 },
-  label: { fontFamily: FontFamily.semibold, letterSpacing: 0.8 },
-  value: { fontFamily: FontFamily.medium },
-  notes: { fontFamily: FontFamily.italic, marginTop: 'auto' },
+  label: { fontFamily: Typeface.semibold, letterSpacing: 0.8 },
+  value: { fontFamily: Typeface.medium },
+  notes: { fontFamily: Typeface.italic, marginTop: 'auto' },
 });

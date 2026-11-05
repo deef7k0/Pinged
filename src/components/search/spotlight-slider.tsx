@@ -263,52 +263,112 @@ export const SpotlightSlider = memo(function SpotlightSlider({
     return (
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         <DiscoverCarouselSkeleton />
+        {/* The dots' row, held, so the page does not move when they come. */}
+        <View style={styles.dots} />
       </View>
     );
   }
 
   return (
-    <Animated.ScrollView
-      ref={list}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      /* Its own gesture: a sideways drag moves the row, a vertical one is the page's. */
-      nestedScrollEnabled
-      snapToInterval={geometry.step}
-      snapToAlignment="start"
-      decelerationRate="fast"
-      disableIntervalMomentum
-      scrollEventThrottle={16}
-      overScrollMode="never"
-      onScroll={onScroll}
-      /* A horizontal scroller grows unless told not to (CLAUDE.md, gotchas). */
-      style={styles.scroller}
-      contentContainerStyle={styles.row}>
-      {slides.map((slide, position) =>
-        slide.kind === 'game' ? (
-          <GameCard
-            key={slide.key}
-            slide={slide}
-            geometry={geometry}
-            position={position}
-            count={count}
-            scrollX={scrollX}
-          />
-        ) : (
-          <CalendarCard
-            key={slide.key}
-            slide={slide}
-            geometry={geometry}
-            position={position}
-            count={count}
-            now={now}
-            releaseDays={spotlight?.releaseDays ?? EMPTY_DAYS}
-          />
-        )
-      )}
-    </Animated.ScrollView>
+    <View>
+      <Animated.ScrollView
+        ref={list}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        /* Its own gesture: a sideways drag moves the row, a vertical one is the page's. */
+        nestedScrollEnabled
+        snapToInterval={geometry.step}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        disableIntervalMomentum
+        scrollEventThrottle={16}
+        overScrollMode="never"
+        onScroll={onScroll}
+        /* A horizontal scroller grows unless told not to (CLAUDE.md, gotchas). */
+        style={styles.scroller}
+        contentContainerStyle={styles.row}>
+        {slides.map((slide, position) =>
+          slide.kind === 'game' ? (
+            <GameCard
+              key={slide.key}
+              slide={slide}
+              geometry={geometry}
+              position={position}
+              count={count}
+              scrollX={scrollX}
+            />
+          ) : (
+            <CalendarCard
+              key={slide.key}
+              slide={slide}
+              geometry={geometry}
+              position={position}
+              count={count}
+              now={now}
+              releaseDays={spotlight?.releaseDays ?? EMPTY_DAYS}
+            />
+          )
+        )}
+      </Animated.ScrollView>
+      {count > 1 && <PageDots count={count} step={geometry.step} scrollX={scrollX} />}
+    </View>
   );
 });
+
+/**
+ * Apple's page dots under the row: one a card, the one in front at full ink
+ * and wider, the rest at a third — driven by the row's own offset on the UI
+ * thread, so they slide with a finger and with the glide alike. A screen
+ * reader hears "Card 2 of 4" on each card instead.
+ */
+function PageDots({
+  count,
+  step,
+  scrollX,
+}: {
+  count: number;
+  step: number;
+  scrollX: SharedValue<number>;
+}) {
+  return (
+    <View
+      style={styles.dots}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants">
+      {Array.from({ length: count }, (_, index) => (
+        <Dot key={index} index={index} step={step} scrollX={scrollX} />
+      ))}
+    </View>
+  );
+}
+
+function Dot({
+  index,
+  step,
+  scrollX,
+}: {
+  index: number;
+  step: number;
+  scrollX: SharedValue<number>;
+}) {
+  const theme = useTheme();
+  const pulse = usePulse();
+  const style = useAnimatedStyle(() => {
+    pulse.get();
+    const away = Math.min(1, Math.abs(scrollX.get() / Math.max(1, step) - index));
+    return {
+      width: DOT + (DOT_ACTIVE - DOT) * (1 - away),
+      opacity: 1 - (1 - DOT_REST) * away,
+      transform: [{ translateX: 0 }],
+    };
+  });
+  return <Animated.View style={[styles.dot, { backgroundColor: theme.text }, style]} />;
+}
+
+/** A dot, the one in front's width, and how bright the others are. */
+const DOT = 7;
+const DOT_ACTIVE = 18;
+const DOT_REST = 0.32;
 
 const EMPTY_DAYS: readonly number[] = [];
 
@@ -541,6 +601,14 @@ const DAY_LIT = 0.18;
 
 const styles = StyleSheet.create({
   scroller: { flexGrow: 0 },
+  dots: {
+    height: DOT + Spacing.x12 * 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  dot: { height: DOT, borderRadius: DOT / 2 },
   /* From the page's margin, so the first card stands under the heading. */
   row: { paddingHorizontal: Spacing.x16, gap: DISCOVER.gap },
   card: {

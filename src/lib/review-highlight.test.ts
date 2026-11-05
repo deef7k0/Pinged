@@ -11,7 +11,7 @@ import {
   wordAt,
   type WordRange,
 } from './review-highlight.ts';
-import { textWidth } from './testkit/poppins-font.ts';
+import { textWidth } from './testkit/app-font.ts';
 
 const REVIEW =
   'Hollow Knight is gorgeous.\r\nIt is also lonely, and far too long.\n\nThe bosses carry it.  Mostly.';

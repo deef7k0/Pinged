@@ -158,7 +158,7 @@ export const GameListItem = memo(function GameListItem({
             storefront puts it. */}
         {badge && (
           <View style={[styles.badge, { backgroundColor: theme.success }]}>
-            <Text variant="label" style={{ color: theme.background }}>
+            <Text variant="badge" style={{ color: theme.background }}>
               {badge}
             </Text>
           </View>

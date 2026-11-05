@@ -26,7 +26,7 @@ export default function LegalScreen() {
   if (!isLegalSlug(doc)) {
     return (
       <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back />}>
-        <EmptyState title="Page not found" />
+        <EmptyState icon="search" title="Page not found" />
       </Screen>
     );
   }

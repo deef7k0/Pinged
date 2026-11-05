@@ -77,7 +77,11 @@ export default function TabsLayout() {
             title: 'Pings',
             tabBarAccessibilityLabel: 'Pings',
             tabBarIcon: ({ color, focused, size }) => (
-              <Ionicons name={focused ? 'radio' : 'radio-outline'} size={size} color={color} />
+              <Ionicons
+                name={focused ? 'paper-plane' : 'paper-plane-outline'}
+                size={size}
+                color={color}
+              />
             ),
           }}
         />

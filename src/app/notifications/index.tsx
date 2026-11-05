@@ -2,18 +2,17 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState, type ReactElement } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
-import { PageFlatList, PageSectionList } from '@/components/ui/page-scroll';
+import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
+import { PageFlatList, PageSectionList, PageWithHeader } from '@/components/ui/page-scroll';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
 import { TabBar } from '@/components/ui/tab-bar';
 import { Text } from '@/components/ui/text';
-import { PosterAspectRatio, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   deleteInboxPing,
@@ -55,7 +54,7 @@ const ICON: Record<NotificationKind, keyof typeof Ionicons.glyphMap> = {
   friend_request: 'person-add',
   friend_accepted: 'people',
   wall_post: 'create',
-  ping_suggestion: 'radio',
+  ping_suggestion: 'paper-plane',
 };
 
 /** The noun after the verb, by what the notification points at. */
@@ -76,17 +75,8 @@ const KIND_ICON: Record<DirectPingKind, keyof typeof Ionicons.glyphMap> = {
   collection: 'albums',
   event: 'calendar',
   soundtrack: 'musical-notes',
-  request: 'radio',
+  request: 'paper-plane',
 };
-
-/** Box art draws portrait; the rest as a landscape tile. */
-const PORTRAIT: readonly DirectPingKind[] = [
-  'game',
-  'soundtrack',
-  'review',
-  'collection',
-  'request',
-];
 
 /**
  * The bell's page: your pings, and your notifications — the owner's brief
@@ -119,24 +109,56 @@ export default function InboxScreen() {
     enabled: !!userId,
   });
 
-  const tabs = [
-    { key: 'pings' as const, label: 'Pings', alert: (pings.data ?? []).some((ping) => !ping.read) },
-    {
-      key: 'notifications' as const,
-      label: 'Notifications',
-      alert: (notifications.data ?? []).some((entry) => !entry.read),
+  const queryClient = useQueryClient();
+  const pingsUnread = (pings.data ?? []).some((ping) => !ping.read);
+  const notificationsUnread = (notifications.data ?? []).some((entry) => !entry.read);
+
+  const markAll = useMutation({
+    mutationFn: async (which: InboxTab) => {
+      if (!userId) return;
+      if (which === 'pings') await markAllPingsRead(userId);
+      else await markAllRead(userId);
     },
+    onSuccess: (_, which) => {
+      toast.success('All marked as read');
+      void queryClient.invalidateQueries({
+        queryKey: [which === 'pings' ? 'direct-pings' : 'notifications'],
+      });
+      void queryClient.invalidateQueries({ queryKey: ['inbox', 'unread'] });
+    },
+  });
+
+  const tabs = [
+    { key: 'pings' as const, label: 'Pings', alert: pingsUnread },
+    { key: 'notifications' as const, label: 'Notifications', alert: notificationsUnread },
   ];
 
+  /* The tabs are the lists' header, under the large title (the Apple pass,
+     2026-11-05): the name first, folding into the bar as the page is read. */
+  const header = (
+    <View style={styles.tabs}>
+      <TabBar tabs={tabs} value={tab} onChange={setTab} label="Inbox" inset={0} />
+    </View>
+  );
+
+  /* "Mark all as read" is a key in the bar, Mail's — it was a button at the
+     head of each list. Drawn only while the tab in front has something unread. */
+  const unread = tab === 'pings' ? pingsUnread : notificationsUnread;
+  const right =
+    unread && !markAll.isPending ? (
+      <TopBarDisc
+        icon="checkmark-done"
+        label="Mark all as read"
+        onPress={() => markAll.mutate(tab)}
+      />
+    ) : undefined;
+
   return (
-    <Screen edges={[]} insetHeader topBar={<FrostedTopBar back title="Inbox" largeTitle={false} />}>
-      <View style={styles.tabs}>
-        <TabBar tabs={tabs} value={tab} onChange={setTab} label="Inbox" />
-      </View>
+    <Screen edges={[]} insetHeader topBar={<FrostedTopBar back title="Inbox" right={right} />}>
       {tab === 'pings' ? (
-        <PingsList query={pings} userId={userId ?? null} />
+        <PingsList query={pings} userId={userId ?? null} header={header} />
       ) : (
-        <NotificationsList query={notifications} userId={userId ?? null} />
+        <NotificationsList query={notifications} userId={userId ?? null} header={header} />
       )}
     </Screen>
   );
@@ -149,9 +171,11 @@ export default function InboxScreen() {
 function PingsList({
   query,
   userId,
+  header,
 }: {
   query: UseQueryResult<InboxPing[]>;
   userId: string | null;
+  header: ReactElement;
 }) {
   const theme = useTheme();
   const router = useRouter();
@@ -161,14 +185,6 @@ function PingsList({
     void queryClient.invalidateQueries({ queryKey: ['direct-pings'] });
     void queryClient.invalidateQueries({ queryKey: ['inbox', 'unread'] });
   }, [queryClient]);
-
-  const markAll = useMutation({
-    mutationFn: () => markAllPingsRead(userId!),
-    onSuccess: () => {
-      toast.success('All marked as read');
-      return refresh();
-    },
-  });
 
   const open = useCallback(
     (ping: InboxPing) => {
@@ -208,19 +224,17 @@ function PingsList({
     [open, remove]
   );
 
-  if (query.isPending) return <LoadingState />;
-  if (query.isLoadingError)
-    return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
+  if (query.isPending || query.isLoadingError) return <ListState query={query} header={header} />;
 
   const rows = query.data ?? [];
-  const unread = rows.some((ping) => !ping.read);
 
   return (
     <PageFlatList
       data={rows}
       keyExtractor={pingKey}
       renderItem={renderItem}
-      contentContainerStyle={rows.length === 0 ? styles.empty : styles.content}
+      ItemSeparatorComponent={RowRule}
+      contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -229,22 +243,10 @@ function PingsList({
           tintColor={theme.primary}
         />
       }
-      ListHeaderComponent={
-        unread ? (
-          <View style={styles.markRead}>
-            <Button
-              title="Mark all as read"
-              variant="secondary"
-              size="small"
-              icon="checkmark-done"
-              loading={markAll.isPending}
-              onPress={() => markAll.mutate()}
-            />
-          </View>
-        ) : null
-      }
+      ListHeaderComponent={header}
       ListEmptyComponent={
         <EmptyState
+          icon="paper-plane-outline"
           title="No pings yet"
           message="When someone pings you a game, a review, a collection, an event or a soundtrack, it lands here."
         />
@@ -266,84 +268,84 @@ const PingRow = memo(function PingRow({
 }) {
   const theme = useTheme();
   const name = displayNameFor(ping.sender);
-  const portrait = PORTRAIT.includes(ping.kind);
-  const artWidth = portrait ? 40 : 64;
-  const artHeight = portrait ? Math.round(40 / PosterAspectRatio) : 36;
 
+  /* A row on the page, Mail's and Messages': the face, the words, the thing
+     at the trailing edge as a 44dp square — not a box inside a box. Unread is
+     the dot before the face. */
   return (
     <PressableScale
       accessibilityRole="button"
-      accessibilityLabel={`${name} ${DIRECT_PING_VERB[ping.kind]}: ${ping.title}${ping.message ? `. “${ping.message}”` : ''}`}
+      accessibilityLabel={`${ping.read ? '' : 'Unread. '}${name} ${DIRECT_PING_VERB[ping.kind]}: ${ping.title}${ping.message ? `. “${ping.message}”` : ''}`}
       accessibilityHint="Opens it. Hold to delete"
       onPress={() => onOpen(ping)}
       onLongPress={() => onRemove(ping)}
       scaleTo={0.99}
-      style={StyleSheet.flatten([
-        styles.row,
-        { backgroundColor: ping.read ? 'transparent' : theme.primaryMuted },
-      ])}>
+      style={styles.row}>
+      <UnreadDot on={!ping.read} />
       <View>
-        <Avatar uri={ping.sender?.avatar_url} name={name} size={44} />
+        <Avatar uri={ping.sender?.avatar_url} name={name} size={AVATAR} />
         <View style={[styles.badge, { backgroundColor: theme.background }]}>
           <Ionicons name={KIND_ICON[ping.kind]} size={11} color={theme.primaryText} />
         </View>
       </View>
 
       <View style={styles.rowText}>
-        <Text variant="body" numberOfLines={2}>
-          <Text variant="h5">{name}</Text> {DIRECT_PING_VERB[ping.kind]}
+        <Text variant="body" numberOfLines={3}>
+          <Text variant="h5">{name}</Text> {DIRECT_PING_VERB[ping.kind]}{' '}
+          <Text variant="h5">{ping.title}</Text>
         </Text>
-
-        <View style={[styles.thing, { backgroundColor: theme.controlFill }]}>
-          {ping.image_url ? (
-            <Image
-              source={{ uri: ping.image_url }}
-              style={[
-                styles.art,
-                { width: artWidth, height: artHeight, backgroundColor: theme.surfaceElevated },
-              ]}
-              contentFit="cover"
-              transition={150}
-              recyclingKey={ping.id}
-              accessibilityIgnoresInvertColors
-            />
-          ) : (
-            <View
-              style={[
-                styles.art,
-                styles.artEmpty,
-                { width: artWidth, height: artHeight, backgroundColor: theme.surfaceElevated },
-              ]}>
-              <Ionicons name={KIND_ICON[ping.kind]} size={16} color={theme.textMuted} />
-            </View>
-          )}
-          <View style={styles.thingText}>
-            <Text variant="itemTitle" numberOfLines={2}>
-              {ping.title}
-            </Text>
-            {ping.subtitle ? (
-              <Text variant="caption" color="textMuted" numberOfLines={1}>
-                {ping.subtitle}
-              </Text>
-            ) : null}
-          </View>
-        </View>
-
         {ping.message ? (
-          <Text variant="body" color="textSecondary">
+          <Text variant="body" color="textSecondary" numberOfLines={3}>
             “{ping.message}”
           </Text>
         ) : null}
-
         <Text variant="caption" color="textMuted">
           {timeAgo(ping.created_at)}
         </Text>
       </View>
 
-      {!ping.read && <View style={[styles.dot, { backgroundColor: theme.primary }]} />}
+      {ping.image_url ? (
+        <Image
+          source={{ uri: ping.image_url }}
+          style={[styles.thumb, { backgroundColor: theme.surfaceElevated }]}
+          contentFit="cover"
+          transition={150}
+          recyclingKey={ping.id}
+          accessibilityIgnoresInvertColors
+        />
+      ) : (
+        <View style={[styles.thumb, styles.thumbEmpty, { backgroundColor: theme.surfaceElevated }]}>
+          <Ionicons name={KIND_ICON[ping.kind]} size={18} color={theme.textMuted} />
+        </View>
+      )}
     </PressableScale>
   );
 });
+
+/** The unread mark before a row's face; the same room when read, so rows align. */
+function UnreadDot({ on }: { on: boolean }) {
+  const theme = useTheme();
+  return <View style={[styles.dot, on && { backgroundColor: theme.primaryText }]} />;
+}
+
+/** The hairline between rows, from where the words start. */
+function RowRule() {
+  const theme = useTheme();
+  return <View style={[styles.rule, { backgroundColor: theme.border }]} />;
+}
+
+/** A list's loading or failed state, under the tabs and the large title. */
+function ListState({ query, header }: { query: UseQueryResult<unknown>; header: ReactElement }) {
+  return (
+    <PageWithHeader header={header} contentContainerStyle={styles.content}>
+      {query.isLoadingError ? (
+        <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+      ) : (
+        <LoadingState />
+      )}
+    </PageWithHeader>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Notifications
@@ -352,28 +354,16 @@ const PingRow = memo(function PingRow({
 function NotificationsList({
   query,
   userId,
+  header,
 }: {
   query: UseQueryResult<AppNotification[]>;
   userId: string | null;
+  header: ReactElement;
 }) {
   const theme = useTheme();
   const router = useRouter();
-  const queryClient = useQueryClient();
 
   const sections = useMemo(() => groupNotifications(query.data ?? []), [query.data]);
-
-  const markRead = useMutation({
-    mutationFn: async () => {
-      if (!userId) return;
-      await markAllRead(userId);
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      void queryClient.invalidateQueries({ queryKey: ['inbox', 'unread'] });
-    },
-  });
-
-  const hasUnread = (query.data ?? []).some((entry) => !entry.read);
 
   function open(notification: AppNotification) {
     // Friend requests, follows and wall posts are all resolved on a profile —
@@ -398,15 +388,14 @@ function NotificationsList({
     }
   }
 
-  if (query.isPending) return <LoadingState />;
-  if (query.isLoadingError)
-    return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
+  if (query.isPending || query.isLoadingError) return <ListState query={query} header={header} />;
 
   return (
     <PageSectionList
       sections={sections}
       keyExtractor={(item) => item.id}
-      contentContainerStyle={sections.length === 0 ? styles.empty : styles.content}
+      ItemSeparatorComponent={RowRule}
+      contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       stickySectionHeadersEnabled={false}
       refreshControl={
@@ -416,19 +405,7 @@ function NotificationsList({
           tintColor={theme.primary}
         />
       }
-      ListHeaderComponent={
-        hasUnread ? (
-          <View style={styles.markRead}>
-            <Button
-              title="Mark all as read"
-              variant="secondary"
-              size="small"
-              icon="checkmark-done"
-              onPress={() => markRead.mutate()}
-            />
-          </View>
-        ) : null
-      }
+      ListHeaderComponent={header}
       renderSectionHeader={({ section }) => (
         <Text variant="h4" style={styles.sectionTitle}>
           {section.title}
@@ -439,13 +416,11 @@ function NotificationsList({
           accessibilityRole="button"
           onPress={() => open(item)}
           scaleTo={0.99}
-          style={StyleSheet.flatten([
-            styles.row,
-            styles.rowCentered,
-            { backgroundColor: item.read ? 'transparent' : theme.primaryMuted },
-          ])}>
+          accessibilityLabel={`${item.read ? '' : 'Unread. '}${displayNameFor(item.actor)} ${VERB[item.kind]}${PERSON_KINDS.includes(item.kind) ? '' : (NOUN[item.target_type ?? ''] ?? ' post')}, ${timeAgo(item.created_at)}`}
+          style={StyleSheet.flatten([styles.row, styles.rowCentered])}>
+          <UnreadDot on={!item.read} />
           <View>
-            <Avatar uri={item.actor?.avatar_url} name={displayNameFor(item.actor)} size={44} />
+            <Avatar uri={item.actor?.avatar_url} name={displayNameFor(item.actor)} size={AVATAR} />
             <View style={[styles.badge, { backgroundColor: theme.background }]}>
               <Ionicons
                 name={ICON[item.kind]}
@@ -464,12 +439,11 @@ function NotificationsList({
               {timeAgo(item.created_at)}
             </Text>
           </View>
-
-          {!item.read && <View style={[styles.dotCentered, { backgroundColor: theme.primary }]} />}
         </PressableScale>
       )}
       ListEmptyComponent={
         <EmptyState
+          icon="notifications-outline"
           title="Nothing yet"
           message="Likes, comments, new followers and suggestions on your pings show up here."
         />
@@ -478,33 +452,26 @@ function NotificationsList({
   );
 }
 
+/** A face in a row: 40, Mail's. */
+const AVATAR = 40;
+/** The unread dot and the room it keeps. */
+const DOT = 8;
+
 const styles = StyleSheet.create({
-  tabs: { paddingTop: Spacing.x8 },
-  content: { padding: Spacing.x16, gap: Spacing.x4, paddingBottom: Spacing.x48 },
-  empty: { flexGrow: 1 },
-  sectionTitle: { marginTop: Spacing.x16, marginBottom: Spacing.x8 },
-  /* Hugs its label rather than spanning the list. */
-  markRead: { alignSelf: 'flex-start', marginBottom: Spacing.x8 },
+  tabs: { paddingBottom: Spacing.x8 },
+  content: { paddingHorizontal: Spacing.x16, paddingBottom: Spacing.x48, flexGrow: 1 },
+  sectionTitle: { marginTop: Spacing.x20, marginBottom: Spacing.x4 },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.x12,
-    padding: Spacing.x12,
-    borderRadius: Radius.image,
+    paddingVertical: Spacing.x12,
   },
   rowCentered: { alignItems: 'center' },
-  rowText: { flex: 1, minWidth: 0, gap: Spacing.x8 },
+  rowText: { flex: 1, minWidth: 0, gap: Spacing.x4 },
   rowTextTight: { flex: 1, minWidth: 0, gap: 2 },
-  thing: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.x12,
-    padding: Spacing.x8,
-    borderRadius: Radius.card,
-  },
-  thingText: { flex: 1, minWidth: 0, gap: 1 },
-  art: { borderRadius: Radius.image },
-  artEmpty: { alignItems: 'center', justifyContent: 'center' },
+  thumb: { width: 44, height: 44, borderRadius: Radius.image, borderCurve: 'continuous' },
+  thumbEmpty: { alignItems: 'center', justifyContent: 'center' },
   badge: {
     position: 'absolute',
     bottom: -2,
@@ -515,6 +482,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dot: { width: 8, height: 8, borderRadius: Radius.pill, marginTop: Spacing.x8 },
-  dotCentered: { width: 8, height: 8, borderRadius: Radius.pill },
+  dot: { width: DOT, height: DOT, borderRadius: Radius.pill, alignSelf: 'center', marginRight: -4 },
+  rule: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: DOT - 4 + Spacing.x12 * 2 + AVATAR,
+  },
 });

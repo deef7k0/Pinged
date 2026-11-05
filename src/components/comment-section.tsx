@@ -4,23 +4,14 @@ import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View, type StyleProp, type TextStyle } from 'react-native';
 
-import { ReportFlag } from '@/components/report-flag';
-import { Avatar } from '@/components/ui/avatar';
+import { COMMENT_INDENT, CommentRow } from '@/components/comment-row';
 import { Button } from '@/components/ui/button';
 import { PressableScale } from '@/components/ui/pressable-scale';
-import { RichText } from '@/components/ui/rich-text';
 import { Text } from '@/components/ui/text';
 import { TextField } from '@/components/ui/text-field';
-import { FontFamily, Spacing, TapTarget } from '@/constants/theme';
+import { Spacing, TapTarget } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import {
-  addComment,
-  deleteComment,
-  getComments,
-  type CommentWithAuthor,
-  type TargetType,
-} from '@/lib/api';
-import { displayNameFor, timeAgo } from '@/lib/format';
+import { addComment, deleteComment, getComments, type TargetType } from '@/lib/api';
 import { useAuth } from '@/store/auth';
 import { toast } from '@/lib/toast';
 
@@ -37,9 +28,6 @@ import { toast } from '@/lib/toast';
  * replies and a pinned composer, and the footer link says how many are there.
  */
 const INLINE_LIMIT = 8;
-
-/** The identity column's width. See `styles.identity`. */
-const IDENTITY_WIDTH = 76;
 
 export type CommentSectionProps = {
   targetType: TargetType;
@@ -235,18 +223,19 @@ export function CommentSection({
         )
       ) : (
         shown.map((comment) => (
-          <CommentRow
-            key={comment.id}
-            comment={comment}
-            canDelete={comment.user_id === userId}
-            onDelete={() => remove.mutate(comment.id)}
-            onOpenThread={() =>
-              router.push({
-                pathname: '/comments/[type]/[id]',
-                params: { type: targetType, id: targetId },
-              })
-            }
-          />
+          <View key={comment.id} style={[styles.rule, { borderTopColor: theme.border }]}>
+            <CommentRow
+              comment={comment}
+              canDelete={comment.user_id === userId}
+              onDelete={() => remove.mutate(comment.id)}
+              onPress={() =>
+                router.push({
+                  pathname: '/comments/[type]/[id]',
+                  params: { type: targetType, id: targetId },
+                })
+              }
+            />
+          </View>
         ))
       )}
 
@@ -270,79 +259,6 @@ export function CommentSection({
   );
 }
 
-/**
- * One comment: identity column, then what they said.
- *
- * The whole row opens the thread, which is where replying to *this* comment
- * happens — so the row needs one accessible label describing all of it rather
- * than three loose nodes, and the avatar and name are deliberately not separate
- * tap targets inside it. A profile is one tap further, from the thread.
- */
-function CommentRow({
-  comment,
-  canDelete,
-  onDelete,
-  onOpenThread,
-}: {
-  comment: CommentWithAuthor;
-  canDelete: boolean;
-  onDelete: () => void;
-  onOpenThread: () => void;
-}) {
-  const theme = useTheme();
-  const name = displayNameFor(comment.profile);
-
-  return (
-    <View style={[styles.row, { borderTopColor: theme.border }]}>
-      <PressableScale
-        accessibilityRole="button"
-        accessibilityLabel={`Comment by ${name}, ${timeAgo(comment.created_at)}. ${comment.body}`}
-        accessibilityHint="Opens the full thread"
-        scaleTo={0.99}
-        onPress={onOpenThread}
-        style={StyleSheet.flatten(styles.rowPress)}>
-        <View style={styles.identity}>
-          <Avatar uri={comment.profile?.avatar_url} name={name} size={34} />
-          <Text variant="bodySmall" numberOfLines={1} style={styles.name}>
-            {name}
-          </Text>
-          <Text variant="caption" color="textMuted">
-            {timeAgo(comment.created_at)}
-          </Text>
-        </View>
-
-        <View style={styles.bodyColumn}>
-          {/* `**bold**` and `*italic*` are what the composer's keys write. */}
-          <RichText variant="body">{comment.body}</RichText>
-        </View>
-      </PressableScale>
-
-      {canDelete && (
-        <PressableScale
-          accessibilityRole="button"
-          accessibilityLabel="Delete your comment"
-          onPress={onDelete}
-          hitSlop={Spacing.x12}
-          scaleTo={0.85}
-          style={StyleSheet.flatten(styles.delete)}>
-          <Ionicons name="trash-outline" size={15} color={theme.textMuted} />
-        </PressableScale>
-      )}
-      {/* Somebody else's: the flag where your own has its bin. It draws
-          nothing when signed out. */}
-      {!canDelete && (
-        <View style={styles.delete}>
-          <ReportFlag
-            target={{ kind: 'comment', targetId: comment.id, authorId: comment.user_id }}
-            authorId={comment.user_id}
-            label={`Report ${name}’s comment`}
-          />
-        </View>
-      )}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   section: { gap: 0 },
   heading: {
@@ -361,22 +277,8 @@ const styles = StyleSheet.create({
 
   quiet: { paddingTop: Spacing.x16 },
 
-  row: { flexDirection: 'row', alignItems: 'flex-start', borderTopWidth: StyleSheet.hairlineWidth },
-  /* The hairline belongs to the row, so the press target is inset from it rather
-     than overlapping — a pressed row that lights up across its own divider reads
-     as two rows reacting to one tap. */
-  rowPress: { flex: 1, flexDirection: 'row', gap: Spacing.x16, paddingVertical: Spacing.x16 },
-  /* Fixed, not `flex`: the identity column has to line up down the whole thread,
-     and a column sized to its contents puts every avatar at a different x. */
-  identity: { width: IDENTITY_WIDTH, alignItems: 'flex-start', gap: Spacing.x4 },
-  name: { fontFamily: FontFamily.semibold },
-  bodyColumn: { flex: 1 },
-
-  /* Top-aligned with the first line of the body rather than centred in the row:
-     centring puts it halfway down a long comment, where it reads as belonging to
-     whatever paragraph it happens to land beside. */
-  delete: { paddingTop: Spacing.x16, paddingLeft: Spacing.x8 },
-
+  /* The hairline between comments, from where the words start. */
+  rule: { borderTopWidth: StyleSheet.hairlineWidth, marginLeft: COMMENT_INDENT },
   more: {
     flexDirection: 'row',
     alignItems: 'center',

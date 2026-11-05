@@ -49,6 +49,7 @@ export default function BlockedScreen() {
             <ErrorState error={blocked.error} onRetry={() => void blocked.refetch()} />
           ) : (
             <EmptyState
+              icon="people-outline"
               title="Nobody blocked"
               message="To block someone, open their profile and use the menu at the top."
             />

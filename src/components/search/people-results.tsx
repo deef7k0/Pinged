@@ -51,6 +51,7 @@ export function PeopleResults({ query }: { query: string }) {
       renderItem={({ item, index }) => <PersonRow profile={item} divided={index > 0} />}
       ListEmptyComponent={
         <EmptyState
+          icon="search"
           title="No people found"
           message={`Nobody matching “${query}”. Try their @handle.`}
         />

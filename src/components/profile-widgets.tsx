@@ -10,7 +10,7 @@ import { Poster } from '@/components/ui/poster';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import { FAVOURITES, favouriteCoverWidth } from '@/constants/profile-layout';
-import { FontFamily, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { Typeface, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { removeFromList, type ListItem } from '@/lib/api';
 import type { ProfileAchievementStats } from '@/lib/database.types';
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 999,
   },
-  topTenLabel: { fontFamily: FontFamily.semibold },
+  topTenLabel: { fontFamily: Typeface.semibold },
   /* `space-between`, with eight as the least they may stand apart: the covers
      are whole dp, so a display that does not divide evenly has a dp or two left
      over, and it goes between them rather than after the last one. */

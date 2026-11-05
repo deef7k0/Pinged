@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+
+import { ModerationRow } from '@/components/moderation-row';
 import { useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { ChoiceChips } from '@/components/choice-chips';
 import { Button } from '@/components/ui/button';
-import { CARD_INSET, cardShape } from '@/components/ui/card-material';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
 import { PageFlatList } from '@/components/ui/page-scroll';
 import { Poster } from '@/components/ui/poster';
@@ -146,10 +147,7 @@ export default function ModerationScreen() {
 
   if (moderator.isLoading) {
     return (
-      <Screen
-        edges={['bottom']}
-        insetHeader
-        topBar={<FrostedTopBar back title="Moderation" largeTitle={false} />}>
+      <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="Moderation" />}>
         <LoadingState />
       </Screen>
     );
@@ -157,11 +155,12 @@ export default function ModerationScreen() {
 
   if (!moderator.data) {
     return (
-      <Screen
-        edges={['bottom']}
-        insetHeader
-        topBar={<FrostedTopBar back title="Moderation" largeTitle={false} />}>
-        <EmptyState title="Moderators only" message="This queue is for Pinged’s moderators." />
+      <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="Moderation" />}>
+        <EmptyState
+          icon="shield-checkmark-outline"
+          title="Moderators only"
+          message="This queue is for Pinged’s moderators."
+        />
       </Screen>
     );
   }
@@ -174,40 +173,40 @@ export default function ModerationScreen() {
 
   const header = (
     <View style={styles.head}>
-      <TabBar tabs={TABS} value={tab} onChange={setTab} label="What to review" />
+      <TabBar tabs={TABS} value={tab} onChange={setTab} label="What to review" inset={0} />
       {tab === 'releases' && queue.data && (
         <Text variant="label" color="textMuted">
           {queue.data.length === 0
-            ? 'NOTHING WAITING'
-            : `${queue.data.length} WAITING · OLDEST FIRST`}
+            ? 'Nothing waiting'
+            : `${queue.data.length} waiting · oldest first`}
         </Text>
       )}
       {tab === 'picks' && reports.data && (
         <Text variant="label" color="textMuted">
           {reports.data.length === 0
-            ? 'NO OPEN REPORTS'
-            : `${reports.data.length} REPORTED · HIDDEN ONES FIRST`}
+            ? 'No open reports'
+            : `${reports.data.length} reported · hidden ones first`}
         </Text>
       )}
       {tab === 'suggestions' && suggestionReports.data && (
         <Text variant="label" color="textMuted">
           {suggestionReports.data.length === 0
-            ? 'NO OPEN REPORTS'
-            : `${suggestionReports.data.length} REPORTED · OLDEST FIRST`}
+            ? 'No open reports'
+            : `${suggestionReports.data.length} reported · oldest first`}
         </Text>
       )}
       {tab === 'reviews' && reviewReports.data && (
         <Text variant="label" color="textMuted">
           {reviewReports.data.length === 0
-            ? 'NO OPEN REPORTS'
-            : `${reviewReports.data.length} REPORTED · OLDEST FIRST`}
+            ? 'No open reports'
+            : `${reviewReports.data.length} reported · oldest first`}
         </Text>
       )}
       {tab === 'people' && peopleReports.data && (
         <Text variant="label" color="textMuted">
           {peopleReports.data.length === 0
-            ? 'NO OPEN REPORTS'
-            : `${peopleReports.data.length} REPORTED · OLDEST FIRST`}
+            ? 'No open reports'
+            : `${peopleReports.data.length} reported · oldest first`}
         </Text>
       )}
     </View>
@@ -234,6 +233,7 @@ export default function ModerationScreen() {
               <ErrorState error={queue.error} onRetry={() => void queue.refetch()} />
             ) : (
               <EmptyState
+                icon="shield-checkmark-outline"
                 title="The queue is empty"
                 message="Every submission has been decided — or seconded by someone else with the same box."
               />
@@ -259,6 +259,7 @@ export default function ModerationScreen() {
               <ErrorState error={reports.error} onRetry={() => void reports.refetch()} />
             ) : (
               <EmptyState
+                icon="shield-checkmark-outline"
                 title="No open reports"
                 message="Nobody has reported a community recommendation."
               />
@@ -287,6 +288,7 @@ export default function ModerationScreen() {
               />
             ) : (
               <EmptyState
+                icon="shield-checkmark-outline"
                 title="No open reports"
                 message="Nobody has reported what someone wrote about a pick."
               />
@@ -314,7 +316,11 @@ export default function ModerationScreen() {
                 onRetry={() => void reviewReports.refetch()}
               />
             ) : (
-              <EmptyState title="No open reports" message="Nobody has reported a review." />
+              <EmptyState
+                icon="shield-checkmark-outline"
+                title="No open reports"
+                message="Nobody has reported a review."
+              />
             )
           }
         />
@@ -345,6 +351,7 @@ export default function ModerationScreen() {
               />
             ) : (
               <EmptyState
+                icon="shield-checkmark-outline"
                 title="No open reports"
                 message="Nobody has reported a comment, a wall post or a profile."
               />
@@ -356,10 +363,7 @@ export default function ModerationScreen() {
   }
 
   return (
-    <Screen
-      edges={['bottom']}
-      insetHeader
-      topBar={<FrostedTopBar back title="Moderation" largeTitle={false} />}>
+    <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="Moderation" />}>
       {list}
     </Screen>
   );
@@ -379,7 +383,6 @@ function Separator() {
  * reports; it takes three new ones to hide it again.
  */
 function ReportCard({ entry }: { entry: SimilarityReportQueueRow }) {
-  const theme = useTheme();
   const queryClient = useQueryClient();
 
   const decide = useMutation({
@@ -393,18 +396,25 @@ function ReportCard({ entry }: { entry: SimilarityReportQueueRow }) {
   });
 
   return (
-    <View
-      style={[
-        cardShape,
-        styles.card,
-        { backgroundColor: theme.surface, borderColor: theme.border },
-      ]}>
+    <ModerationRow
+      keep={{
+        label: entry.status === 'hidden' ? 'Put it back' : 'Dismiss reports',
+        icon: 'checkmark',
+        pending: decide.isPending && decide.variables === 'restore',
+        onPress: () => decide.mutate('restore'),
+      }}
+      remove={{
+        label: entry.status === 'hidden' ? 'Keep hidden' : 'Hide',
+        icon: 'eye-off',
+        pending: decide.isPending && decide.variables === 'hide',
+        onPress: () => decide.mutate('hide'),
+      }}>
       <View style={styles.cardHead}>
         <Text variant="label" color={entry.status === 'hidden' ? 'danger' : 'textMuted'}>
-          {entry.status === 'hidden' ? 'HIDDEN BY REPORTS' : 'STILL SHOWN'}
+          {entry.status === 'hidden' ? 'Hidden by reports' : 'Still shown'}
         </Text>
         <Text variant="label" color="textMuted">
-          {`${entry.report_count} ${entry.report_count === 1 ? 'REPORT' : 'REPORTS'}`}
+          {`${entry.report_count} ${entry.report_count === 1 ? 'report' : 'reports'}`}
         </Text>
       </View>
       <Text variant="h4">
@@ -427,31 +437,7 @@ function ReportCard({ entry }: { entry: SimilarityReportQueueRow }) {
           {decide.error instanceof Error ? decide.error.message : 'Could not record that.'}
         </Text>
       )}
-
-      <View style={styles.actions}>
-        <View style={styles.flex}>
-          <Button
-            title={entry.status === 'hidden' ? 'Keep hidden' : 'Hide'}
-            variant="secondary"
-            size="small"
-            fullWidth
-            loading={decide.isPending && decide.variables === 'hide'}
-            disabled={decide.isPending}
-            onPress={() => decide.mutate('hide')}
-          />
-        </View>
-        <View style={styles.flex}>
-          <Button
-            title={entry.status === 'hidden' ? 'Put it back' : 'Dismiss reports'}
-            size="small"
-            fullWidth
-            loading={decide.isPending && decide.variables === 'restore'}
-            disabled={decide.isPending}
-            onPress={() => decide.mutate('restore')}
-          />
-        </View>
-      </View>
-    </View>
+    </ModerationRow>
   );
 }
 
@@ -465,7 +451,6 @@ function ReportCard({ entry }: { entry: SimilarityReportQueueRow }) {
  * upvotes the words earned. It cannot be undone, so it asks first.
  */
 function SuggestionReportCard({ entry }: { entry: SuggestionReportQueueRow }) {
-  const theme = useTheme();
   const queryClient = useQueryClient();
 
   const decide = useMutation({
@@ -496,18 +481,25 @@ function SuggestionReportCard({ entry }: { entry: SuggestionReportQueueRow }) {
   const reasons = entry.reasons.map((reason) => SIMILARITY_REASON_LABEL[reason]).join(' · ');
 
   return (
-    <View
-      style={[
-        cardShape,
-        styles.card,
-        { backgroundColor: theme.surface, borderColor: theme.border },
-      ]}>
+    <ModerationRow
+      keep={{
+        label: 'Dismiss reports',
+        icon: 'checkmark',
+        pending: decide.isPending && decide.variables === 'dismiss',
+        onPress: () => decide.mutate('dismiss'),
+      }}
+      remove={{
+        label: 'Remove',
+        icon: 'trash',
+        pending: decide.isPending && decide.variables === 'remove',
+        onPress: askRemove,
+      }}>
       <View style={styles.cardHead}>
         <Text variant="label" color="textMuted" numberOfLines={1} style={styles.shrink}>
-          {`SUGGESTION BY ${entry.author_name.toUpperCase()}`}
+          {`Suggestion by ${entry.author_name}`}
         </Text>
         <Text variant="label" color="textMuted">
-          {`${entry.report_count} ${entry.report_count === 1 ? 'REPORT' : 'REPORTS'}`}
+          {`${entry.report_count} ${entry.report_count === 1 ? 'report' : 'reports'}`}
         </Text>
       </View>
       <Text variant="h4">
@@ -532,14 +524,7 @@ function SuggestionReportCard({ entry }: { entry: SuggestionReportQueueRow }) {
           {decide.error instanceof Error ? decide.error.message : 'Could not record that.'}
         </Text>
       )}
-
-      <RemoveOrDismiss
-        removeTitle="Remove"
-        pending={decide.isPending ? decide.variables : null}
-        onRemove={askRemove}
-        onDismiss={() => decide.mutate('dismiss')}
-      />
-    </View>
+    </ModerationRow>
   );
 }
 
@@ -555,7 +540,6 @@ const REVIEW_LINES = 12;
  * something somebody said. It cannot be undone, so it asks first.
  */
 function ReviewReportCard({ entry }: { entry: ReviewReportQueueRow }) {
-  const theme = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -596,18 +580,37 @@ function ReviewReportCard({ entry }: { entry: ReviewReportQueueRow }) {
   const prose = entry.review?.trim() || null;
 
   return (
-    <View
-      style={[
-        cardShape,
-        styles.card,
-        { backgroundColor: theme.surface, borderColor: theme.border },
-      ]}>
+    <ModerationRow
+      keep={{
+        label: 'Dismiss reports',
+        icon: 'checkmark',
+        pending: decide.isPending && decide.variables === 'dismiss',
+        onPress: () => decide.mutate('dismiss'),
+      }}
+      remove={{
+        label: 'Remove text',
+        icon: 'trash',
+        pending: decide.isPending && decide.variables === 'remove',
+        onPress: askRemove,
+      }}
+      more={
+        prose
+          ? [
+              {
+                label: 'Read it in full',
+                icon: 'document-text-outline',
+                onPress: () =>
+                  router.push({ pathname: '/review/[id]', params: { id: entry.log_id } }),
+              },
+            ]
+          : []
+      }>
       <View style={styles.cardHead}>
         <Text variant="label" color="textMuted" numberOfLines={1} style={styles.shrink}>
-          {`REVIEW BY ${entry.author_name.toUpperCase()}`}
+          {`Review by ${entry.author_name}`}
         </Text>
         <Text variant="label" color="textMuted">
-          {`${entry.report_count} ${entry.report_count === 1 ? 'REPORT' : 'REPORTS'}`}
+          {`${entry.report_count} ${entry.report_count === 1 ? 'report' : 'reports'}`}
         </Text>
       </View>
       <Text variant="h4">{entry.game_title}</Text>
@@ -616,7 +619,7 @@ function ReviewReportCard({ entry }: { entry: ReviewReportQueueRow }) {
           reading the spoiler. The flag is said in words above it instead. */}
       {entry.spoilers && (
         <Text variant="caption" color="textMuted">
-          MARKED AS CONTAINING SPOILERS
+          Marked as containing spoilers
         </Text>
       )}
       {headline && <Quoted text={headline} strong />}
@@ -625,16 +628,6 @@ function ReviewReportCard({ entry }: { entry: ReviewReportQueueRow }) {
         <Text variant="bodySmall" color="textMuted">
           The writing is already gone — its author took it down.
         </Text>
-      )}
-      {prose && (
-        <View style={styles.readAll}>
-          <Button
-            title="Read it in full"
-            variant="ghost"
-            size="small"
-            onPress={() => router.push({ pathname: '/review/[id]', params: { id: entry.log_id } })}
-          />
-        </View>
       )}
 
       <ReportFacts
@@ -648,14 +641,7 @@ function ReviewReportCard({ entry }: { entry: ReviewReportQueueRow }) {
           {decide.error instanceof Error ? decide.error.message : 'Could not record that.'}
         </Text>
       )}
-
-      <RemoveOrDismiss
-        removeTitle="Remove text"
-        pending={decide.isPending ? decide.variables : null}
-        onRemove={askRemove}
-        onDismiss={() => decide.mutate('dismiss')}
-      />
-    </View>
+    </ModerationRow>
   );
 }
 
@@ -665,29 +651,29 @@ const PEOPLE_KIND: Record<
   { noun: string; remove: string; explain: (name: string) => string }
 > = {
   comment: {
-    noun: 'COMMENT',
+    noun: 'Comment',
     remove: 'Remove words',
     explain: (name) =>
       `${name}’s words are replaced by “This comment was removed by a moderator.” Replies to it stay. This cannot be undone.`,
   },
   wall_post: {
-    noun: 'WALL POST',
+    noun: 'Wall post',
     remove: 'Delete post',
     explain: (name) => `${name}’s wall post is deleted. This cannot be undone.`,
   },
   ping: {
-    noun: 'PING',
+    noun: 'Ping',
     remove: 'Delete ping',
     explain: (name) =>
       `${name}’s ping is deleted, with every suggestion on it. This cannot be undone.`,
   },
   ping_suggestion: {
-    noun: 'PING SUGGESTION',
+    noun: 'Ping suggestion',
     remove: 'Delete suggestion',
     explain: (name) => `${name}’s suggestion is deleted. This cannot be undone.`,
   },
   profile: {
-    noun: 'PROFILE',
+    noun: 'Profile',
     remove: 'Reset profile',
     explain: (name) =>
       `${name}’s display name, bio, pictures and location are cleared, and their handle goes back to the one a new account gets, so they are asked for a new one. Their reviews and logs stay. This cannot be undone.`,
@@ -699,7 +685,6 @@ const PEOPLE_KIND: Record<
  * them where they are, what the reporters said, and the two verdicts.
  */
 function UserContentReportCard({ entry }: { entry: UserContentReportQueueRow }) {
-  const theme = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
   const kind = PEOPLE_KIND[entry.kind];
@@ -747,18 +732,37 @@ function UserContentReportCard({ entry }: { entry: UserContentReportQueueRow }) 
   }
 
   return (
-    <View
-      style={[
-        cardShape,
-        styles.card,
-        { backgroundColor: theme.surface, borderColor: theme.border },
+    <ModerationRow
+      keep={{
+        label: 'Dismiss reports',
+        icon: 'checkmark',
+        pending: decide.isPending && decide.variables === 'dismiss',
+        onPress: () => decide.mutate('dismiss'),
+      }}
+      remove={{
+        label: kind.remove,
+        icon: 'trash',
+        pending: decide.isPending && decide.variables === 'remove',
+        onPress: askRemove,
+      }}
+      more={[
+        {
+          label:
+            entry.kind === 'comment'
+              ? 'Open the thread'
+              : entry.kind === 'ping' || entry.kind === 'ping_suggestion'
+                ? 'Open the ping'
+                : 'Open the profile',
+          icon: 'open-outline',
+          onPress: open,
+        },
       ]}>
       <View style={styles.cardHead}>
         <Text variant="label" color="textMuted" numberOfLines={1} style={styles.shrink}>
-          {`${kind.noun} · @${entry.author_username.toUpperCase()}`}
+          {`${kind.noun} · @${entry.author_username}`}
         </Text>
         <Text variant="label" color="textMuted">
-          {`${entry.report_count} ${entry.report_count === 1 ? 'REPORT' : 'REPORTS'}`}
+          {`${entry.report_count} ${entry.report_count === 1 ? 'report' : 'reports'}`}
         </Text>
       </View>
       <Text variant="h4">{entry.author_name}</Text>
@@ -773,20 +777,6 @@ function UserContentReportCard({ entry }: { entry: UserContentReportQueueRow }) 
           {entry.kind === 'profile' ? 'No name or bio — look at the profile.' : 'No words.'}
         </Text>
       )}
-      <View style={styles.readAll}>
-        <Button
-          title={
-            entry.kind === 'comment'
-              ? 'Open the thread'
-              : entry.kind === 'ping' || entry.kind === 'ping_suggestion'
-                ? 'Open the ping'
-                : 'Open the profile'
-          }
-          variant="ghost"
-          size="small"
-          onPress={open}
-        />
-      </View>
 
       <ReportFacts
         reasons={entry.report_reasons}
@@ -799,14 +789,7 @@ function UserContentReportCard({ entry }: { entry: UserContentReportQueueRow }) 
           {decide.error instanceof Error ? decide.error.message : 'Could not record that.'}
         </Text>
       )}
-
-      <RemoveOrDismiss
-        removeTitle={kind.remove}
-        pending={decide.isPending ? decide.variables : null}
-        onRemove={askRemove}
-        onDismiss={() => decide.mutate('dismiss')}
-      />
-    </View>
+    </ModerationRow>
   );
 }
 
@@ -864,46 +847,6 @@ function ReportFacts({
   );
 }
 
-/** The two verdicts on somebody's writing, in the pick card's arrangement. */
-function RemoveOrDismiss({
-  removeTitle,
-  pending,
-  onRemove,
-  onDismiss,
-}: {
-  removeTitle: string;
-  /** Which verdict is being sent, if one is. */
-  pending: 'remove' | 'dismiss' | null | undefined;
-  onRemove: () => void;
-  onDismiss: () => void;
-}) {
-  return (
-    <View style={styles.actions}>
-      <View style={styles.flex}>
-        <Button
-          title={removeTitle}
-          variant="secondary"
-          size="small"
-          fullWidth
-          loading={pending === 'remove'}
-          disabled={!!pending}
-          onPress={onRemove}
-        />
-      </View>
-      <View style={styles.flex}>
-        <Button
-          title="Dismiss reports"
-          size="small"
-          fullWidth
-          loading={pending === 'dismiss'}
-          disabled={!!pending}
-          onPress={onDismiss}
-        />
-      </View>
-    </View>
-  );
-}
-
 function ClaimCard({ entry, siblings }: { entry: ContributionWithRelations; siblings: number }) {
   const theme = useTheme();
   const queryClient = useQueryClient();
@@ -928,19 +871,26 @@ function ClaimCard({ entry, siblings }: { entry: ContributionWithRelations; sibl
   ].filter(Boolean);
 
   return (
-    <View
-      style={[
-        cardShape,
-        styles.card,
-        { backgroundColor: theme.surface, borderColor: theme.border },
-      ]}>
+    <ModerationRow
+      keep={{
+        label: 'Approve',
+        icon: 'checkmark',
+        pending: decide.isPending && decide.variables?.decision === 'approve',
+        onPress: () => decide.mutate({ decision: 'approve' }),
+      }}
+      remove={{
+        label: 'Reject',
+        icon: 'close',
+        pending: decide.isPending && decide.variables?.decision === 'reject',
+        onPress: () => setRejecting(true),
+      }}>
       <View style={styles.cardHead}>
         <Text variant="label" color="textMuted">
-          BARCODE {displayBarcode(entry.barcode)}
+          Barcode {displayBarcode(entry.barcode)}
         </Text>
         {siblings > 0 && (
           <Text variant="label" color="danger">
-            {`${siblings} OTHER ${siblings === 1 ? 'CLAIM' : 'CLAIMS'}`}
+            {`${siblings} other ${siblings === 1 ? 'claim' : 'claims'}`}
           </Text>
         )}
       </View>
@@ -1007,6 +957,7 @@ function ClaimCard({ entry, siblings }: { entry: ContributionWithRelations; sibl
         </Text>
       )}
 
+      {/* Reject asks why, in place — the swipe or the ⋯ opens this. */}
       {rejecting ? (
         <View style={styles.reject}>
           <ChoiceChips
@@ -1046,41 +997,23 @@ function ClaimCard({ entry, siblings }: { entry: ContributionWithRelations; sibl
             </View>
           </View>
         </View>
-      ) : (
-        <View style={styles.actions}>
-          <View style={styles.flex}>
-            <Button
-              title="Reject"
-              variant="secondary"
-              size="small"
-              fullWidth
-              disabled={decide.isPending}
-              onPress={() => setRejecting(true)}
-            />
-          </View>
-          <View style={styles.flex}>
-            <Button
-              title="Approve"
-              size="small"
-              fullWidth
-              loading={decide.isPending}
-              onPress={() => decide.mutate({ decision: 'approve' })}
-            />
-          </View>
-        </View>
-      )}
-    </View>
+      ) : null}
+    </ModerationRow>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  content: { padding: Spacing.x16, paddingBottom: Spacing.x48 },
+  content: { paddingHorizontal: Spacing.x16, paddingBottom: Spacing.x48 },
   head: { gap: Spacing.x12, marginBottom: Spacing.x16 },
   separator: { height: Spacing.x12 },
-  /* Every card's material (`card-material`), on the app's own page. */
-  card: { gap: Spacing.x12, padding: CARD_INSET },
-  cardHead: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.x8 },
+  /* Clear of the ⋯ at the box's corner. */
+  cardHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: Spacing.x8,
+    marginRight: 32,
+  },
   game: { flexDirection: 'row', gap: Spacing.x12, alignItems: 'flex-start' },
   photos: { gap: Spacing.x8 },
   photo: { width: 72, gap: 2 },
@@ -1090,7 +1023,6 @@ const styles = StyleSheet.create({
   /* The label truncates before the report count does. */
   shrink: { flexShrink: 1 },
   quote: { borderLeftWidth: 2, paddingLeft: Spacing.x12 },
-  readAll: { alignItems: 'flex-start' },
   reportedAvatar: { width: 56, height: 56, borderRadius: 28 },
   facts: { gap: Spacing.x4, paddingTop: Spacing.x12, borderTopWidth: StyleSheet.hairlineWidth },
 });

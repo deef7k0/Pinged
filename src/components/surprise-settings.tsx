@@ -333,6 +333,7 @@ export function SurpriseSettings({ prefs, onChange, canUseForYou }: SurpriseSett
               value={prefs.match}
               onChange={(match) => onChange({ ...prefs, match })}
               accessibilityLabel="Selection mode"
+              kind="choice"
             />
             <Text variant="bodySmall" color="textSecondary">
               {prefs.match === 'all'

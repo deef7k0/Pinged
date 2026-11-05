@@ -2,7 +2,7 @@
  * `react-native-web` only. Not a stylesheet — four variables and nothing else.
  *
  * On native, type comes from the Inter families loaded in the root layout and
- * named in `FontFamily`; on web those families resolve through these fallbacks
+ * named in `Typeface`; on web those families resolve through these fallbacks
  * until the TTFs are registered, so Inter leads every stack that carries text.
  */
 :root {

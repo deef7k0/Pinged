@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { BlurTargetView } from 'expo-blur';
 import { isValidElement, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -144,11 +145,14 @@ export function Screen({
     variant?: string;
     centerTitle?: boolean;
     largeTitle?: boolean;
+    subtitle?: string;
   }>(topBar)
     ? topBar.props
     : null;
+  /* A page that keeps the bar's room itself (Home, under its glow) asks for
+     the plain bar by `variant="bar"` and has a large title as well. */
   const largeTitle =
-    insetHeader &&
+    (insetHeader || barProps?.variant === 'bar') &&
     !modal &&
     barProps &&
     typeof barProps.title === 'string' &&
@@ -163,7 +167,8 @@ export function Screen({
       modal={modal}
       background={background ?? theme.background}
       insetHeader={insetHeader}
-      largeTitle={largeTitle}>
+      largeTitle={largeTitle}
+      largeSubtitle={largeTitle ? (barProps?.subtitle ?? null) : null}>
       {({ blurTargetRef }) => (
         <View style={styles.flex}>
           {/*
@@ -239,18 +244,45 @@ export type EmptyStateProps = {
   title: string;
   message?: string;
   action?: ReactNode;
+  /**
+   * The symbol over the title — Apple's `ContentUnavailableView`. A
+   * controller unless the caller names something closer to what is missing
+   * (`people-outline` for nobody followed, `search` for no results…).
+   */
+  icon?: keyof typeof Ionicons.glyphMap | null;
   /** Developer-facing detail. Rendered only where the caller passes one. */
   footnote?: string;
 };
 
-export function EmptyState({ title, message, action, footnote }: EmptyStateProps) {
+/**
+ * Nothing here, or nothing yet — Apple's `ContentUnavailableView` (the Apple
+ * pass, 2026-11-04): a large symbol in the quiet ink, the title in Title 2,
+ * one line under it, one button. It was a heading and a line of text.
+ */
+export function EmptyState({
+  title,
+  message,
+  action,
+  icon = 'game-controller-outline',
+  footnote,
+}: EmptyStateProps) {
+  const theme = useTheme();
   return (
     <View style={styles.centered}>
-      <Text variant="h3" style={styles.centeredText}>
+      {icon && (
+        <Ionicons
+          name={icon}
+          size={EMPTY_SYMBOL}
+          color={theme.textSecondary}
+          style={styles.symbol}
+          importantForAccessibility="no"
+        />
+      )}
+      <Text variant="h2" style={styles.centeredText}>
         {title}
       </Text>
       {message && (
-        <Text variant="body" color="textMuted" style={styles.centeredText}>
+        <Text variant="body" color="textSecondary" style={[styles.centeredText, styles.message]}>
           {message}
         </Text>
       )}
@@ -264,6 +296,9 @@ export function EmptyState({ title, message, action, footnote }: EmptyStateProps
   );
 }
 
+/** The symbol's size, about twice the title's cap height, as Apple draws it. */
+const EMPTY_SYMBOL = 52;
+
 /**
  * What the reader is told when a request fails.
  *
@@ -273,6 +308,17 @@ export function EmptyState({ title, message, action, footnote }: EmptyStateProps
  * it. The distinction the reader actually needs is whether to try again, so
  * that is what this decides; the raw text stays available in `__DEV__`.
  */
+function errorSymbol(error: unknown): keyof typeof Ionicons.glyphMap {
+  const raw = error instanceof Error ? error.message.toLowerCase() : '';
+  if (raw.includes('network') || raw.includes('fetch') || raw.includes('timeout')) {
+    return 'cloud-offline-outline';
+  }
+  if (raw.includes('jwt') || raw.includes('unauthorized') || raw.includes('not signed in')) {
+    return 'lock-closed-outline';
+  }
+  return 'alert-circle-outline';
+}
+
 function readableError(error: unknown): string {
   const raw = error instanceof Error ? error.message.toLowerCase() : '';
 
@@ -298,6 +344,7 @@ export function ErrorState({
   return (
     <EmptyState
       title="Could not load"
+      icon={errorSymbol(error)}
       message={readableError(error)}
       /* Every failure on a read-only surface is worth one more attempt, and
          before this not a single `ErrorState` in the app offered one — a failed
@@ -320,6 +367,8 @@ const styles = StyleSheet.create({
     gap: Spacing.x8,
   },
   centeredText: { textAlign: 'center' },
+  symbol: { marginBottom: Spacing.x8 },
+  message: { maxWidth: 300 },
   action: { marginTop: Spacing.x12 },
   footnote: { marginTop: Spacing.x8, opacity: 0.7 },
 });

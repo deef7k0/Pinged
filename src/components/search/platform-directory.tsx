@@ -134,6 +134,7 @@ export function PlatformDirectory({ filter }: { filter: string }) {
       renderItem={({ item }) => <PlatformTile platform={item} width={tileWidth} low />}
       ListEmptyComponent={
         <EmptyState
+          icon="search"
           title="No platforms found"
           message={`IGDB lists no platform called anything like “${filter.trim()}”.`}
         />

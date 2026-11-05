@@ -124,6 +124,7 @@ export function DiscoverReviews({
       ListEmptyComponent={
         period === 'all' || !windowed ? (
           <EmptyState
+            icon="chatbubble-ellipses-outline"
             title="No reviews yet"
             message="Write one with a score and some words and it will show up here."
           />
@@ -186,6 +187,7 @@ export function DiscoverCollections() {
       renderItem={renderTile}
       ListEmptyComponent={
         <EmptyState
+          icon="albums-outline"
           title="No collections yet"
           /* "the Lists tab on your profile" until now. The tab is called
              Collections, the route is `new-list`, and the profile says Lists —

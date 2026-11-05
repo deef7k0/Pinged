@@ -6,7 +6,9 @@ import { FlatList, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { CoverRail, CoverRailSkeleton } from '@/components/game-rail';
 import { InfoCardButton } from '@/components/ui/info-card';
+import { Section } from '@/components/ui/section';
 import { Poster } from '@/components/ui/poster';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/screen';
@@ -50,6 +52,96 @@ const SORTS: readonly SortOption<SimilaritySort>[] = [
  * says how many there are and shows the first few covers, which is enough to
  * decide whether to open it.
  */
+/**
+ * The Similar tab's first rail (the Apple pass, 2026-11-05): what people here
+ * say is like this game, as covers under "From the community", the most
+ * agreed-with first, how many agree under each. A cover opens that pick's
+ * own page; the heading opens the whole list (the sheet). With none yet it
+ * says so and offers the way to suggest one.
+ */
+export function CommunitySimilarRail({
+  gameId,
+  gameTitle,
+  onOpen,
+}: {
+  gameId: string;
+  gameTitle: string;
+  onOpen: () => void;
+}) {
+  const router = useRouter();
+  const userId = useAuth((state) => state.session?.user.id) ?? null;
+
+  const picks = useQuery({
+    queryKey: ['community-similar', gameId, 'top'],
+    queryFn: () => getCommunitySimilar(gameId, { sort: 'top' }),
+    staleTime: 60_000,
+  });
+
+  const suggest = () => router.push({ pathname: '/suggest-similar/[id]', params: { id: gameId } });
+  const shown = [...(picks.data ?? [])].sort((a, b) => b.up - a.up);
+  const suggestButton = userId ? (
+    <View style={styles.railAction}>
+      <Button title="Suggest a similar game" icon="add" variant="secondary" onPress={suggest} />
+    </View>
+  ) : null;
+
+  return (
+    <Section
+      title="From the community"
+      more={
+        shown.length > 0
+          ? {
+              accessibilityLabel: `All ${shown.length} games players say are like ${gameTitle}`,
+              onPress: onOpen,
+            }
+          : undefined
+      }>
+      {picks.isLoading ? (
+        <CoverRailSkeleton />
+      ) : picks.isLoadingError ? (
+        <ErrorState error={picks.error} onRetry={() => void picks.refetch()} />
+      ) : shown.length === 0 ? (
+        <View style={styles.railEmpty}>
+          <Text variant="body" color="textSecondary">
+            Nobody here has said what {gameTitle} is like yet.
+          </Text>
+          {suggestButton}
+        </View>
+      ) : (
+        <>
+          <CoverRail
+            data={shown}
+            keyOf={(pick) => pick.similarity_id}
+            gameOf={(pick) => ({
+              id: pick.game_id,
+              title: pick.title,
+              coverUrl: pick.cover_url,
+              heroUrl: pick.hero_url,
+              edition: (pick.edition_kind as EditionKind | null) ?? null,
+              releaseYear: pick.release_year,
+            })}
+            footOf={(pick) => (
+              <Text variant="bodySmall" color="textSecondary" numberOfLines={1}>
+                {`${pick.up} ${pick.up === 1 ? 'agrees' : 'agree'}`}
+              </Text>
+            )}
+            labelOf={(pick) =>
+              `${pick.title}: ${pick.up} ${pick.up === 1 ? 'person says' : 'people say'} it is like ${gameTitle}. Opens the pick.`
+            }
+            onPressItem={(pick) =>
+              router.push({
+                pathname: '/similar/[id]',
+                params: { id: pick.similarity_id, game: gameId },
+              })
+            }
+          />
+          {suggestButton}
+        </>
+      )}
+    </Section>
+  );
+}
+
 export function CommunitySimilarCard({
   gameId,
   gameTitle,
@@ -351,6 +443,8 @@ const PickRow = memo(function PickRow({
 });
 
 const styles = StyleSheet.create({
+  railEmpty: { gap: Spacing.x12, paddingHorizontal: Spacing.x16 },
+  railAction: { paddingHorizontal: Spacing.x16, paddingTop: Spacing.x12, alignItems: 'flex-start' },
   flex: { flex: 1 },
   card: { gap: Spacing.x12 },
   preview: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },

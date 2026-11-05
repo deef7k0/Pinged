@@ -1,10 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
-import { ChoiceChips } from '@/components/choice-chips';
-import { Button } from '@/components/ui/button';
+import { CollectionArtTile, CollectionTitleField } from '@/components/collection-form';
+import { InsetGroup } from '@/components/ui/inset-group';
+import { PullDownRow } from '@/components/ui/pull-down-row';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
 import { PageScrollView } from '@/components/ui/page-scroll';
 import { RICH_TEXT_HINT } from '@/components/ui/rich-text';
@@ -52,12 +53,11 @@ export default function NewListScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [shapeIndex, setShapeIndex] = useState(0);
+  const shape = SHAPES[shapeIndex];
 
   const create = useMutation({
     mutationFn: async () => {
       if (!userId) throw new Error('You must be signed in.');
-      const shape = SHAPES[shapeIndex];
-
       /* An award show is created by an RPC, not an insert: it arrives with its
          eight categories already in place, and a list that existed with half a
          ballot would be worse than one that failed. The function reads
@@ -89,7 +89,18 @@ export default function NewListScreen() {
       padded
       insetHeader
       modal
-      topBar={<FrostedTopBar dismiss title="New collection" />}>
+      topBar={
+        <FrostedTopBar
+          dismiss
+          title="New collection"
+          confirm={{
+            label: 'Create collection',
+            onPress: () => create.mutate(),
+            loading: create.isPending,
+            disabled: !title.trim(),
+          }}
+        />
+      }>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -97,53 +108,48 @@ export default function NewListScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <TextField
-            label="Title"
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Best horror games"
-            maxLength={100}
-            autoFocus
-          />
-
-          {/* Tall enough to write in. This is the collection's argument, not a
-              caption, and a field one line deep tells you to write one line. */}
-          <TextField
-            label="About"
-            value={description}
-            onChangeText={setDescription}
-            placeholder="What ties these together?"
-            multiline
-            maxLength={1000}
-            hint={RICH_TEXT_HINT}
-            style={styles.about}
-          />
-
-          {/* The app's selection cards, the same object as a report's reasons:
-              a name, what it means, and a radio. Not clearable — a collection
-              is always one of these. */}
-          <ChoiceChips
-            label="Type"
-            choices={SHAPE_CHOICES}
-            value={String(shapeIndex)}
-            onChange={(next) => next !== null && setShapeIndex(Number(next))}
-            clearable={false}
-            withHints
-          />
-
+          {/* Apple Music's New Playlist (the Apple pass, 2026-11-05): the
+              art, the name under it, then the rest as rows. */}
+          <View style={styles.head}>
+            <CollectionArtTile />
+            <CollectionTitleField
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Collection name"
+              maxLength={100}
+              autoFocus
+            />
+          </View>
+          {/* About is the collection's argument, not a caption: a row that
+              grows with what is written. */}
+          <InsetGroup footer={RICH_TEXT_HINT}>
+            <TextField
+              variant="row"
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Description"
+              accessibilityLabel="Description"
+              multiline
+              maxLength={1000}
+              style={styles.about}
+            />
+            <PullDownRow
+              title="Type"
+              choices={SHAPE_CHOICES}
+              value={String(shapeIndex)}
+              onChange={(next) => next !== null && setShapeIndex(Number(next))}
+            />
+          </InsetGroup>
+          {shape.hint ? (
+            <Text variant="bodySmall" color="textSecondary" style={styles.typeNote}>
+              {shape.hint}
+            </Text>
+          ) : null}
           {create.isError && (
             <Text variant="bodySmall" color="danger">
               {create.error instanceof Error ? create.error.message : 'Could not create the list.'}
             </Text>
           )}
-
-          <Button
-            title="Create collection"
-            onPress={() => create.mutate()}
-            loading={create.isPending}
-            disabled={!title.trim()}
-            fullWidth
-          />
         </PageScrollView>
       </KeyboardAvoidingView>
     </Screen>
@@ -152,6 +158,8 @@ export default function NewListScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  content: { gap: Spacing.x16, paddingVertical: Spacing.x24 },
-  about: { minHeight: 120, maxHeight: 260 },
+  content: { gap: Spacing.x24, paddingVertical: Spacing.x24 },
+  head: { gap: Spacing.x12 },
+  about: { maxHeight: 260 },
+  typeNote: { marginTop: -Spacing.x16, paddingHorizontal: Spacing.x16 },
 });

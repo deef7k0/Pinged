@@ -2,25 +2,24 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { memo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 
-import { Button } from '@/components/ui/button';
-import { CARD_INSET, cardShape } from '@/components/ui/card-material';
-import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
+import { AnchoredMenu, AnchoredMenuItem, useAnchoredMenu } from '@/components/ui/anchored-menu';
+import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
 import { PageFlatList } from '@/components/ui/page-scroll';
 import { Poster } from '@/components/ui/poster';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
 import { copyStateLine, releaseLine } from '@/constants/physical';
-import { Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { getCopies, getProfile, type CopyWithRelations } from '@/lib/api';
 import { displayNameFor } from '@/lib/format';
 import { useAuth } from '@/store/auth';
 
-/** The box art on a row. Fixed dp, like all artwork (CLAUDE.md). */
-const ROW_ART = 56;
+/** Between the two columns of covers. */
+const GRID_GAP = Spacing.x12;
 
 /**
  * Someone's physical collection: every copy they own, newest first.
@@ -53,6 +52,9 @@ export default function CopiesScreen() {
   });
 
   const count = copies.data?.length ?? 0;
+  const [trigger, menu] = useAnchoredMenu();
+  const { width } = useWindowDimensions();
+  const tile = Math.floor((Math.min(width, MaxContentWidth) - Spacing.x16 * 2 - GRID_GAP) / 2);
   const gameTitle = game ? copies.data?.[0]?.game?.title : null;
   const ownerName = isSelf ? 'You' : displayNameFor(owner.data ?? null);
 
@@ -61,19 +63,51 @@ export default function CopiesScreen() {
       edges={['bottom']}
       insetHeader
       topBar={
-        <FrostedTopBar back title={gameTitle ? `Copies of ${gameTitle}` : 'Physical collection'} />
+        <FrostedTopBar
+          back
+          title={gameTitle ? `Copies of ${gameTitle}` : 'Physical collection'}
+          right={
+            isSelf ? (
+              /* Scan and Add are the + in the bar (the Apple pass,
+                 2026-11-05); they were two buttons at the head. */
+              <View ref={trigger} collapsable={false}>
+                <TopBarDisc icon="add" label="Add a copy" onPress={menu.open} />
+              </View>
+            ) : undefined
+          }
+        />
       }>
+      <AnchoredMenu menu={menu} label="Add a copy" align="end">
+        <AnchoredMenuItem
+          icon="barcode-outline"
+          title="Scan a barcode"
+          onPress={() => {
+            menu.close();
+            router.push('/scan');
+          }}
+        />
+        <AnchoredMenuItem
+          icon="create-outline"
+          title="Add by hand"
+          onPress={() => {
+            menu.close();
+            router.push(game ? { pathname: '/add-copy', params: { game } } : '/add-copy');
+          }}
+        />
+      </AnchoredMenu>
       <PageFlatList
         data={copies.data ?? []}
         keyExtractor={(copy) => copy.id}
+        numColumns={2}
+        columnWrapperStyle={styles.column}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View style={styles.head}>
             {copies.data && (
-              <Text variant="label" color="textMuted">
-                {`${ownerName === 'You' ? 'YOUR' : `${ownerName.toUpperCase()}’S`} ${count} ${
-                  count === 1 ? 'COPY' : 'COPIES'
+              <Text variant="body" color="textSecondary">
+                {`${ownerName === 'You' ? 'Your' : `${ownerName}’s`} ${count} ${
+                  count === 1 ? 'copy' : 'copies'
                 }`}
               </Text>
             )}
@@ -93,35 +127,9 @@ export default function CopiesScreen() {
                 </PressableScale>
               </Link>
             )}
-
-            {isSelf && (
-              <View style={styles.actions}>
-                <View style={styles.flex}>
-                  <Button
-                    title="Scan a barcode"
-                    icon="barcode-outline"
-                    variant="secondary"
-                    fullWidth
-                    onPress={() => router.push('/scan')}
-                  />
-                </View>
-                <View style={styles.flex}>
-                  <Button
-                    title="Add by hand"
-                    icon="add"
-                    variant="secondary"
-                    fullWidth
-                    onPress={() =>
-                      router.push(game ? { pathname: '/add-copy', params: { game } } : '/add-copy')
-                    }
-                  />
-                </View>
-              </View>
-            )}
           </View>
         }
-        renderItem={({ item }) => <CopyRow copy={item} />}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        renderItem={({ item }) => <CopyTile copy={item} width={tile} />}
         ListEmptyComponent={
           copies.isLoading ? (
             <LoadingState />
@@ -144,12 +152,19 @@ export default function CopiesScreen() {
 }
 
 /**
- * The quick view: "Resident Evil 2 / PS1 · PAL / CIB · Very good".
+ * One copy as a cover in a two-across grid (the Apple pass, 2026-11-05) —
+ * the box, the game's name, and its release and state in a quiet line. It was
+ * a card per copy with a small box beside the words.
  *
- * Memoised: this renders once per row of a list that can be a whole shelf long,
- * and its props are one query-owned object.
+ * Memoised: this renders once per tile of a grid that can be a whole shelf.
  */
-const CopyRow = memo(function CopyRow({ copy }: { copy: CopyWithRelations }) {
+const CopyTile = memo(function CopyTile({
+  copy,
+  width,
+}: {
+  copy: CopyWithRelations;
+  width: number;
+}) {
   const theme = useTheme();
   const release = releaseLine(copy);
   const state = copyStateLine(copy);
@@ -167,43 +182,32 @@ const CopyRow = memo(function CopyRow({ copy }: { copy: CopyWithRelations }) {
         ]
           .filter(Boolean)
           .join(', ')}
-        scaleTo={0.98}
-        style={StyleSheet.flatten([
-          cardShape,
-          styles.row,
-          { backgroundColor: theme.surface, borderColor: theme.border },
-        ])}>
+        scaleTo={0.97}
+        style={StyleSheet.flatten([styles.tile, { width }])}>
         <Poster
           coverUrl={copy.game?.cover_url ?? null}
           heroUrl={copy.game?.hero_url ?? null}
           title={copy.game?.title ?? ''}
-          width={ROW_ART}
+          width={width}
           rounded="image"
+          zoomable={false}
         />
-        <View style={styles.rowText}>
-          <Text variant="h5" numberOfLines={2}>
-            {copy.game?.title ?? 'Unknown game'}
+        <Text variant="bodySmall" numberOfLines={1}>
+          {copy.game?.title ?? 'Unknown game'}
+        </Text>
+        {(release || state) && (
+          <Text variant="caption" color="textSecondary" numberOfLines={1}>
+            {[release, state].filter(Boolean).join(' · ')}
           </Text>
-          {!!release && (
-            <Text variant="bodySmall" color="textSecondary" numberOfLines={1}>
-              {release}
+        )}
+        {waiting && (
+          <View style={styles.pending}>
+            <Ionicons name="time-outline" size={12} color={theme.textMuted} />
+            <Text variant="caption" color="textMuted">
+              Pending review
             </Text>
-          )}
-          {state && (
-            <Text variant="caption" color="textMuted" numberOfLines={1}>
-              {state}
-            </Text>
-          )}
-          {waiting && (
-            <View style={styles.pending}>
-              <Ionicons name="time-outline" size={12} color={theme.textMuted} />
-              <Text variant="caption" color="textMuted">
-                Release pending review
-              </Text>
-            </View>
-          )}
-        </View>
-        <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+          </View>
+        )}
       </PressableScale>
     </Link>
   );
@@ -213,16 +217,13 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { padding: Spacing.x16, paddingBottom: Spacing.x48 },
   head: { gap: Spacing.x8, marginBottom: Spacing.x24 },
-  actions: { flexDirection: 'row', gap: Spacing.x8, marginTop: Spacing.x8 },
+  column: { gap: GRID_GAP, marginBottom: Spacing.x20 },
+  tile: { gap: 2 },
   submissions: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
     gap: Spacing.x4,
   },
-  separator: { height: Spacing.x8 },
-  /* Every card's material (`card-material`). */
-  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12, padding: CARD_INSET },
-  rowText: { flex: 1, gap: 2 },
   pending: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x4 },
 });

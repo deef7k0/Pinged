@@ -62,7 +62,7 @@ export function MarqueeText({
   align = 'start',
 }: {
   text: string;
-  variant: 'h3';
+  variant: 'h3' | 'h4';
   accessibilityRole?: 'header';
   /**
    * Where a title that fits sits in its window: at the start, or centred —

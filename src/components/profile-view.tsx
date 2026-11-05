@@ -26,7 +26,6 @@ import { Text } from '@/components/ui/text';
 import {
   ACTIONS_TOP,
   BIO_TOP,
-  COUNTS,
   HEADER_GAP,
   NAME_TOP,
   PROFILE_MARGIN,
@@ -401,7 +400,7 @@ export function ProfileView({ profileId, headerAction }: ProfileViewProps) {
 
   if (profile.isLoading) return <LoadingState />;
   if (profile.isLoadingError) return <ErrorState error={profile.error} />;
-  if (!profile.data) return <EmptyState title="Profile not found" />;
+  if (!profile.data) return <EmptyState icon="search" title="Profile not found" />;
 
   const person = profile.data;
 
@@ -541,15 +540,15 @@ export function ProfileView({ profileId, headerAction }: ProfileViewProps) {
         <View style={styles.counts}>
           <Count
             value={stats.data?.followers}
-            label="Followers"
+            label="followers"
             href={{ pathname: '/people/[id]', params: { id: profileId, tab: 'followers' } }}
           />
           <CountRule />
-          <Count value={stats.data?.logged} label="Logged" />
+          <Count value={stats.data?.logged} label="logged" />
           <CountRule />
           <Count
             value={stats.data?.following}
-            label="Following"
+            label="following"
             href={{ pathname: '/people/[id]', params: { id: profileId, tab: 'following' } }}
           />
         </View>
@@ -676,14 +675,7 @@ export function ProfileView({ profileId, headerAction }: ProfileViewProps) {
         as a strip of destinations; `inset={0}` because this block already
         keeps the screen's margin.
       */}
-      <TabBar
-        tabs={TABS}
-        value={tab}
-        onChange={setTab}
-        iconOnly
-        inset={0}
-        label="Profile sections"
-      />
+      <TabBar tabs={TABS} value={tab} onChange={setTab} inset={0} label="Profile sections" />
     </View>
   );
 
@@ -733,6 +725,7 @@ export function ProfileView({ profileId, headerAction }: ProfileViewProps) {
           <ConnectAccountCard userId={profileId} linked={false} />
         ) : (
           <EmptyState
+            icon="logo-steam"
             title="No Steam account"
             message={`${ownerName} has not linked a Steam account.`}
           />
@@ -971,18 +964,16 @@ function Meta({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: st
 function Count({ value, label, href }: { value?: number; label: string; href?: Href }) {
   const shown = value == null ? '—' : value.toLocaleString();
 
-  /* Figure over word, centred in its column: the figure bold at 14, the word
-     at 11 under it, both quieter than the name — the reference's counts are
-     grey, so the name is the one white line in the head. */
+  /* On one line, the figure bold and the word after it — Apple Music's
+     profile (the Apple pass, 2026-11-05); they were figure over word in three
+     ruled columns. */
   const body = (
-    <>
-      <Text variant="h5" color="textSecondary" numberOfLines={1}>
+    <Text variant="bodySmall" color="textSecondary" numberOfLines={1}>
+      <Text variant="h5" color="text">
         {shown}
       </Text>
-      <Text variant="bodySmall" color="textMuted" numberOfLines={1}>
-        {label}
-      </Text>
-    </>
+      {` ${label}`}
+    </Text>
   );
 
   if (!href || value == null) {
@@ -1010,10 +1001,13 @@ function Count({ value, label, href }: { value?: number; label: string; href?: H
   );
 }
 
-/** The faint rule between two counts, as the reference draws it. */
+/** The dot between two counts on their line. */
 function CountRule() {
-  const theme = useTheme();
-  return <View style={[styles.countRule, { backgroundColor: theme.border }]} />;
+  return (
+    <Text variant="bodySmall" color="textMuted" importantForAccessibility="no">
+      ·
+    </Text>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -1057,11 +1051,16 @@ const styles = StyleSheet.create({
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x4, flexShrink: 1 },
   metaLabel: { flexShrink: 1 },
   /* Three columns of the reference's width, a rule between each two. */
-  counts: { flexDirection: 'row', alignItems: 'center', marginTop: HEADER_GAP },
+  counts: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.x8,
+    marginTop: HEADER_GAP,
+  },
   /* Number over label, centred in its column. Shrinks rather than
      overflowing at a large OS text size. */
-  count: { width: COUNTS.column, flexShrink: 1, alignItems: 'center' },
-  countRule: { width: StyleSheet.hairlineWidth, height: COUNTS.rule },
+  count: { flexShrink: 1 },
   actions: { alignSelf: 'stretch', marginTop: ACTIONS_TOP },
   notice: { marginTop: Spacing.x8 },
   steamStack: { gap: Spacing.x16 },

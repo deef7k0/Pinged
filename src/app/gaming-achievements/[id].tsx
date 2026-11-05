@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 
 import { steamCoverUrl, steamHeaderUrl } from '@/components/gaming/game-tile';
+import { AchievementHead } from '@/components/achievement-parts';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
 import { PageFlatList } from '@/components/ui/page-scroll';
 import { Poster } from '@/components/ui/poster';
@@ -42,6 +43,7 @@ export default function GamingAchievementsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const viewerId = useAuth((state) => state.session?.user.id) ?? null;
   const isSelf = viewerId === id;
+  const theme = useTheme();
 
   const account = useLinkedAccount(id ?? null);
   useGamingSync({ userId: id ?? null, enabled: isSelf, sections: ['achievements'] });
@@ -73,7 +75,7 @@ export default function GamingAchievementsScreen() {
   if (!id) {
     return (
       <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="Achievements" />}>
-        <EmptyState title="Not found" />
+        <EmptyState icon="search" title="Not found" />
       </Screen>
     );
   }
@@ -86,6 +88,7 @@ export default function GamingAchievementsScreen() {
         insetHeader
         topBar={<FrostedTopBar back title="Achievements" />}>
         <EmptyState
+          icon="logo-steam"
           title="No Steam account linked"
           message={
             isSelf
@@ -114,7 +117,23 @@ export default function GamingAchievementsScreen() {
             {stats.isLoading ? (
               <Skeleton width="100%" height={96} radius={Radius.image} />
             ) : overall ? (
-              <OverallCard stats={overall} />
+              /* The Games app's head (the Apple pass, 2026-11-05): the ring
+                 and the figures as tiles; no art, for this is every game. */
+              <AchievementHead
+                artUrl={null}
+                unlocked={overall.achievementsUnlocked}
+                total={overall.achievementsTotal}
+                color={theme.success}
+                background={theme.background}
+                figures={[
+                  { label: 'unlocked', value: overall.achievementsUnlocked.toLocaleString() },
+                  {
+                    label: 'complete',
+                    value: `${completionPercent(overall.achievementsUnlocked, overall.achievementsTotal)}%`,
+                  },
+                  { label: 'perfect games', value: overall.perfectGames.toLocaleString() },
+                ]}
+              />
             ) : null}
 
             {rarest.data && rarest.data.length > 0 && (
@@ -126,8 +145,8 @@ export default function GamingAchievementsScreen() {
             )}
 
             {games.length > 0 && (
-              <Text variant="caption" color="textSecondary">
-                {`BY GAME · ${games.length}`}
+              <Text variant="h2" accessibilityRole="header">
+                {`By game · ${games.length}`}
               </Text>
             )}
           </View>
@@ -148,6 +167,7 @@ export default function GamingAchievementsScreen() {
             />
           ) : (
             <EmptyState
+              icon="trophy-outline"
               title="No achievements yet"
               message={
                 isSelf
@@ -159,48 +179,6 @@ export default function GamingAchievementsScreen() {
         }
       />
     </Screen>
-  );
-}
-
-function OverallCard({
-  stats,
-}: {
-  stats: NonNullable<Awaited<ReturnType<typeof getGamingStats>>>;
-}) {
-  const theme = useTheme();
-  const percent = completionPercent(stats.achievementsUnlocked, stats.achievementsTotal);
-
-  return (
-    <View style={[styles.overall, { borderTopColor: theme.border }]}>
-      <View style={styles.overallRow}>
-        <Metric value={stats.achievementsUnlocked.toLocaleString()} label="Unlocked" />
-        <Metric value={`${percent}%`} label="Completion" tint={theme.success} />
-        <Metric value={stats.perfectGames.toLocaleString()} label="Perfect" tint={theme.platinum} />
-      </View>
-
-      {/* A single bar for overall completion reads faster than the ratio alone. */}
-      <View style={[styles.track, { backgroundColor: theme.surfaceElevated }]}>
-        <View style={[styles.fill, { width: `${percent}%`, backgroundColor: theme.success }]} />
-      </View>
-
-      <Text variant="caption" color="textMuted">
-        {stats.achievementsUnlocked.toLocaleString()} of {stats.achievementsTotal.toLocaleString()}{' '}
-        across scanned games
-      </Text>
-    </View>
-  );
-}
-
-function Metric({ value, label, tint }: { value: string; label: string; tint?: string }) {
-  return (
-    <View style={styles.metric}>
-      <Text variant="h3" style={tint ? { color: tint } : undefined}>
-        {value}
-      </Text>
-      <Text variant="caption" color="textMuted">
-        {label}
-      </Text>
-    </View>
   );
 }
 
@@ -219,7 +197,7 @@ function Showcase({
   return (
     <View style={styles.section}>
       <Text variant="label" color="textSecondary">
-        {title.toUpperCase()}
+        {title}
       </Text>
 
       <FlatList

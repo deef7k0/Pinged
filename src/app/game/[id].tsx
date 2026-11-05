@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import Animated, { LinearTransition, useReducedMotion } from 'react-native-reanimated';
 
-import { CommunitySimilarCard, CommunitySimilarSheet } from '@/components/community-similar';
+import { CommunitySimilarRail, CommunitySimilarSheet } from '@/components/community-similar';
 import { CoverFront } from '@/components/cover-front';
 import { useCriticSummary } from '@/components/critic-reviews';
 import { ExternalLink } from '@/components/external-link';
@@ -26,12 +26,11 @@ import { GameHeaderWords } from '@/components/game-header';
 import { GameInformation } from '@/components/game-information';
 import { GameAudienceCard } from '@/components/game-insights';
 import { GameEditions, OriginalGame } from '@/components/game-lineage';
-import { GameListItem } from '@/components/game-list-item';
 import { GameListsSheet } from '@/components/game-lists-sheet';
 import { GameModeratorCard } from '@/components/game-moderation';
 import { PlayedByFaces, RatingsAndReviews } from '@/components/game-overview';
 import { GamePlatforms } from '@/components/game-platforms';
-import { GameCoverRail } from '@/components/game-rail';
+import { CoverRailSkeleton, GameCoverRail } from '@/components/game-rail';
 import { GameReviewsSheet } from '@/components/game-reviews-sheet';
 import { GameScreenshots } from '@/components/game-screenshots';
 import { PING_GLYPH, usePingTo } from '@/components/pings/use-ping-to';
@@ -43,6 +42,7 @@ import { TrailerBackdrop } from '@/components/trailer-backdrop';
 import { AnimatedCoverImage } from '@/components/ui/animated-cover-image';
 import { Button } from '@/components/ui/button';
 import { CardlessContext } from '@/components/ui/card-material';
+import { AnchoredMenu, AnchoredMenuItem, useAnchoredMenu } from '@/components/ui/anchored-menu';
 import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
 import { heroHeightFor } from '@/components/ui/hero-art';
 import { InfoCard, InfoCardButton } from '@/components/ui/info-card';
@@ -462,7 +462,7 @@ export default function GameDetailScreen() {
   if (!game.data) {
     return (
       <Screen edges={['top', 'bottom']} topBar={<FrostedTopBar back glass />}>
-        <EmptyState title="Game not found" />
+        <EmptyState icon="search" title="Game not found" />
       </Screen>
     );
   }
@@ -537,37 +537,34 @@ export default function GameDetailScreen() {
         );
 
       case 'similar':
+        /* Two rails of covers (the Apple pass, 2026-11-05): what people here
+           say is like it, then IGDB's list. */
         return (
-          <View style={styles.tabBody}>
-            <CommunitySimilarCard gameId={data.id} gameTitle={data.title} onOpen={openSimilar} />
-            <View style={styles.similarSection}>
-              <Text variant="h3" accessibilityRole="header">
-                Similar, according to IGDB
-              </Text>
-              {similar.isLoading ? (
-                <LoadingState />
-              ) : similar.isLoadingError ? (
-                <ErrorState
-                  error={similar.error}
-                  action={
-                    <Button title="Retry" variant="secondary" onPress={() => similar.refetch()} />
-                  }
-                />
-              ) : (similar.data ?? []).length === 0 ? (
-                <Text variant="body" color="textSecondary">
-                  {data.source === 'igdb'
-                    ? 'IGDB has no similar games listed for this title.'
-                    : 'IGDB’s list is only available for IGDB titles. Try opening this game from a search result instead.'}
-                </Text>
-              ) : (
-                (similar.data ?? []).map((entry) => (
-                  <View key={entry.id} style={styles.similarRow}>
-                    <GameListItem game={entry} />
-                  </View>
-                ))
-              )}
+          <SectionInsetProvider inset={Spacing.x16}>
+            <View style={styles.similarTab}>
+              <CommunitySimilarRail gameId={data.id} gameTitle={data.title} onOpen={openSimilar} />
+              <Section title="Similar, according to IGDB">
+                {similar.isLoading ? (
+                  <CoverRailSkeleton />
+                ) : similar.isLoadingError ? (
+                  <ErrorState
+                    error={similar.error}
+                    action={
+                      <Button title="Retry" variant="secondary" onPress={() => similar.refetch()} />
+                    }
+                  />
+                ) : (similar.data ?? []).length === 0 ? (
+                  <Text variant="body" color="textSecondary" style={styles.similarNote}>
+                    {data.source === 'igdb'
+                      ? 'IGDB has no similar games listed for this title.'
+                      : 'IGDB’s list is only available for IGDB titles. Try opening this game from a search result instead.'}
+                  </Text>
+                ) : (
+                  <GameCoverRail games={similar.data ?? []} />
+                )}
+              </Section>
             </View>
-          </View>
+          </SectionInsetProvider>
         );
 
       default:
@@ -820,48 +817,59 @@ export default function GameDetailScreen() {
                 handoff={handoff}
                 right={
                   <>
-                    {/* The cover's animation, played where it stands. */}
-                    {!reduceMotion && (
-                      <TopBarDisc
-                        icon={animated ? 'pause' : 'sparkles-outline'}
-                        label={animated ? 'Stop the animated cover' : 'Play the animated cover'}
-                        onPress={toggleCoverMotion}
-                      />
-                    )}
-                    {/* The trailer, played now or stopped — and with it, whether
-                      trailers play by themselves. Only where there is one. */}
-                    {trailerUrl && (
-                      <TopBarDisc
-                        icon={landscape ? 'stop' : 'play'}
-                        label={landscape ? 'Stop the trailer' : 'Play the trailer'}
-                        onPress={() => {
-                          if (landscape) {
-                            trailers.setOn(false);
-                            changeMode('portrait');
-                          } else {
-                            trailers.setOn(true);
-                            playTrailer();
-                          }
-                        }}
-                      />
-                    )}
-                    {pingTo && (
-                      <TopBarDisc
-                        icon={PING_GLYPH}
-                        label={`Ping ${data.title} to someone`}
-                        onPress={() =>
-                          pingTo({
-                            kind: 'game',
-                            targetId: data.id,
-                            title: data.title,
-                            subtitle: [data.developer, data.releaseYear]
-                              .filter(Boolean)
-                              .join(' · '),
-                            imageUrl: data.coverUrl,
-                          })
-                        }
-                      />
-                    )}
+                    {/* Two keys at most (the Apple pass, 2026-11-05): ⋯ holds
+                        the animated cover, the trailer and Ping; share stands
+                        alone. They were four discs in the capsule. */}
+                    <GameMoreKey
+                      items={[
+                        ...(!reduceMotion
+                          ? [
+                              {
+                                icon: animated ? ('pause' as const) : ('sparkles-outline' as const),
+                                title: animated
+                                  ? 'Stop the animated cover'
+                                  : 'Play the animated cover',
+                                onPress: toggleCoverMotion,
+                              },
+                            ]
+                          : []),
+                        ...(trailerUrl
+                          ? [
+                              {
+                                icon: landscape ? ('stop' as const) : ('play' as const),
+                                title: landscape ? 'Stop the trailer' : 'Play the trailer',
+                                onPress: () => {
+                                  if (landscape) {
+                                    trailers.setOn(false);
+                                    changeMode('portrait');
+                                  } else {
+                                    trailers.setOn(true);
+                                    playTrailer();
+                                  }
+                                },
+                              },
+                            ]
+                          : []),
+                        ...(pingTo
+                          ? [
+                              {
+                                icon: PING_GLYPH,
+                                title: 'Ping to someone',
+                                onPress: () =>
+                                  pingTo({
+                                    kind: 'game',
+                                    targetId: data.id,
+                                    title: data.title,
+                                    subtitle: [data.developer, data.releaseYear]
+                                      .filter(Boolean)
+                                      .join(' · '),
+                                    imageUrl: data.coverUrl,
+                                  }),
+                              },
+                            ]
+                          : []),
+                      ]}
+                    />
                     <TopBarDisc
                       icon="share-outline"
                       label={`Share ${data.title}`}
@@ -1054,10 +1062,44 @@ const styles = StyleSheet.create({
   words: { paddingBottom: Spacing.x24 },
   overview: { gap: SECTION_GAP, paddingTop: Spacing.x16, paddingBottom: Spacing.x16 },
   tabBody: { padding: Spacing.x16, gap: Spacing.x16 },
-  similarSection: { gap: Spacing.x12, marginTop: Spacing.x24 },
-  similarRow: { marginBottom: Spacing.x12 },
+  similarTab: { gap: Spacing.x32, paddingTop: Spacing.x16, paddingBottom: Spacing.x24 },
+  similarNote: { paddingHorizontal: Spacing.x16 },
   retry: { gap: Spacing.x12, alignItems: 'flex-start' },
   lines: { gap: 2 },
   storeLink: { paddingHorizontal: Spacing.x16 },
   about: { paddingHorizontal: Spacing.x16, paddingBottom: Spacing.x32 },
 });
+
+/** The ⋯ in a game page's bar: the actions that are not Share, as a menu. */
+function GameMoreKey({
+  items,
+}: {
+  items: {
+    icon: React.ComponentProps<typeof TopBarDisc>['icon'];
+    title: string;
+    onPress: () => void;
+  }[];
+}) {
+  const [trigger, menu] = useAnchoredMenu();
+  if (items.length === 0) return null;
+  return (
+    <>
+      <View ref={trigger} collapsable={false}>
+        <TopBarDisc icon="ellipsis-horizontal" label="More" onPress={menu.open} />
+      </View>
+      <AnchoredMenu menu={menu} label="More" align="end">
+        {items.map((item) => (
+          <AnchoredMenuItem
+            key={item.title}
+            icon={item.icon}
+            title={item.title}
+            onPress={() => {
+              menu.close();
+              item.onPress();
+            }}
+          />
+        ))}
+      </AnchoredMenu>
+    </>
+  );
+}

@@ -1,16 +1,17 @@
 import { readFileSync } from 'node:fs';
 
 /**
- * Poppins' advance widths, read out of the font files the app ships — for
+ * The app's typeface's (Inter's) advance widths, read out of the font files
+ * the app ships — for
  * tests that need to know how many lines a sentence takes. Node only: it reads
  * `node_modules`, and nothing in the app may import it.
  *
  * Just enough of TrueType to answer "how wide is this string": the `cmap`
  * (format 4 or 12) for a character's glyph, `hmtx` for its advance. No
- * kerning, which Poppins applies sparingly and which only narrows a line.
+ * kerning, which Inter applies sparingly and which only narrows a line.
  */
 
-type Weight = '400Regular' | '700Bold' | '800ExtraBold';
+type Weight = '400Regular' | '500Medium' | '600SemiBold' | '700Bold' | '800ExtraBold';
 
 const cache = new Map<Weight, (char: string) => number>();
 
@@ -19,7 +20,7 @@ function advanceTable(weight: Weight): (char: string) => number {
   if (known) return known;
 
   const file = new URL(
-    `../../../node_modules/@expo-google-fonts/poppins/${weight}/Poppins_${weight}.ttf`,
+    `../../../node_modules/@expo-google-fonts/inter/${weight}/Inter_${weight}.ttf`,
     import.meta.url
   );
   const font = readFileSync(file);
@@ -30,7 +31,7 @@ function advanceTable(weight: Weight): (char: string) => number {
   }
   const table = (tag: string) => {
     const offset = tables.get(tag);
-    if (offset === undefined) throw new Error(`Poppins ${weight} has no ${tag} table`);
+    if (offset === undefined) throw new Error(`Inter ${weight} has no ${tag} table`);
     return offset;
   };
 

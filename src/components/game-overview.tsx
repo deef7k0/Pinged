@@ -10,7 +10,7 @@ import { Section, useSectionInset } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { clampScore, labelFor, scoreColor } from '@/constants/score';
 import { STATUS_LABEL } from '@/constants/status';
-import { FontFamily, Palette, Spacing, withAlpha } from '@/constants/theme';
+import { Typeface, Palette, Spacing, withAlpha } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -106,7 +106,15 @@ export function RatingsAndReviews({
             <Text style={[styles.score, { color: scoreColor(shown, theme) }]}>{shown}</Text>
           </PressableScale>
         )}
-        {top && <ReviewBox item={top} width={width - inset * 2} />}
+        {top && (
+          <ReviewBox
+            log={top.log}
+            likes={top.likes}
+            comments={top.comments}
+            likedByViewer={top.likedByViewer}
+            width={width - inset * 2}
+          />
+        )}
       </View>
     </Section>
   );
@@ -118,12 +126,28 @@ const TOP_CANDIDATES = 5;
 /**
  * One review, as the App Store draws one: who and how much across the top,
  * the words under them — the writer's one sentence between its marks when
- * they chose it, else their text — and the likes at the foot.
+ * they chose it, else their text — and the likes at the foot. `showGame`
+ * names the game under the writer, for a rail of reviews of many games
+ * (Explore's Popular reviews).
  */
-function ReviewBox({ item, width }: { item: ReviewListItem; width: number }) {
+export function ReviewBox({
+  log,
+  likes = 0,
+  comments = 0,
+  likedByViewer = false,
+  width,
+  showGame = false,
+}: {
+  log: ReviewListItem['log'];
+  likes?: number;
+  comments?: number;
+  likedByViewer?: boolean;
+  width: number;
+  showGame?: boolean;
+}) {
   const router = useRouter();
   const theme = useTheme();
-  const { log } = item;
+  const gameTitle = showGame ? (log.game?.title ?? null) : null;
   const name = displayNameFor(log.profile);
   const score = log.rating === null ? null : Math.round(log.rating);
   const shows = cardShows(log);
@@ -133,7 +157,7 @@ function ReviewBox({ item, width }: { item: ReviewListItem; width: number }) {
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={[
-        `${name}’s review`,
+        gameTitle ? `${name}’s review of ${gameTitle}` : `${name}’s review`,
         score !== null ? `scored it ${score}, ${labelFor(score)}` : null,
         log.spoilers ? 'Contains spoilers' : shows === 'quote' ? log.review_title : words,
         'Opens the review.',
@@ -145,9 +169,16 @@ function ReviewBox({ item, width }: { item: ReviewListItem; width: number }) {
       <View style={[styles.box, { width, backgroundColor: BOX_FILL }]}>
         <View style={styles.boxHead}>
           <Avatar uri={log.profile?.avatar_url ?? null} name={name} size={28} />
-          <Text variant="itemTitle" numberOfLines={1} style={styles.boxName}>
-            {name}
-          </Text>
+          <View style={styles.boxName}>
+            <Text variant="itemTitle" numberOfLines={1}>
+              {name}
+            </Text>
+            {!!gameTitle && (
+              <Text variant="bodySmall" color="textSecondary" numberOfLines={1}>
+                {gameTitle}
+              </Text>
+            )}
+          </View>
           {score !== null && (
             <Text style={[styles.boxScore, { color: scoreColor(score, theme) }]}>{score}</Text>
           )}
@@ -175,25 +206,25 @@ function ReviewBox({ item, width }: { item: ReviewListItem; width: number }) {
           )}
         </View>
 
-        {(item.likes > 0 || item.comments > 0) && (
+        {(likes > 0 || comments > 0) && (
           <View style={styles.boxFoot}>
-            {item.likes > 0 && (
+            {likes > 0 && (
               <View style={styles.count}>
                 <Ionicons
                   name="heart"
                   size={12}
-                  color={item.likedByViewer ? theme.liked : theme.textSecondary}
+                  color={likedByViewer ? theme.liked : theme.textSecondary}
                 />
                 <Text variant="bodySmall" color="textSecondary">
-                  {item.likes.toLocaleString()}
+                  {likes.toLocaleString()}
                 </Text>
               </View>
             )}
-            {item.comments > 0 && (
+            {comments > 0 && (
               <View style={styles.count}>
                 <Ionicons name="chatbubble" size={12} color={theme.textSecondary} />
                 <Text variant="bodySmall" color="textSecondary">
-                  {item.comments.toLocaleString()}
+                  {comments.toLocaleString()}
                 </Text>
               </View>
             )}
@@ -294,7 +325,7 @@ const styles = StyleSheet.create({
   ratings: { gap: Spacing.x16 },
   number: { alignSelf: 'flex-start' },
   score: {
-    fontFamily: FontFamily.extraBold,
+    fontFamily: Typeface.extraBold,
     fontSize: 56,
     lineHeight: 60,
     letterSpacing: -1.5,
@@ -308,7 +339,7 @@ const styles = StyleSheet.create({
   },
   boxHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8 },
   boxName: { flex: 1 },
-  boxScore: { fontFamily: FontFamily.extraBold, fontSize: 17, lineHeight: 22 },
+  boxScore: { fontFamily: Typeface.extraBold, fontSize: 17, lineHeight: 22 },
   boxWords: { flex: 1, overflow: 'hidden' },
   boxFoot: { flexDirection: 'row', gap: Spacing.x12 },
   count: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x4 },
@@ -316,7 +347,7 @@ const styles = StyleSheet.create({
   faces: { gap: Spacing.x16, paddingTop: Spacing.x8 },
   face: { width: FACE + 12, alignItems: 'center', gap: 2 },
   faceName: { marginTop: Spacing.x8, textAlign: 'center' },
-  faceRole: { textAlign: 'center', fontFamily: FontFamily.semibold },
+  faceRole: { textAlign: 'center', fontFamily: Typeface.semibold },
   friend: {
     position: 'absolute',
     right: -2,

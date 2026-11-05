@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Elevation, FontFamily } from '@/constants/theme';
+import { Elevation, Typeface } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type AvatarProps = {
@@ -106,5 +106,5 @@ export function Avatar({ uri, name, size = 40 }: AvatarProps) {
 const styles = StyleSheet.create({
   base: { overflow: 'hidden' },
   fallback: { alignItems: 'center', justifyContent: 'center' },
-  initial: { fontFamily: FontFamily.semibold },
+  initial: { fontFamily: Typeface.semibold },
 });

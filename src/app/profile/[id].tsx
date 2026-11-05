@@ -104,7 +104,7 @@ export default function ProfileScreen() {
       insetHeader
       topBar={<FrostedTopBar back title={handle} centerTitle right={right} />}>
       {!id ? (
-        <EmptyState title="Profile not found" />
+        <EmptyState icon="search" title="Profile not found" />
       ) : isBlocked ? (
         <View style={styles.blocked}>
           <Text variant="h3" style={styles.centred} accessibilityRole="header">

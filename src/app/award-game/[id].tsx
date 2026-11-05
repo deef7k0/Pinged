@@ -121,6 +121,7 @@ export default function AwardGamePickerScreen() {
         )}
         ListEmptyComponent={
           <EmptyState
+            icon="search"
             title="Nothing matches"
             message="Try a wider year range, or clear a filter."
           />

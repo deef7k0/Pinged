@@ -87,11 +87,8 @@ export default function PeopleScreen() {
 
   if (!id) {
     return (
-      <Screen
-        edges={[]}
-        insetHeader
-        topBar={<FrostedTopBar back title="People" largeTitle={false} />}>
-        <EmptyState title="Profile not found" />
+      <Screen edges={[]} insetHeader topBar={<FrostedTopBar back title="People" />}>
+        <EmptyState icon="search" title="Profile not found" />
       </Screen>
     );
   }
@@ -100,13 +97,14 @@ export default function PeopleScreen() {
     /* `insetHeader`: this screen leads with a tab strip rather than artwork, so
        content starts below the bar instead of running under it. The bar names
        whose people these are — the thing the tabs underneath are filtering. */
-    <Screen
-      edges={[]}
-      insetHeader
-      topBar={<FrostedTopBar back title={owner ?? 'People'} largeTitle={false} />}>
-      <TabBar tabs={TABS} value={tab} onChange={setTab} />
-
+    <Screen edges={[]} insetHeader topBar={<FrostedTopBar back title={owner ?? 'People'} />}>
+      {/* The tabs are the list's header, under the large title, so the name
+          is the first thing on the page and folds into the bar (the Apple
+          pass, 2026-11-05). */}
       <PageFlatList
+        ListHeaderComponent={
+          <TabBar tabs={TABS} value={tab} onChange={setTab} inset={0} label="People" />
+        }
         data={people.data ?? []}
         keyExtractor={(person) => person.id}
         contentContainerStyle={styles.content}

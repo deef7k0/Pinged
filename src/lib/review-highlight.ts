@@ -1,4 +1,4 @@
-import { advanceWidth, type PoppinsWeight } from './poppins-advance';
+import { advanceWidth, type FontWeight } from './font-advance';
 
 /**
  * Picking the part of a review that goes on its image — the owner's design
@@ -78,7 +78,7 @@ export function layoutWords(
   width: number,
   fontSize: number,
   lineHeight: number,
-  weight: PoppinsWeight = 'regular'
+  weight: FontWeight = 'regular'
 ): WordLayout {
   const space = advanceWidth(' ', fontSize, weight);
   const placed: PlacedWord[] = [];

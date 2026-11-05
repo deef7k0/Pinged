@@ -8,7 +8,7 @@ import { PressableScale } from '@/components/ui/pressable-scale';
 import { Skeleton } from '@/components/ui/surface';
 import { Text } from '@/components/ui/text';
 import { EXPLORE, featureCard } from '@/constants/explore';
-import { FontFamily, MaxContentWidth, Palette, Spacing, withAlpha } from '@/constants/theme';
+import { Typeface, MaxContentWidth, Palette, Spacing, withAlpha } from '@/constants/theme';
 
 export type FeatureCardGame = {
   id: string;
@@ -129,21 +129,21 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   strap: {
-    fontFamily: FontFamily.semibold,
+    fontFamily: Typeface.semibold,
     fontSize: 11,
     lineHeight: 15,
     letterSpacing: 0.5,
     color: withAlpha(Palette.white, 0.8),
   },
   name: {
-    fontFamily: FontFamily.extraBold,
+    fontFamily: Typeface.extraBold,
     fontSize: 28,
     lineHeight: 32,
     letterSpacing: -0.5,
     color: Palette.white,
   },
   line: {
-    fontFamily: FontFamily.regular,
+    fontFamily: Typeface.regular,
     fontSize: 13,
     lineHeight: 18,
     color: withAlpha(Palette.white, 0.75),

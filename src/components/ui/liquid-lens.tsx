@@ -26,7 +26,7 @@ const LENS_EFFECT = Skia.RuntimeEffect.Make(lensShader());
 
 /* The glyphs and the words, drawn by Skia so the lens can bend them. */
 const IONICONS = require('@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf');
-const LABEL_FONT = require('@expo-google-fonts/poppins/600SemiBold/Poppins_600SemiBold.ttf');
+const LABEL_FONT = require('@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf');
 
 /** The bar's geometry, as `<AppTabBar>` lays it out. */
 export type LensBarGeometry = {

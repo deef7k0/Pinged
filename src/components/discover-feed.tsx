@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Fragment, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
+  FlatList,
   RefreshControl,
   StyleSheet,
   View,
@@ -17,8 +18,8 @@ import { useTabBarClearance } from '@/components/app-tab-bar';
 import { FeatureCards, type FeatureCardGame } from '@/components/explore/feature-cards';
 import { CoverRailSkeleton, GameCoverRail, useRailLayout } from '@/components/game-rail';
 import { HomeSection } from '@/components/home-section';
-import { CollectionSeparator, ListTile } from '@/components/list-tile';
-import { LogCard } from '@/components/log-card';
+import { ReviewBox } from '@/components/game-overview';
+import { CollectionShelfCard } from '@/components/list-tile';
 import { SpotlightSlider } from '@/components/search/spotlight-slider';
 import { TopChartEntry } from '@/components/search/top-chart-entry';
 import { GlassSurface, useLiquidGlass } from '@/components/ui/liquid-glass';
@@ -31,7 +32,7 @@ import { footHeight } from '@/constants/cover-rail';
 import type { EditionKind } from '@/constants/game-editions';
 import { discoverGeometry } from '@/constants/discover-carousel';
 import { clampScore, scoreColor } from '@/constants/score';
-import { FontFamily, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Typeface, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useReviewChart } from '@/hooks/use-review-chart';
 import { useTheme } from '@/hooks/use-theme';
 import { getBelovedGames, getPopularCollections, getUserLogs, type BelovedPeriod } from '@/lib/api';
@@ -43,8 +44,12 @@ import { useAuth } from '@/store/auth';
 
 const RAIL_GAMES = 20;
 const RECOMMENDED_GAMES = 12;
-/** How many reviews and collections Explore shows of each chart: a taste, then "See all". */
-const PREVIEW = 3;
+/** How many reviews and collections Explore's two rails hold before "See all". */
+const PREVIEW = 10;
+/** A review box on the rail: most of the display, so the next one peeks in. */
+const REVIEW_SHARE = 0.82;
+/** A collection's square on its shelf: two and a bit in view, Apple Music's. */
+const SHELF_SHARE = 0.42;
 /** The slider has left the screen once this much of it has scrolled away. */
 const SLIDER_GONE = 0.8;
 
@@ -67,11 +72,13 @@ const PERIOD_WORDS: Record<BelovedPeriod, string> = {
  *
  * Top to bottom, in the owner's order: the tab's name, then the games out
  * now and coming soon as the square parallax slider Search used to lead with
- * (`<SpotlightSlider>` — the portrait hero was tried and taken back the same
- * day); Highly rated; Popular this month as Apple TV Home's big cards (`<FeatureCards>`);
+ * (`<SpotlightSlider>`, no heading over it and page dots under it — the
+ * Apple pass); Highly rated; Popular this month as Apple TV Home's big cards (`<FeatureCards>`);
  * then the rest of what Discover was — Similar to the game you reviewed last,
  * Beloved by the community, the Top 1000 — and the two charts the Reviews and
- * Collections tabs led with untyped, three of each and "See all".
+ * Collections tabs led with untyped, as rails (the Apple pass, 2026-11-05):
+ * reviews as the App Store's boxes, collections as Apple Music's shelf of
+ * squares, ten of each and "See all".
  */
 export function DiscoverFeed() {
   const theme = useTheme();
@@ -178,6 +185,9 @@ export function DiscoverFeed() {
   const lineFoot = footHeight('line');
   const linedRailHeight = rail.cover.height + lineFoot;
   const sliderHeight = discoverGeometry(Math.min(width, MaxContentWidth)).height;
+  const pageWidth = Math.min(width, MaxContentWidth);
+  const reviewWidth = Math.round(pageWidth * REVIEW_SHARE);
+  const shelfSize = Math.round(pageWidth * SHELF_SHARE);
 
   function onScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const away = event.nativeEvent.contentOffset.y > sliderTop + sliderHeight * SLIDER_GONE;
@@ -238,15 +248,15 @@ export function DiscoverFeed() {
             calendar, as Home's carousel moving by itself — the square
             parallax slider Search led with (the owner's, 2026-11-03: "go
             back to the square parallax games"). */}
+        {/* No heading over it (the Apple pass): Apple TV's hero speaks for
+            itself, and its page dots say there is more than one card. */}
         <View onLayout={(event) => setSliderTop(event.nativeEvent.layout.y)}>
-          <HomeSection title="Out now and coming soon">
-            <SpotlightSlider
-              spotlight={spotlight.data ?? null}
-              loading={spotlight.isPending}
-              now={now}
-              away={sliderAway}
-            />
-          </HomeSection>
+          <SpotlightSlider
+            spotlight={spotlight.data ?? null}
+            loading={spotlight.isPending}
+            now={now}
+            away={sliderAway}
+          />
         </View>
 
         <HomeSection title="Highly rated">
@@ -320,24 +330,36 @@ export function DiscoverFeed() {
 
         {reviews.length > 0 && (
           <HomeSection title="Popular reviews" seeAll="/reviews?period=month">
-            <View style={styles.cards}>
-              {reviews.map((log) => (
-                <LogCard key={log.id} log={log} />
-              ))}
-            </View>
+            {/* The App Store's rail of review boxes, the game named in each. */}
+            <FlatList
+              horizontal
+              data={reviews}
+              keyExtractor={(log) => log.id}
+              showsHorizontalScrollIndicator={false}
+              nestedScrollEnabled
+              snapToInterval={reviewWidth + Spacing.x12}
+              snapToAlignment="start"
+              decelerationRate="fast"
+              style={styles.rail}
+              contentContainerStyle={styles.railRow}
+              renderItem={({ item }) => <ReviewBox log={item} width={reviewWidth} showGame />}
+            />
           </HomeSection>
         )}
 
         {lists.length > 0 && (
           <HomeSection title="Popular collections" seeAll="/collections">
-            <View style={styles.tiles}>
-              {lists.map((list, index) => (
-                <Fragment key={list.id}>
-                  {index > 0 && <CollectionSeparator />}
-                  <ListTile list={list} />
-                </Fragment>
-              ))}
-            </View>
+            {/* Apple Music's shelf of playlists: the mosaic, its name, its owner. */}
+            <FlatList
+              horizontal
+              data={lists}
+              keyExtractor={(list) => list.id}
+              showsHorizontalScrollIndicator={false}
+              nestedScrollEnabled
+              style={styles.rail}
+              contentContainerStyle={styles.railRow}
+              renderItem={({ item }) => <CollectionShelfCard list={item} size={shelfSize} />}
+            />
           </HomeSection>
         )}
       </View>
@@ -354,9 +376,10 @@ const styles = StyleSheet.create({
   },
   key: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   sections: { gap: Spacing.x32, paddingTop: Spacing.x16 },
-  score: { fontFamily: FontFamily.bold, fontVariant: ['tabular-nums'] },
+  score: { fontFamily: Typeface.bold, fontVariant: ['tabular-nums'] },
   settling: { opacity: 0.5 },
   note: { justifyContent: 'center', paddingHorizontal: Spacing.x16 },
-  cards: { paddingHorizontal: Spacing.x16, gap: Spacing.x12 },
-  tiles: { paddingHorizontal: Spacing.x16 },
+  /* A horizontal scroller grows unless told not to (CLAUDE.md, gotchas). */
+  rail: { flexGrow: 0 },
+  railRow: { paddingHorizontal: Spacing.x16, gap: Spacing.x12 },
 });

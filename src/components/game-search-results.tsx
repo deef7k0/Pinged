@@ -336,6 +336,7 @@ export function GameSearchResults({
       }
       ListEmptyComponent={
         <EmptyState
+          icon="search"
           title="No games found"
           /* A zero result on a catalogue this size is nearly always a typo, an
              abbreviation ("botw"), or a subtitle that does not match — so the
@@ -348,7 +349,7 @@ export function GameSearchResults({
 }
 
 /** Four result rows' worth of structure, while the first search is in flight. */
-function ResultsSkeleton() {
+export function ResultsSkeleton() {
   const theme = useTheme();
 
   return (

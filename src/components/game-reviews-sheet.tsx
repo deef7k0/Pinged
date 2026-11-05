@@ -11,21 +11,16 @@ import { ScoreMethodNote } from '@/components/score-method-note';
 import { ScoreSummary } from '@/components/score-summary';
 import { Button } from '@/components/ui/button';
 import { Pager } from '@/components/ui/pager';
+import { InsetGroup } from '@/components/ui/inset-group';
+import { PullDownRow } from '@/components/ui/pull-down-row';
+import { Tray } from '@/components/ui/tray';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/screen';
-import { useSelectable } from '@/components/ui/selectable';
 import { SortBar, type SortOption } from '@/components/ui/sort-bar';
 import { Text } from '@/components/ui/text';
 import { PLATFORM_FAMILIES, familyForStored } from '@/constants/platform-family';
 import { ArtRowWindow } from '@/constants/list-window';
-import {
-  ControlHeight,
-  Radius,
-  SmallControlSlop,
-  Spacing,
-  TapTarget,
-  Type,
-} from '@/constants/theme';
+import { SmallControlSlop, Spacing, TapTarget, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   REVIEW_PAGE_SIZE,
@@ -162,7 +157,6 @@ export function GameReviewsSheet({
   criticScore,
 }: GameReviewsSheetProps) {
   const theme = useTheme();
-  const selectable = useSelectable();
   const viewerId = useAuth((state) => state.session?.user.id) ?? null;
 
   const [sort, setSort] = useState<ReviewSort>('popular');
@@ -242,7 +236,6 @@ export function GameReviewsSheet({
     (progress ? 1 : 0) +
     (play ? 1 : 0) +
     (language ? 1 : 0);
-  const filterLook = selectable(activeFilters > 0);
 
   /* What the list is narrowed to, in words — said under the Filters button
      whether the panel is open or not, so a narrowed list never looks like
@@ -315,12 +308,12 @@ export function GameReviewsSheet({
 
   const header = (
     <View>
+      {/* App Store's "Ratings & Reviews" (the Apple pass, 2026-11-05): the
+          sheet opened from the game's page, so it does not repeat the game's
+          name, nor print "REVIEWS" under it. */}
       <View style={styles.title}>
-        <Text variant="h1" numberOfLines={2}>
-          {gameTitle}
-        </Text>
-        <Text variant="label" color="textMuted">
-          REVIEWS
+        <Text variant="h2" accessibilityRole="header">
+          Ratings & Reviews
         </Text>
       </View>
 
@@ -390,31 +383,31 @@ export function GameReviewsSheet({
             accessibilityLabel="Sort reviews"
           />
 
+          {/* One key for the filters, which open as a tray of menus (the
+              Apple pass, 2026-11-05) — it was a pill unfolding a card of five
+              questions in the list. Lit, with the count, while any is on. */}
           <PressableScale
             accessibilityRole="button"
             accessibilityState={{ expanded: filtersOpen }}
-            accessibilityLabel={activeFilters > 0 ? `Filters, ${activeFilters} active` : 'Filters'}
-            onPress={() => setFiltersOpen((open) => !open)}
-            scaleTo={0.96}
+            accessibilityLabel={activeFilters > 0 ? `Filters, ${activeFilters} on` : 'Filters'}
+            onPress={() => setFiltersOpen(true)}
+            scaleTo={0.92}
             hitSlop={SmallControlSlop}
-            /* Lit while any filter is on, so a narrowed list says so even with
-             the panel folded away. */
-            pressedColor={filterLook.pressedColor}
-            focusRing={filterLook.focusRing}
-            style={StyleSheet.flatten([styles.filterButton, filterLook.style])}>
+            pressedColor={theme.controlPressed}
+            style={StyleSheet.flatten([
+              styles.filterKey,
+              { backgroundColor: activeFilters > 0 ? theme.text : theme.controlFill },
+            ])}>
             <Ionicons
               name="options-outline"
-              size={16}
-              color={activeFilters > 0 ? theme.text : theme.textSecondary}
+              size={18}
+              color={activeFilters > 0 ? theme.onPrimary : theme.text}
             />
-            <Text variant="bodySmall" color={filterLook.label}>
-              {activeFilters > 0 ? `Filters · ${activeFilters}` : 'Filters'}
-            </Text>
-            <Ionicons
-              name={filtersOpen ? 'chevron-up' : 'chevron-down'}
-              size={14}
-              color={theme.textMuted}
-            />
+            {activeFilters > 0 && (
+              <Text variant="h5" style={{ color: theme.onPrimary }}>
+                {activeFilters}
+              </Text>
+            )}
           </PressableScale>
         </View>
 
@@ -430,72 +423,84 @@ export function GameReviewsSheet({
           game on, and the languages only the ones somebody reviewed it in;
           the other three are fixed vocabularies, and one that finds nothing
           says so in the list below. */}
-        {filtersOpen && (
-          <View
-            style={[styles.filters, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <FilterGroup label="Score" hint="What the reviewer gave it">
-              <SortBar
-                options={SCORES.map(({ key, label }) => ({ key, label }))}
-                value={score}
-                onChange={setScore}
-                accessibilityLabel="Filter by score"
+        <Tray visible={filtersOpen} onClose={() => setFiltersOpen(false)}>
+          <View style={styles.tray}>
+            <Text variant="h4" accessibilityRole="header" style={styles.trayTitle}>
+              Filter reviews
+            </Text>
+            <InsetGroup>
+              <PullDownRow
+                title="Score"
+                choices={SCORES.filter((entry) => entry.key !== 'any').map(({ key, label }) => ({
+                  value: key,
+                  label,
+                }))}
+                value={score === 'any' ? null : score}
+                onChange={(next) => setScore(next ?? 'any')}
+                anyLabel="Any score"
               />
-            </FilterGroup>
-
-            {facets.length > 0 && (
-              <FilterGroup label="Played on" hint="The platform the review is about" divided>
-                <SortBar
-                  options={[ANY, ...facets.map(({ key, label }) => ({ key, label }))]}
-                  value={family ?? 'any'}
-                  onChange={(key) => setFamily(key === 'any' ? null : key)}
-                  accessibilityLabel="Filter by platform"
+              {facets.length > 0 ? (
+                <PullDownRow
+                  title="Played on"
+                  choices={facets.map(({ key, label }) => ({ value: key, label }))}
+                  value={family}
+                  onChange={setFamily}
+                  anyLabel="Any"
                 />
-              </FilterGroup>
-            )}
-
-            <FilterGroup label="How far they got" divided>
-              <SortBar
-                options={PROGRESS_OPTIONS}
-                value={progress ?? 'any'}
-                onChange={(key) => setProgress(key === 'any' ? null : key)}
-                accessibilityLabel="Filter by how far the reviewer got"
+              ) : null}
+              <PullDownRow
+                title="How far they got"
+                choices={PROGRESS_FILTERS.map(({ key, label }) => ({ value: key, label }))}
+                value={progress}
+                onChange={setProgress}
+                anyLabel="Any"
               />
-            </FilterGroup>
-
-            <FilterGroup label="Solo or co-op" divided>
-              <SortBar
-                options={PLAY_OPTIONS}
-                value={play ?? 'any'}
-                onChange={(key) => setPlay(key === 'any' ? null : key)}
-                accessibilityLabel="Filter by solo or co-op"
+              <PullDownRow
+                title="Solo or co-op"
+                choices={PLAY_FILTERS.map(({ key, label }) => ({ value: key, label }))}
+                value={play}
+                onChange={setPlay}
+                anyLabel="Any"
               />
-            </FilterGroup>
-
-            {languages.length > 0 && (
-              <FilterGroup label="Written in" divided>
-                <SortBar
-                  options={languageOptions}
-                  value={language ?? 'any'}
-                  onChange={(key) => setLanguage(key === 'any' ? null : key)}
-                  accessibilityLabel="Filter by the language the review is written in"
+              {languages.length > 0 ? (
+                <PullDownRow
+                  title="Written in"
+                  choices={languages.map(({ code, label }) => ({ value: code, label }))}
+                  value={language}
+                  onChange={setLanguage}
+                  anyLabel="Any"
                 />
-              </FilterGroup>
-            )}
-
-            {activeFilters > 0 && (
-              <View style={styles.clear}>
-                <Button title="Clear filters" variant="ghost" size="small" onPress={clearFilters} />
+              ) : null}
+            </InsetGroup>
+            <View style={styles.trayActions}>
+              <View style={styles.flex}>
+                <Button
+                  title="Clear"
+                  variant="secondary"
+                  fullWidth
+                  disabled={activeFilters === 0}
+                  onPress={clearFilters}
+                />
               </View>
-            )}
+              <View style={styles.flex}>
+                <Button title="Done" fullWidth onPress={() => setFiltersOpen(false)} />
+              </View>
+            </View>
           </View>
-        )}
+        </Tray>
 
         {/* The pages, once there is more than one. */}
-        {pageCount !== null && pageCount > 1 && (
+        {/* How many, and the pages at the foot only (the Apple pass). The
+            line is where a page turn returns the list to. */}
+        {!!summary && (
           <View
             style={styles.pager}
             onLayout={(event: LayoutChangeEvent) => setPagerY(event.nativeEvent.layout.y)}>
-            <Pager page={page} pageCount={pageCount} onChange={turnTo} summary={summary} />
+            <Text variant="bodySmall" color="textSecondary">
+              {pageCount !== null && pageCount > 1
+                ? `${summary} · page ${page} of ${pageCount}`
+                : summary}
+            </Text>
           </View>
         )}
       </View>
@@ -546,50 +551,6 @@ export function GameReviewsSheet({
         )
       }
     />
-  );
-}
-
-/**
- * One filter question: its name in sentence case at the body's weight, a
- * quiet line saying what it asks where the name alone does not, and its
- * choices. Questions are divided by a hairline inside the panel's card. They
- * were upper-case micro-labels — "SOLO OR CO-OP" — the owner: "make the
- * filters… better to read" (2026-10-21).
- */
-function FilterGroup({
-  label,
-  hint,
-  divided = false,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  divided?: boolean;
-  children: React.ReactNode;
-}) {
-  const theme = useTheme();
-  return (
-    <View
-      style={[
-        styles.filterGroup,
-        divided && {
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: theme.border,
-          paddingTop: Spacing.x16,
-        },
-      ]}>
-      <View style={styles.filterHead}>
-        <Text variant="h5" accessibilityRole="header">
-          {label}
-        </Text>
-        {hint && (
-          <Text variant="caption" color="textMuted">
-            {hint}
-          </Text>
-        )}
-      </View>
-      {children}
-    </View>
   );
 }
 
@@ -695,31 +656,30 @@ const styles = StyleSheet.create({
      under whatever is over them. */
   header: { paddingHorizontal: Spacing.x16, gap: Spacing.x8 },
   members: { marginTop: Spacing.x24, marginBottom: Spacing.x4 },
-  controls: { gap: Spacing.x8, marginTop: Spacing.x16 },
-  /* A filter pill like the sort pills above it, drawn at 32 and touched at
-     the floor. */
-  filterButton: {
+  controls: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
+    justifyContent: 'space-between',
     gap: Spacing.x8,
-    paddingVertical: Spacing.x4,
-    paddingHorizontal: Spacing.x16,
-    minHeight: ControlHeight.small,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
+    marginTop: Spacing.x16,
   },
+  filterKey: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.x4,
+    minWidth: 40,
+    height: 40,
+    paddingHorizontal: Spacing.x8,
+    borderRadius: 20,
+  },
+  flex: { flex: 1 },
+  tray: { padding: Spacing.x16, gap: Spacing.x16 },
+  trayTitle: { textAlign: 'center' },
+  trayActions: { flexDirection: 'row', gap: Spacing.x12 },
+  /* A filter pill like the sort pills above it, drawn at 32 and touched at
+     the floor. */
   /* The panel: one card — the sheet's own surface — holding the questions. */
-  filters: {
-    gap: Spacing.x16,
-    marginTop: Spacing.x8,
-    padding: Spacing.x16,
-    borderRadius: Radius.card,
-    borderWidth: 1,
-  },
-  filterGroup: { gap: Spacing.x12 },
-  filterHead: { gap: 2 },
-  clear: { alignItems: 'flex-start' },
   rowWrap: { paddingHorizontal: Spacing.x16, paddingTop: Spacing.x12 },
   pager: { marginTop: Spacing.x16 },
   /* Two quiet links, their touch boxes meeting and not overlapping. */

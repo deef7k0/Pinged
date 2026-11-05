@@ -41,7 +41,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassSurface, useLiquidGlass } from '@/components/ui/liquid-glass';
 import type { LensTab } from '@/components/ui/liquid-lens';
 import { MINI_PLAYER_FOOTPRINT } from '@/constants/player';
-import { FontFamily, MaxContentWidth, withAlpha } from '@/constants/theme';
+import { Typeface, MaxContentWidth, withAlpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useMiniPlayerActive } from '@/store/player';
 
@@ -69,7 +69,7 @@ export type AppTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>[
  * expo-glass-tabs (davidmokos/expo-glass-tabs, MIT), measured from its
  * `glass-tab-bar.tsx`: a floating pill 12 from the sides, 58 tall with icons
  * and words, 44 and 34 further in at each side once minimized; a highlight
- * that slides between tabs; a 21dp glyph over a 9.5 word.
+ * that slides between tabs; a 21dp glyph over a 10 word, medium, as iOS's tab bar sets it.
  */
 const EXPANDED_HEIGHT = 58;
 const MINIMIZED_HEIGHT = 44;
@@ -252,7 +252,8 @@ export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
   const tints = useMemo(
     () => ({
       active: theme.white,
-      inactive: theme.textSecondary,
+      /* Apple's unchosen tab: white at 55%, not a second grey. */
+      inactive: withAlpha(theme.white, 0.55),
       highlight: withAlpha(theme.white, 0.14),
       glass: withAlpha(theme.surface, 0.94),
       lit: withAlpha(theme.surfaceSelected, 0.97),
@@ -694,7 +695,7 @@ function LENS_GEOMETRY(width: number) {
     icon: ICON_SIZE,
     gap: ITEM_GAP,
     labelLine: LABEL_HEIGHT,
-    labelSize: 9.5,
+    labelSize: 10,
     padTop: ITEM_PAD_V,
   };
 }
@@ -722,9 +723,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   label: {
-    fontSize: 9.5,
+    fontSize: 10,
     lineHeight: LABEL_HEIGHT,
-    fontFamily: FontFamily.semibold,
+    fontFamily: Typeface.medium,
     marginTop: ITEM_GAP,
   },
 });

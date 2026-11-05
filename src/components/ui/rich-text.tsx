@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode } from 'react';
 
 import { Text, type TextProps } from '@/components/ui/text';
-import { FontFamily } from '@/constants/theme';
+import { Typeface } from '@/constants/theme';
 
 /**
  * Body copy with the two emphases people actually type: `**bold**` and
@@ -49,7 +49,7 @@ import { FontFamily } from '@/constants/theme';
  *
  * A `<Text>` inside a `<Text>` inherits `fontFamily`, and setting it *replaces*
  * the parent's rather than combining with it — there is no `fontStyle` axis to
- * fall back on, because italic is a separate family here (see `FontFamily`). So
+ * fall back on, because italic is a separate family here (see `Typeface`). So
  * `**bold with *italic* inside**` cannot be rendered by nesting an italic run
  * inside a semibold one: the inner run would come out regular italic, quietly
  * dropping the weight. The active emphasis is therefore threaded down the
@@ -87,9 +87,9 @@ const MARKERS = [
 
 /** The one loaded face that expresses this combination, or none to inherit. */
 function familyFor(bold: boolean, italic: boolean): string | undefined {
-  if (bold && italic) return FontFamily.boldItalic;
-  if (bold) return FontFamily.semibold;
-  if (italic) return FontFamily.italic;
+  if (bold && italic) return Typeface.boldItalic;
+  if (bold) return Typeface.semibold;
+  if (italic) return Typeface.italic;
   return undefined;
 }
 

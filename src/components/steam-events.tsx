@@ -121,7 +121,7 @@ export function SteamEvents({ appId, title }: { appId: string | null; title: str
                   cover is (`<Poster>`): the colour on the art belongs to it. */}
               {phase && (
                 <View style={[styles.badge, { backgroundColor: withAlpha(theme.shadowInk, 0.82) }]}>
-                  <Text variant="label" color="white">
+                  <Text variant="badge" color="white">
                     {phase === 'live' ? 'ON NOW' : 'UPCOMING'}
                   </Text>
                 </View>

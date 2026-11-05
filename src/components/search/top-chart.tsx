@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Link } from 'expo-router';
 import { memo, useMemo, useState } from 'react';
@@ -5,7 +6,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { HomeSection } from '@/components/home-section';
 import { SectionFailed } from '@/components/search/discover-sections';
-import { Pager } from '@/components/ui/pager';
+import { INSET_GROUP } from '@/components/ui/inset-group';
 import { Poster } from '@/components/ui/poster';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { SortBar } from '@/components/ui/sort-bar';
@@ -13,7 +14,7 @@ import { Skeleton } from '@/components/ui/surface';
 import { Text } from '@/components/ui/text';
 import type { EditionKind } from '@/constants/game-editions';
 import { clampScore, labelFor, scoreColor } from '@/constants/score';
-import { FontFamily, PosterAspectRatio, Radius, Spacing, TapTarget } from '@/constants/theme';
+import { Typeface, PosterAspectRatio, Radius, Spacing, TapTarget } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { getGameLogChartPage, getGameLogRanking } from '@/lib/api';
 import { getCriticChartLength, getCriticChartPage } from '@/lib/games/browse';
@@ -166,6 +167,7 @@ export function TopChart({
     else void gamelogPage.refetch();
   }
 
+  const theme = useTheme();
   const body = (
     <>
       <View style={styles.toggle}>
@@ -174,6 +176,7 @@ export function TopChart({
           value={basis}
           onChange={setBasis}
           accessibilityLabel="Rank the Top 1000 by"
+          kind="choice"
         />
       </View>
 
@@ -193,22 +196,29 @@ export function TopChart({
         </Text>
       ) : (
         <>
-          <View style={[styles.rows, shown.isPlaceholderData && styles.turning]}>
+          {/* An inset group of rows (the Apple pass, 2026-11-05), hairlines
+              from where the words start. */}
+          <View
+            style={[
+              styles.rows,
+              { backgroundColor: theme.surface },
+              shown.isPlaceholderData && styles.turning,
+            ]}>
             {rows.map((entry, index) => (
               <ChartRow key={entry.id} entry={entry} basis={basis} divided={index > 0} />
             ))}
           </View>
 
+          {/* The pages at the foot as "‹ Page 3 of 50 ›" — the pager kept, its
+              look Apple's (the owner keeps pages of a list). */}
           {(pageCount === null ? hasNext || page > 1 : pageCount > 1) && (
-            <View style={styles.inset}>
-              <Pager
-                page={page}
-                pageCount={pageCount}
-                hasNext={hasNext}
-                onChange={turnTo}
-                summary={length === null ? null : `${length.toLocaleString()} games`}
-              />
-            </View>
+            <PageStepper
+              page={page}
+              pageCount={pageCount}
+              hasNext={pageCount === null ? hasNext : page < pageCount}
+              onChange={turnTo}
+              summary={length === null ? null : `${length.toLocaleString()} games`}
+            />
           )}
         </>
       )}
@@ -257,11 +267,9 @@ const ChartRow = memo(function ChartRow({
         accessibilityRole="link"
         accessibilityLabel={`Number ${entry.rank}: ${entry.title}. Scored ${score} out of 100 ${whose}, ${labelFor(score)}, from ${made}.`}
         scaleTo={0.98}
-        style={StyleSheet.flatten([
-          styles.row,
-          divided && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
-        ])}>
-        <Text variant="h5" color="textSecondary" style={styles.rank}>
+        style={styles.row}>
+        {divided && <View style={[styles.rule, { backgroundColor: theme.border }]} />}
+        <Text variant="h4" color="textSecondary" style={styles.rank}>
           {entry.rank}
         </Text>
         {/* No `gameId`: a 44dp box has no room for the Must Play badge. */}
@@ -296,6 +304,60 @@ const ChartRow = memo(function ChartRow({
   );
 });
 
+/** "‹ Page 3 of 50 ›": the chart's pages, a step at a time. */
+function PageStepper({
+  page,
+  pageCount,
+  hasNext,
+  onChange,
+  summary,
+}: {
+  page: number;
+  pageCount: number | null;
+  hasNext: boolean;
+  onChange: (page: number) => void;
+  summary: string | null;
+}) {
+  const theme = useTheme();
+  const key = (
+    icon: 'chevron-back' | 'chevron-forward',
+    label: string,
+    to: number,
+    on: boolean
+  ) => (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !on }}
+      disabled={!on}
+      onPress={() => onChange(to)}
+      scaleTo={0.9}
+      pressedColor={theme.controlPressed}
+      style={StyleSheet.flatten([
+        styles.stepKey,
+        { backgroundColor: theme.controlFill, opacity: on ? 1 : 0.35 },
+      ])}>
+      <Ionicons name={icon} size={20} color={theme.text} />
+    </PressableScale>
+  );
+  return (
+    <View style={styles.stepper}>
+      <View style={styles.stepRow}>
+        {key('chevron-back', 'Previous page', page - 1, page > 1)}
+        <Text variant="h5" accessibilityLiveRegion="polite">
+          {pageCount === null ? `Page ${page}` : `Page ${page} of ${pageCount}`}
+        </Text>
+        {key('chevron-forward', 'Next page', page + 1, hasNext)}
+      </View>
+      {summary ? (
+        <Text variant="caption" color="textMuted">
+          {summary}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 /** The first page's shape while it is on its way. */
 function ChartSkeleton() {
   return (
@@ -318,7 +380,29 @@ const styles = StyleSheet.create({
   toggle: { paddingHorizontal: Spacing.x16 },
   standalone: { gap: Spacing.x16 },
   inset: { paddingHorizontal: Spacing.x16 },
-  rows: { paddingHorizontal: Spacing.x16 },
+  rows: {
+    marginHorizontal: Spacing.x16,
+    paddingHorizontal: Spacing.x16,
+    borderRadius: INSET_GROUP.radius,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+  },
+  rule: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    left: RANK_WIDTH + Spacing.x12,
+    height: StyleSheet.hairlineWidth,
+  },
+  stepper: { alignItems: 'center', gap: Spacing.x4 },
+  stepRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x16 },
+  stepKey: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   /* The last page, while the next one is on its way. */
   turning: { opacity: 0.45 },
   row: {
@@ -335,5 +419,5 @@ const styles = StyleSheet.create({
   billing: { flex: 1, minWidth: 0, gap: 2 },
   score: { alignItems: 'flex-end', gap: 1 },
   /* The bold family: Android synthesises no weight for a custom font. */
-  figure: { fontFamily: FontFamily.bold, fontVariant: ['tabular-nums'] },
+  figure: { fontFamily: Typeface.bold, fontVariant: ['tabular-nums'] },
 });

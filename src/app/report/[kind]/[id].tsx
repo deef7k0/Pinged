@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
+import { useBarConfirm } from '@/hooks/use-bar-confirm';
 import { ChoiceChips, type Choice } from '@/components/choice-chips';
 import { Button } from '@/components/ui/button';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
@@ -127,10 +128,11 @@ export default function ReportScreen() {
 
   let body: ReactNode;
   if (!userId) {
-    body = <EmptyState title="Sign in to report" />;
+    body = <EmptyState icon="shield-checkmark-outline" title="Sign in to report" />;
   } else if (!target) {
     body = (
       <EmptyState
+        icon="shield-checkmark-outline"
         title="Nothing to report"
         message="This link does not point at anything that can be reported."
       />
@@ -393,6 +395,13 @@ function ReportForm<R extends string>({
     },
   });
 
+  useBarConfirm({
+    label: 'Send report',
+    onPress: () => submit.mutate(),
+    loading: submit.isPending,
+    disabled: !reason,
+  });
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -454,13 +463,6 @@ function ReportForm<R extends string>({
         )}
 
         <View style={styles.send}>
-          <Button
-            title="Send report"
-            fullWidth
-            disabled={!reason}
-            loading={submit.isPending}
-            onPress={() => submit.mutate()}
-          />
           <Text variant="caption" color="textMuted" style={styles.centred}>
             {promise}
           </Text>

@@ -2,12 +2,15 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
 
-import { ChoiceChips, MultiChoiceChips } from '@/components/choice-chips';
+import { useBarConfirm } from '@/hooks/use-bar-confirm';
 import { GameSearchResults } from '@/components/game-search-results';
 import { Button } from '@/components/ui/button';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
+import { ChecklistGroup, chosenLine } from '@/components/ui/checklist-group';
+import { InsetGroup, Row } from '@/components/ui/inset-group';
+import { PullDownRow } from '@/components/ui/pull-down-row';
 import { PageScrollView } from '@/components/ui/page-scroll';
 import { Poster } from '@/components/ui/poster';
 import { PressGlyph } from '@/components/ui/press-glyph';
@@ -15,7 +18,8 @@ import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
 import { TextField } from '@/components/ui/text-field';
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing, Typeface } from '@/constants/theme';
+import { useAccent } from '@/hooks/use-accent';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useTheme } from '@/hooks/use-theme';
 import { createPing, getPing, updatePing, type PingDraft, type PingReference } from '@/lib/api';
@@ -117,20 +121,14 @@ function draftOf(ping: PingFeedRow | null): PingDraft {
 
 function PingForm({ existing }: { existing: PingFeedRow | null }) {
   const theme = useTheme();
+  const accent = useAccent();
   const router = useRouter();
   const queryClient = useQueryClient();
   const userId = useAuth((state) => state.session?.user.id) ?? null;
   const [draft, setDraft] = useState<PingDraft>(() => draftOf(existing));
   const [picking, setPicking] = useState(false);
-  const [showPreferences, setShowPreferences] = useState(
-    () =>
-      !!existing &&
-      (existing.genres.length > 0 ||
-        existing.platforms.length > 0 ||
-        !!existing.play_length ||
-        !!existing.player_mode ||
-        !!existing.release_era)
-  );
+  /** A checklist pushed over the form — Genres or Platforms — or none. */
+  const [checklist, setChecklist] = useState<'genres' | 'platforms' | null>(null);
   /* One example a visit, chosen when the sheet opens. */
   const [example] = useState(() => PING_EXAMPLES[Math.floor(Math.random() * PING_EXAMPLES.length)]);
 
@@ -161,6 +159,20 @@ function PingForm({ existing }: { existing: PingFeedRow | null }) {
     },
   });
 
+  useBarConfirm(
+    picking
+      ? null
+      : checklist
+        ? /* A checklist's ✓ returns to the form, its picks kept. */
+          { label: 'Done', onPress: () => setChecklist(null) }
+        : {
+            label: existing ? 'Save changes' : 'Publish ping',
+            onPress: () => publish.mutate(),
+            loading: publish.isPending,
+            disabled: length === 0 || tooLong,
+          }
+  );
+
   if (picking) {
     return (
       <ReferencePicker
@@ -174,6 +186,21 @@ function PingForm({ existing }: { existing: PingFeedRow | null }) {
     );
   }
 
+  if (checklist) {
+    const isGenres = checklist === 'genres';
+    return (
+      <PageScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ChecklistGroup
+          title={isGenres ? 'Genres' : 'Platforms'}
+          choices={isGenres ? PING_GENRES : PING_PLATFORMS}
+          value={isGenres ? draft.genres : draft.platforms}
+          onChange={(next) => update(isGenres ? { genres: next } : { platforms: next })}
+          max={PING_FILTER_MAX}
+        />
+      </PageScrollView>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -183,157 +210,113 @@ function PingForm({ existing }: { existing: PingFeedRow | null }) {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
+        {/*
+          The Apple pass (2026-11-05): the question is the page — a borderless
+          20pt field, no well; the games an editable list (⊖ to take one off,
+          ⊕ to add); the preferences five rows, Genres and Platforms pushing
+          checklists, the rest pull-downs. It was a heading over a well, a
+          dashed "Add a game" box, and a disclosure of ~30 chips.
+        */}
         <View style={styles.block}>
-          <Text variant="h3" accessibilityRole="header">
-            What are you looking for?
-          </Text>
-          <TextField
+          <TextInput
             value={draft.description}
             onChangeText={(description) => update({ description })}
             placeholder={example}
+            placeholderTextColor={theme.textMuted}
+            selectionColor={accent.onSurface}
+            cursorColor={accent.onSurface}
             multiline
             autoFocus={!existing}
             maxLength={PING_DESCRIPTION_MAX + 50}
             accessibilityLabel="What you’re looking for"
-            style={styles.description}
-            error={tooLong ? `${PING_DESCRIPTION_MAX} characters at most.` : null}
+            style={[styles.question, { color: theme.text }]}
           />
           <Text variant="caption" color={tooLong ? 'danger' : 'textMuted'} style={styles.count}>
-            {`${draft.description.length} / ${PING_DESCRIPTION_MAX}`}
+            {tooLong
+              ? `${PING_DESCRIPTION_MAX} characters at most`
+              : `${draft.description.length} / ${PING_DESCRIPTION_MAX}`}
           </Text>
         </View>
 
-        <View style={styles.block}>
-          <View style={styles.headRow}>
-            <Text variant="h4" accessibilityRole="header">
-              Like these games
-            </Text>
-            <Text variant="caption" color="textMuted">
-              {`${draft.references.length} of ${PING_REFERENCE_MAX}`}
-            </Text>
-          </View>
-          <Text variant="bodySmall" color="textSecondary">
-            Optional, but it helps: people who’ve played them see your ping first.
-          </Text>
-          <View style={styles.refs}>
-            {draft.references.map((ref, index) => (
-              <View key={ref.id} style={[styles.refRow, { backgroundColor: theme.controlFill }]}>
-                <Poster coverUrl={ref.coverUrl} title={ref.title} width={32} />
-                <Text variant="itemTitle" numberOfLines={2} style={styles.refTitle}>
-                  {ref.title}
-                </Text>
-                <PressableScale
-                  accessibilityRole="button"
-                  accessibilityLabel={`Remove ${ref.title}`}
-                  onPress={() =>
-                    update({ references: draft.references.filter((_, at) => at !== index) })
-                  }
-                  hitSlop={10}
-                  scaleTo={0.9}
-                  style={StyleSheet.flatten(styles.remove)}>
-                  <PressGlyph>
-                    <Ionicons name="close" size={18} color={theme.textMuted} />
-                  </PressGlyph>
-                </PressableScale>
-              </View>
-            ))}
-            {draft.references.length < PING_REFERENCE_MAX && (
+        <InsetGroup
+          header={`Like these games · ${draft.references.length} of ${PING_REFERENCE_MAX}`}
+          footer="Optional, but it helps: people who’ve played them see your ping first.">
+          {draft.references.map((ref, index) => (
+            <View key={ref.id} style={styles.refRow}>
               <PressableScale
                 accessibilityRole="button"
-                accessibilityLabel="Add a game it should be like"
-                onPress={() => setPicking(true)}
-                scaleTo={0.98}
-                style={StyleSheet.flatten([styles.addRow, { borderColor: theme.outline }])}>
-                <Ionicons name="add-circle-outline" size={20} color={theme.primaryText} />
-                <Text variant="itemTitle" style={{ color: theme.primaryText }}>
-                  {draft.references.length === 0 ? 'Add a game' : 'Add another'}
-                </Text>
+                accessibilityLabel={`Remove ${ref.title}`}
+                onPress={() =>
+                  update({ references: draft.references.filter((_, at) => at !== index) })
+                }
+                hitSlop={12}
+                scaleTo={0.9}>
+                <PressGlyph>
+                  <Ionicons name="remove-circle" size={22} color={theme.danger} />
+                </PressGlyph>
               </PressableScale>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.block}>
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityState={{ expanded: showPreferences }}
-            onPress={() => setShowPreferences((open) => !open)}
-            scaleTo={0.98}
-            pressedColor={theme.controlPressed}
-            style={StyleSheet.flatten([
-              styles.disclosure,
-              { backgroundColor: showPreferences ? theme.surfaceSelected : theme.controlFill },
-            ])}>
-            <Ionicons name="options-outline" size={18} color={theme.textSecondary} />
-            <View style={styles.flex}>
-              <Text variant="h5">Preferences</Text>
-              <Text variant="caption" color="textMuted">
-                Genre, platform, length, players, era — all optional
+              <Poster coverUrl={ref.coverUrl} title={ref.title} width={32} zoomable={false} />
+              <Text variant="body" numberOfLines={2} style={styles.refTitle}>
+                {ref.title}
               </Text>
             </View>
-            <Ionicons
-              name={showPreferences ? 'chevron-up' : 'chevron-down'}
-              size={16}
-              color={theme.textMuted}
-            />
-          </PressableScale>
-
-          {showPreferences && (
-            <View style={styles.preferences}>
-              <MultiChoiceChips
-                label="Genres"
-                choices={PING_GENRES}
-                value={draft.genres}
-                onChange={(genres) => update({ genres })}
-                max={PING_FILTER_MAX}
-              />
-              <MultiChoiceChips
-                label="Platforms"
-                choices={PING_PLATFORMS}
-                value={draft.platforms}
-                onChange={(platforms) => update({ platforms })}
-                max={PING_FILTER_MAX}
-              />
-              <ChoiceChips
-                label="Length"
-                choices={PING_LENGTHS}
-                value={draft.playLength}
-                onChange={(playLength) => update({ playLength })}
-                clearable
-              />
-              <ChoiceChips
-                label="Players"
-                choices={PING_PLAYERS}
-                value={draft.playerMode}
-                onChange={(playerMode) => update({ playerMode })}
-                clearable
-              />
-              <ChoiceChips
-                label="Release"
-                choices={PING_ERAS}
-                value={draft.releaseEra}
-                onChange={(releaseEra) => update({ releaseEra })}
-                clearable
-              />
-            </View>
+          ))}
+          {draft.references.length < PING_REFERENCE_MAX && (
+            <PressableScale
+              key="add"
+              accessibilityRole="button"
+              accessibilityLabel="Add a game it should be like"
+              onPress={() => setPicking(true)}
+              scaleTo={1}
+              pressedColor={theme.controlPressed}
+              style={styles.refRow}>
+              <Ionicons name="add-circle" size={22} color={theme.success} />
+              <Text variant="body" style={{ color: theme.primaryText }}>
+                {draft.references.length === 0 ? 'Add a game' : 'Add another'}
+              </Text>
+            </PressableScale>
           )}
-        </View>
+        </InsetGroup>
+
+        <InsetGroup header="Preferences" footer="All optional.">
+          <Row
+            title="Genres"
+            value={chosenLine(draft.genres, PING_GENRES)}
+            onPress={() => setChecklist('genres')}
+          />
+          <Row
+            title="Platforms"
+            value={chosenLine(draft.platforms, PING_PLATFORMS)}
+            onPress={() => setChecklist('platforms')}
+          />
+          <PullDownRow
+            title="Length"
+            choices={PING_LENGTHS}
+            value={draft.playLength}
+            onChange={(playLength) => update({ playLength })}
+            anyLabel="Any"
+          />
+          <PullDownRow
+            title="Players"
+            choices={PING_PLAYERS}
+            value={draft.playerMode}
+            onChange={(playerMode) => update({ playerMode })}
+            anyLabel="Any"
+          />
+          <PullDownRow
+            title="Release"
+            choices={PING_ERAS}
+            value={draft.releaseEra}
+            onChange={(releaseEra) => update({ releaseEra })}
+            anyLabel="Any"
+          />
+        </InsetGroup>
 
         {publish.isError && (
           <Text variant="bodySmall" color="danger">
             {publish.error instanceof Error ? publish.error.message : 'Could not publish that.'}
           </Text>
         )}
-
-        <Button
-          title={existing ? 'Save changes' : 'Publish ping'}
-          icon={existing ? 'checkmark' : 'paper-plane'}
-          fullWidth
-          size="large"
-          loading={publish.isPending}
-          disabled={length === 0 || tooLong}
-          onPress={() => publish.mutate()}
-        />
         {!existing && (
           <Text variant="caption" color="textMuted" style={styles.footnote}>
             Everyone on Pinged can see it and suggest a game. You can edit it, mark it found or
@@ -419,39 +402,25 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { padding: Spacing.x16, gap: Spacing.x32, paddingBottom: Spacing.x48 },
   block: { gap: Spacing.x12 },
-  description: { minHeight: 120, textAlignVertical: 'top' },
+  question: {
+    fontFamily: Typeface.semibold,
+    fontSize: 20,
+    lineHeight: 26,
+    minHeight: 104,
+    textAlignVertical: 'top',
+    paddingHorizontal: 0,
+  },
   count: { alignSelf: 'flex-end' },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  refs: { gap: Spacing.x8 },
   refRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.x12,
-    padding: Spacing.x8,
-    paddingRight: Spacing.x12,
-    borderRadius: Radius.card,
+    minHeight: 52,
+    paddingHorizontal: Spacing.x16,
+    paddingVertical: Spacing.x8,
   },
   refTitle: { flex: 1, minWidth: 0 },
-  remove: { padding: Spacing.x4 },
-  addRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.x8,
-    height: 52,
-    borderRadius: Radius.card,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-  },
-  disclosure: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.x12,
-    minHeight: 56,
-    paddingHorizontal: Spacing.x16,
-    borderRadius: Radius.card,
-  },
-  preferences: { gap: Spacing.x24, paddingTop: Spacing.x8 },
   footnote: { textAlign: 'center', paddingHorizontal: Spacing.x16 },
   pickerHead: { padding: Spacing.x16, gap: Spacing.x12 },
 });

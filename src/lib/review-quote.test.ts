@@ -11,7 +11,7 @@ import {
   normaliseQuote,
 } from './review-quote.ts';
 import { PULL_QUOTE, quoteMarkSize } from '../constants/pull-quote.ts';
-import { textWidth } from './testkit/poppins-font.ts';
+import { textWidth } from './testkit/app-font.ts';
 
 /** The owner's own example (2026-10-16). */
 const OWNER_EXAMPLE =

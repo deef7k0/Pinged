@@ -1,20 +1,19 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { useBarConfirm } from '@/hooks/use-bar-confirm';
 import { copyArtQuery, prefetchCopyArt } from '@/hooks/use-copy-art';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
-import { ChoiceChips } from '@/components/choice-chips';
 import { GamePicker } from '@/components/game-picker';
-import { Button } from '@/components/ui/button';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
 import { PageScrollView } from '@/components/ui/page-scroll';
-import { PartialDateField } from '@/components/ui/partial-date-field';
+import { InsetGroup, Row } from '@/components/ui/inset-group';
+import { PartialDateRow } from '@/components/ui/partial-date-row';
+import { PullDownRow } from '@/components/ui/pull-down-row';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
-import { SelectionCard } from '@/components/ui/selection-card';
-import { SelectField } from '@/components/ui/select-field';
 import { Text } from '@/components/ui/text';
 import { TextField } from '@/components/ui/text-field';
 import {
@@ -118,14 +117,18 @@ export default function AddCopyScreen() {
 
   let body: React.ReactNode;
   if (!userId) {
-    body = <EmptyState title="Sign in to add your copies" />;
+    body = <EmptyState icon="disc-outline" title="Sign in to add your copies" />;
   } else if (params.copy && existing.isLoading) {
     body = <LoadingState />;
   } else if (params.copy && !existing.data) {
     body = existing.isLoadingError ? (
       <ErrorState error={existing.error} onRetry={() => void existing.refetch()} />
     ) : (
-      <EmptyState title="That copy is gone" message="It may have been deleted." />
+      <EmptyState
+        icon="disc-outline"
+        title="That copy is gone"
+        message="It may have been deleted."
+      />
     );
   } else if (!gameId) {
     body = (
@@ -148,7 +151,7 @@ export default function AddCopyScreen() {
       />
     );
   } else if (!game.data) {
-    body = <EmptyState title="Game not found" />;
+    body = <EmptyState icon="search" title="Game not found" />;
   } else {
     body = (
       <CopyForm
@@ -288,6 +291,13 @@ function CopyForm({
     },
   });
 
+  useBarConfirm({
+    label: existing ? 'Save copy' : 'Add to my copies',
+    onPress: () => save.mutate(),
+    loading: save.isPending,
+    disabled: describeMissing,
+  });
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -303,134 +313,123 @@ function CopyForm({
           </Text>
         </View>
 
-        {/* ------------------------------------------------------ release */}
-        <View style={styles.section}>
-          <Text variant="label" color="textMuted" accessibilityRole="header">
-            Which release
-          </Text>
-
-          {releases.length > 0 ? (
-            <View style={styles.releases} accessibilityRole="radiogroup">
-              {releases.map((release) => (
-                <ReleaseRow
-                  key={release.id}
-                  title={releaseLine(release)}
-                  subtitle={release.publisher ?? null}
-                  selected={choice.kind === 'release' && choice.id === release.id}
-                  onPress={() => setChoice({ kind: 'release', id: release.id })}
-                />
-              ))}
+        {/*
+          Every field a row (the Apple pass, 2026-11-05): the release as a
+          checklist of one, the facts as pull-downs, the date a row opening a
+          tray, the notes a row that grows. It was selection cards, chips and
+          labelled wells.
+        */}
+        {releases.length > 0 ? (
+          <InsetGroup header="Which release">
+            {releases.map((release) => (
               <ReleaseRow
-                title="Not listed"
-                subtitle="Describe it yourself"
-                selected={choice.kind === 'describe'}
-                onPress={() => setChoice({ kind: 'describe' })}
+                key={release.id}
+                title={releaseLine(release)}
+                subtitle={release.publisher ?? null}
+                selected={choice.kind === 'release' && choice.id === release.id}
+                onPress={() => setChoice({ kind: 'release', id: release.id })}
               />
-            </View>
-          ) : (
-            <Text variant="bodySmall" color="textMuted">
-              No releases of this game are in the database yet. Describe yours below — or scan its
-              barcode, and the next person with the same box will find it.
+            ))}
+            <ReleaseRow
+              title="Not listed"
+              subtitle="Describe it yourself"
+              selected={choice.kind === 'describe'}
+              onPress={() => setChoice({ kind: 'describe' })}
+            />
+          </InsetGroup>
+        ) : (
+          <Text variant="bodySmall" color="textMuted" style={styles.note}>
+            No releases of this game are in the database yet. Describe yours below — or scan its
+            barcode, and the next person with the same box will find it.
+          </Text>
+        )}
+
+        {waitingOn && (
+          <View style={[styles.notice, { borderColor: theme.border }]}>
+            <Ionicons name="time-outline" size={16} color={theme.textSecondary} />
+            <Text variant="bodySmall" color="textSecondary" style={styles.flex}>
+              Waiting on your barcode submission. This copy links to the release by itself once it
+              is approved.
             </Text>
-          )}
+          </View>
+        )}
 
-          {waitingOn && (
-            <View style={[styles.notice, { borderColor: theme.border }]}>
-              <Ionicons name="time-outline" size={16} color={theme.textSecondary} />
-              <Text variant="bodySmall" color="textSecondary" style={styles.flex}>
-                Waiting on your barcode submission. This copy links to the release by itself once it
-                is approved.
-              </Text>
-            </View>
-          )}
+        {choice.kind === 'describe' && (
+          <InsetGroup
+            header="Your release"
+            footer={describeMissing ? 'Choose the platform your copy is for.' : undefined}>
+            <PullDownRow
+              title="Platform"
+              choices={platformOptions}
+              value={platform || null}
+              onChange={(next) => setPlatform(next ?? '')}
+            />
+            <PullDownRow
+              title="Region"
+              choices={REGIONS.map((value) => ({
+                value,
+                label: REGION_LABEL[value],
+                hint: REGION_HINT[value],
+              }))}
+              value={region}
+              onChange={setRegion}
+              anyLabel="Not sure"
+            />
+            <TextField
+              variant="row"
+              label="Edition"
+              value={edition}
+              onChangeText={setEdition}
+              placeholder="Standard"
+              maxLength={80}
+            />
+          </InsetGroup>
+        )}
 
-          {choice.kind === 'describe' && (
-            <View style={styles.describe}>
-              <SelectField
-                label="Platform"
-                sheetTitle="Platform"
-                value={platform}
-                options={platformOptions}
-                onChange={setPlatform}
-                placeholder="Choose"
-                clearable={false}
-              />
-              <ChoiceChips
-                label="Region"
-                choices={REGIONS.map((value) => ({
-                  value,
-                  label: REGION_LABEL[value],
-                  hint: REGION_HINT[value],
-                }))}
-                value={region}
-                onChange={setRegion}
-              />
-              <TextField
-                label="Edition"
-                value={edition}
-                onChangeText={setEdition}
-                placeholder="Standard"
-                maxLength={80}
-              />
-            </View>
-          )}
-        </View>
+        {/* What came with it and its condition are independent, on purpose:
+            complete-in-box and battered is not loose and mint. */}
+        <InsetGroup header="This copy">
+          <PullDownRow
+            title="What came with it"
+            choices={completenessChoices(platformKey).map((value) => ({
+              value,
+              label: completenessLabel(value, medium),
+              hint: COMPLETENESS_HINT[value],
+            }))}
+            value={completeness}
+            onChange={setCompleteness}
+            anyLabel="Not sure"
+          />
+          <PullDownRow
+            title="Condition"
+            choices={CONDITIONS.map((value) => ({
+              value,
+              label: CONDITION_LABEL[value],
+              hint: CONDITION_HINT[value],
+            }))}
+            value={condition}
+            onChange={setCondition}
+            anyLabel="Not sure"
+          />
+          <PartialDateRow title="Got it" value={acquiredOn} onChange={setAcquiredOn} />
+        </InsetGroup>
 
-        {/* ------------------------------------------------- the copy itself */}
-        <ChoiceChips
-          label="What came with it"
-          choices={completenessChoices(platformKey).map((value) => ({
-            value,
-            label: completenessLabel(value, medium),
-            hint: COMPLETENESS_HINT[value],
-          }))}
-          value={completeness}
-          onChange={setCompleteness}
-          withHints
-        />
-
-        {/* Independent of the one above, on purpose: complete-in-box and
-            battered is not loose and mint. */}
-        <ChoiceChips
-          label="Condition"
-          choices={CONDITIONS.map((value) => ({
-            value,
-            label: CONDITION_LABEL[value],
-            hint: CONDITION_HINT[value],
-          }))}
-          value={condition}
-          onChange={setCondition}
-          withHints
-        />
-
-        <PartialDateField label="Got it" value={acquiredOn} onChange={setAcquiredOn} />
-
-        <TextField
-          label="Notes"
-          value={notes}
-          onChangeText={setNotes}
-          multiline
-          maxLength={MAX_NOTES}
-          placeholder="Original case, tiny crack on the front…"
-          hint={`${notes.length}/${MAX_NOTES}`}
-        />
+        <InsetGroup>
+          <TextField
+            variant="row"
+            value={notes}
+            onChangeText={setNotes}
+            multiline
+            maxLength={MAX_NOTES}
+            accessibilityLabel="Notes"
+            placeholder="Notes — original case, tiny crack on the front…"
+            hint={notes.length > 0 ? `${notes.length}/${MAX_NOTES}` : undefined}
+          />
+        </InsetGroup>
 
         {save.isError && (
           <Text variant="bodySmall" color="danger">
             {save.error instanceof Error ? save.error.message : 'Could not save this copy.'}
-          </Text>
-        )}
-
-        <Button
-          title={existing ? 'Save copy' : 'Add to my copies'}
-          fullWidth
-          loading={save.isPending}
-          disabled={describeMissing}
-          onPress={() => save.mutate()}
-        />
-        {describeMissing && (
-          <Text variant="caption" color="textMuted" style={styles.centred}>
-            Choose the platform your copy is for.
           </Text>
         )}
       </PageScrollView>
@@ -438,7 +437,7 @@ function CopyForm({
   );
 }
 
-/** One radio row in the release list — a selection card, like every choice. */
+/** One row of the release checklist: its line, the publisher, a check when chosen. */
 function ReleaseRow({
   title,
   subtitle,
@@ -450,13 +449,14 @@ function ReleaseRow({
   selected: boolean;
   onPress: () => void;
 }) {
+  const theme = useTheme();
   return (
-    <SelectionCard
+    <Row
       title={title}
-      hint={subtitle}
-      selected={selected}
+      subtitle={subtitle ?? undefined}
       onPress={onPress}
-      accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
+      accessibilityLabel={`${subtitle ? `${title}, ${subtitle}` : title}${selected ? ', chosen' : ''}`}
+      trailing={selected ? <Ionicons name="checkmark" size={20} color={theme.text} /> : undefined}
     />
   );
 }
@@ -465,9 +465,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { padding: Spacing.x16, gap: Spacing.x24, paddingBottom: Spacing.x48 },
   head: { gap: Spacing.x4 },
-  section: { gap: Spacing.x12 },
-  releases: { gap: Spacing.x12 },
-  describe: { gap: Spacing.x16 },
+  note: { paddingHorizontal: Spacing.x16 },
   notice: {
     flexDirection: 'row',
     alignItems: 'flex-start',

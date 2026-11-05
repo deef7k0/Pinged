@@ -55,12 +55,12 @@ export function ReviewMeta({ score, gameTitle, status }: ReviewMetaProps) {
       <View style={styles.labels}>
         {status !== null && (
           <Text variant="label" style={{ color: tint }}>
-            {STATUS_VERB[status].toUpperCase()}
+            {STATUS_VERB[status]}
           </Text>
         )}
         {score !== null && (
           <Text variant="label" style={{ color: tint }}>
-            {labelFor(score).toUpperCase()}
+            {labelFor(score)}
           </Text>
         )}
       </View>

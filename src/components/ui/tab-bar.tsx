@@ -96,9 +96,10 @@ const TRACK_PAD = 5;
  *   widening to whichever tab it is over, and settles on the nearest when
  *   let go. Only along a row that fits: one wider than the phone scrolls,
  *   and a sideways drag is the scroll's.
- * - The pill is white with near-black words (`segmentPill`, the demo's), on
- *   the translucent track; on a game's page, its Material 3 `primary` and
- *   `onPrimary`, so the chosen tab is the game's colour.
+ * - The pill is iOS 26's glass thumb — white at 22% with white words
+ *   (`segmentPill`; it was the demo's solid white) — on the translucent
+ *   track; on a game's page, its Material 3 `primary` and `onPrimary`, so
+ *   the chosen tab is the game's colour.
  *
  * Two departures, as with the control before it: tabs are as wide as their
  * words, sharing the slack (Search's six scopes do not fit equal sixths), and

@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import { clampScore, labelFor, scoreColor } from '@/constants/score';
-import { FontFamily, Radius, Spacing } from '@/constants/theme';
+import { Typeface, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { BreakdownSection } from '@/lib/review-facets';
 
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
   score: {
     width: SCORE_WIDTH,
     textAlign: 'right',
-    fontFamily: FontFamily.bold,
+    fontFamily: Typeface.bold,
     fontVariant: ['tabular-nums'],
   },
   failed: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8, marginTop: Spacing.x8 },

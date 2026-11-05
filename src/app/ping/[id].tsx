@@ -2,13 +2,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { RefreshControl, StyleSheet, View } from 'react-native';
+import { RefreshControl, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { FamiliarityLine } from '@/components/pings/familiarity-line';
 import { StatusTag } from '@/components/pings/status-tag';
 import { SuggestionGroupCard } from '@/components/pings/suggestion-group';
 import { ReportFlag } from '@/components/report-flag';
 import { Avatar } from '@/components/ui/avatar';
+import { ReferenceFan } from '@/components/pings/ping-spotlight';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { cardShape, CARD_GAP, CARD_INSET, useCardMaterial } from '@/components/ui/card-material';
@@ -20,7 +21,7 @@ import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/sc
 import { SelectionCard } from '@/components/ui/selection-card';
 import { SlideUpSheet } from '@/components/ui/slide-up-sheet';
 import { Text } from '@/components/ui/text';
-import { PosterAspectRatio, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   deletePing,
@@ -37,9 +38,6 @@ import { canSuggest, groupSuggestions, pingTags, suggestionCount } from '@/lib/p
 import { useAuth } from '@/store/auth';
 import { showAlert } from '@/components/ui/dialog';
 import { toast } from '@/lib/toast';
-
-/** A reference game's box on the request's own page. */
-const REF_COVER = 92;
 
 /**
  * One request, whole: what was asked, the games it is built on, and every
@@ -128,6 +126,7 @@ export default function PingScreen() {
       <Screen edges={['bottom']} insetHeader topBar={bar}>
         {isPingsNotReady(ping.error) ? (
           <EmptyState
+            icon="paper-plane-outline"
             title="Pings are on their way"
             message="They arrive with the database’s next update."
           />
@@ -141,6 +140,7 @@ export default function PingScreen() {
     return (
       <Screen edges={['bottom']} insetHeader topBar={bar}>
         <EmptyState
+          icon="paper-plane-outline"
           title="This ping is gone"
           message="Its owner deleted it, or it isn’t yours to see."
         />
@@ -177,9 +177,31 @@ function Request({ ping, mine }: { ping: PingFeedRow; mine: boolean }) {
   const router = useRouter();
   const name = displayNameFor(ping);
   const tags = pingTags(ping);
+  const { width } = useWindowDimensions();
 
   return (
     <View style={styles.request}>
+      {/* The Apple pass (2026-11-05): the games fanned on top, as For You
+          stages them; then the question at 22; then "Asked by Ada · 2h" with
+          a 20 face. It was a 40 face and a name over the words, and the
+          games as a labelled row ("LIKE THESE") under them. */}
+      {ping.refs.length > 0 && (
+        <PressableScale
+          accessibilityRole="link"
+          accessibilityLabel={`Like ${ping.refs.map((ref) => ref.title).join(', ')}. Opens ${ping.refs[0].title}`}
+          onPress={() =>
+            router.push({ pathname: '/game/[id]', params: { id: ping.refs[0].game_id } })
+          }
+          scaleTo={0.98}
+          style={styles.fan}>
+          <ReferenceFan refs={ping.refs} width={width - Spacing.x16 * 2} />
+        </PressableScale>
+      )}
+
+      <Text variant="h2" accessibilityRole="header">
+        {ping.description}
+      </Text>
+
       <View style={styles.author}>
         <PressableScale
           accessibilityRole="link"
@@ -187,23 +209,23 @@ function Request({ ping, mine }: { ping: PingFeedRow; mine: boolean }) {
           onPress={() => router.push({ pathname: '/profile/[id]', params: { id: ping.user_id } })}
           scaleTo={0.97}
           style={StyleSheet.flatten(styles.who)}>
-          <Avatar uri={ping.avatar_url} name={name} size={40} />
-          <View style={styles.whoText}>
-            <Text variant="h5" numberOfLines={1}>
-              {mine ? 'You asked' : `${name} asks`}
-            </Text>
-            <Text variant="caption" color="textMuted" numberOfLines={1}>
-              {`@${ping.username} · ${timeAgoLong(ping.created_at)}`}
-              {ping.updated_at > ping.created_at ? ' · edited' : ''}
-            </Text>
-          </View>
+          <Avatar uri={ping.avatar_url} name={name} size={20} />
+          <Text variant="bodySmall" color="textSecondary" numberOfLines={1} style={styles.whoText}>
+            {`${mine ? 'Asked by you' : `Asked by ${name}`} · ${timeAgoLong(ping.created_at)}${
+              ping.updated_at > ping.created_at ? ' · edited' : ''
+            }`}
+          </Text>
         </PressableScale>
         {ping.status !== 'open' && <StatusTag status={ping.status} />}
       </View>
 
-      <Text variant="h2" accessibilityRole="header">
-        {ping.description}
-      </Text>
+      {ping.refs.length > 0 && (
+        <Text variant="bodySmall" color="textSecondary">
+          {`Like ${ping.refs
+            .map((ref) => `${ref.title}${ref.played ? ' (played)' : ''}`)
+            .join(', ')}`}
+        </Text>
+      )}
 
       {tags.length > 0 && (
         <View style={styles.tags}>
@@ -214,41 +236,6 @@ function Request({ ping, mine }: { ping: PingFeedRow; mine: boolean }) {
               </Text>
             </View>
           ))}
-        </View>
-      )}
-
-      {ping.refs.length > 0 && (
-        <View style={styles.refsBlock}>
-          <Text variant="label" color="textMuted">
-            LIKE THESE
-          </Text>
-          <View style={styles.refs}>
-            {ping.refs.map((ref) => (
-              <PressableScale
-                key={ref.game_id}
-                accessibilityRole="link"
-                accessibilityLabel={`${ref.title}${ref.played ? ', you’ve played it' : ''}`}
-                onPress={() => router.push({ pathname: '/game/[id]', params: { id: ref.game_id } })}
-                scaleTo={0.96}
-                style={StyleSheet.flatten(styles.ref)}>
-                <View
-                  style={{ width: REF_COVER, height: Math.round(REF_COVER / PosterAspectRatio) }}>
-                  <Poster coverUrl={ref.cover_url} title={ref.title} width={REF_COVER} elevated />
-                </View>
-                <Text variant="bodySmall" numberOfLines={2} style={styles.refTitle}>
-                  {ref.title}
-                </Text>
-                {ref.played && (
-                  <View style={styles.played}>
-                    <Ionicons name="checkmark-circle" size={12} color={theme.primaryText} />
-                    <Text variant="caption" style={{ color: theme.primaryText }}>
-                      Played
-                    </Text>
-                  </View>
-                )}
-              </PressableScale>
-            ))}
-          </View>
         </View>
       )}
 
@@ -371,7 +358,12 @@ function Actions({
   }
 
   function more() {
-    const options: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [];
+    const options: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [
+      {
+        text: 'Edit',
+        onPress: () => router.push({ pathname: '/new-ping', params: { edit: ping.id } }),
+      },
+    ];
     if (ping.status === 'open') {
       options.push({ text: 'Close it', onPress: () => status.mutate({ next: 'closed' }) });
     } else {
@@ -419,16 +411,9 @@ function Actions({
             />
           </View>
         )}
-        <Button
-          title="Edit"
-          variant="secondary"
-          icon="create-outline"
-          disabled={busy}
-          onPress={() => router.push({ pathname: '/new-ping', params: { edit: ping.id } })}
-        />
         <IconButton
           icon="ellipsis-horizontal"
-          accessibilityLabel="More: close, reopen or delete"
+          accessibilityLabel="More: edit, close, reopen or delete"
           disabled={busy}
           onPress={more}
         />
@@ -558,14 +543,11 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.x16, paddingBottom: Spacing.x48, gap: Spacing.x24 },
   request: { gap: Spacing.x16 },
   author: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
-  who: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
+  who: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: Spacing.x8 },
+  fan: { alignItems: 'center' },
   whoText: { flex: 1, minWidth: 0, gap: 1 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.x8 },
   tag: { paddingHorizontal: Spacing.x12, paddingVertical: 5, borderRadius: 999 },
-  refsBlock: { gap: Spacing.x8 },
-  refs: { flexDirection: 'row', gap: Spacing.x16 },
-  ref: { width: REF_COVER, gap: Spacing.x8 },
-  refTitle: { marginTop: 2 },
   played: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   reportRow: { flexDirection: 'row' },
   answer: {

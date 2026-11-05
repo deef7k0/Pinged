@@ -5,7 +5,7 @@ import { describe, it } from 'node:test';
 import { luminance, toHsl } from '../lib/color';
 import { GAME_GENRES } from './game-genres';
 import { MOODS } from '../lib/games/moods';
-import { advanceWidth } from '../lib/poppins-advance';
+import { advanceWidth } from '../lib/font-advance';
 import {
   ART_OFFSET,
   ART_SIZE,
@@ -14,6 +14,7 @@ import {
   INK_RATIO,
   LUMINANCE,
   NAME_LINES,
+  NAME_TYPE,
   SATURATION_FLOOR,
   TILE_ASPECT,
   TILE_COLUMNS,
@@ -91,7 +92,8 @@ describe('a mood tile, against MoodCategoryCard.kt', () => {
 
   it('fits every mood’s and every genre’s name, measured in the font it is set in', () => {
     /* The names are one or two short words, so what has to fit is the longest
-       unbreakable one — Poppins SemiBold at 13, bounded here by the Bold table,
+       unbreakable one — Inter SemiBold at 14 (`NAME_TYPE`), bounded here by
+       the Bold table,
        which is the wider of the two the advance widths hold.
 
        `320` is left out on purpose: the reference's 72 is a constant measured
@@ -105,16 +107,16 @@ describe('a mood tile, against MoodCategoryCard.kt', () => {
     for (const display of DISPLAYS.filter((width) => width >= 360)) {
       const room = tileSize(display, MARGIN).width - TILE_PAD.start - TILE_PAD.end;
       for (const word of words) {
-        const width = advanceWidth(word, 13, 'bold');
+        const width = advanceWidth(word, NAME_TYPE.fontSize, 'bold');
         assert.ok(width <= room, `${display}dp: "${word}" is ${width.toFixed(0)}dp in ${room}dp`);
       }
     }
   });
 
   it('holds two lines of the name inside the tile', () => {
-    /* `Type.itemTitle` is 13 on 18, which is what the tile draws the name in. */
+    /* The tile draws its name in `NAME_TYPE`. */
     const { height } = tileSize(360, MARGIN);
-    assert.ok(TILE_PAD.top + NAME_LINES * 18 + TILE_PAD.bottom <= height + 1);
+    assert.ok(TILE_PAD.top + NAME_LINES * NAME_TYPE.lineHeight + TILE_PAD.bottom <= height + 1);
   });
 
   it('fills the row at every width — two whole tiles, no rounding gap', () => {

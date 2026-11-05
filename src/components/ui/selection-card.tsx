@@ -1,14 +1,12 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { PressableScale } from '@/components/ui/pressable-scale';
-import { useSelectable } from '@/components/ui/selectable';
-import { RadioMark, RADIO_SIZE } from '@/components/ui/selection-marks';
 import { Text } from '@/components/ui/text';
-import { Radius, Spacing, TapTarget } from '@/constants/theme';
-
-/** The radio on a `compact` row: small enough for a list, still clearly a mark. */
-const COMPACT_RADIO = 26;
+import { Radius, Spacing, TapTarget, withAlpha } from '@/constants/theme';
+import { useAccent } from '@/hooks/use-accent';
+import { useTheme } from '@/hooks/use-theme';
 
 export type SelectionCardProps = {
   title: string;
@@ -39,20 +37,18 @@ export type SelectionCardProps = {
 };
 
 /**
- * One choice, drawn as the owner's reference draws it — SimpMusic's Server
- * options, taken from its code rather than traced from a screenshot:
+ * One choice, as Apple draws a choice in a list (the Apple pass, 2026-11-04):
+ * a filled row, the name and what it means on the left, and **a checkmark at
+ * the trailing edge** once it is chosen — Settings' and a pull-down's. A
+ * card that toggles on its own (`checkbox`) shows an empty circle that fills
+ * with a check, as Reminders' does.
  *
- *  - a row, `Radius.card` (12, every card's corner) corners, 15dp of padding and
- *    13 between parts;
- *  - **the circle first**, 34dp, on the leading edge (`<RadioMark>`);
- *  - the name in `optionTitle`, and what it means under it in `bodySmall`;
- *  - at rest, only an outline; chosen, the accent's wash inside and its edge
- *    around, the name up to full strength — the app's one selected state
- *    (`useSelectable`).
+ * It was SimpMusic's Server option: an outlined card with a 34dp radio on
+ * the leading edge and the accent's wash inside when chosen.
  *
  * The one implementation for every single-choice list with words to it: a
- * report's reasons, a copy's condition, a collection's type, the progress
- * choices, a release, a select field's options. A new one uses this.
+ * report's reasons, a copy's condition, a collection's type, a release, a
+ * select field's options. A new one uses this.
  */
 export function SelectionCard({
   title,
@@ -68,8 +64,9 @@ export function SelectionCard({
   accessibilityLabel,
   accessibilityHint,
 }: SelectionCardProps) {
-  const look = useSelectable()(selected);
-  const bare = frame === 'row' && !selected;
+  const theme = useTheme();
+  const accent = useAccent();
+  const mark = accent.tonal ? accent.onSurface : theme.text;
 
   return (
     <PressableScale
@@ -81,31 +78,22 @@ export function SelectionCard({
       accessibilityHint={accessibilityHint ?? hint ?? undefined}
       disabled={disabled}
       onPress={onPress}
-      scaleTo={0.985}
-      pressedColor={look.pressedColor}
-      focusRing={look.focusRing}
+      scaleTo={1}
+      pressedColor={theme.controlPressed}
       style={StyleSheet.flatten([
         styles.card,
         compact && styles.compact,
-        bare ? { backgroundColor: 'transparent', borderColor: 'transparent' } : look.style,
+        { backgroundColor: frame === 'row' ? withAlpha(theme.text, 0) : theme.surface },
         disabled && styles.disabled,
       ])}>
-      <RadioMark on={selected} size={compact ? COMPACT_RADIO : RADIO_SIZE} />
-
       <View style={styles.text}>
         <View style={styles.titleRow}>
           {leading}
-          <Text
-            variant="optionTitle"
-            color={look.label}
-            numberOfLines={compact ? 1 : 2}
-            style={styles.title}>
+          <Text variant="body" numberOfLines={compact ? 1 : 2} style={styles.title}>
             {title}
           </Text>
         </View>
         {hint ? (
-          /* `textSecondary`, never `textMuted`: the quiet step is under AA on
-             an accent-washed card, and this has to be read to be chosen. */
           <Text variant="bodySmall" color="textSecondary">
             {hint}
           </Text>
@@ -113,6 +101,18 @@ export function SelectionCard({
       </View>
 
       {trailing}
+
+      {role === 'checkbox' ? (
+        <Ionicons
+          name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+          size={24}
+          color={selected ? mark : theme.textMuted}
+        />
+      ) : (
+        <View style={styles.check}>
+          {selected && <Ionicons name="checkmark" size={20} color={mark} />}
+        </View>
+      )}
     </PressableScale>
   );
 }
@@ -122,10 +122,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.x12,
-    padding: Spacing.x16,
+    paddingVertical: Spacing.x12,
+    paddingHorizontal: Spacing.x16,
+    minHeight: TapTarget + Spacing.x8,
     borderRadius: Radius.card,
-    borderWidth: 1,
+    borderCurve: 'continuous',
   },
+  /* The check's place is kept while nothing is chosen, so the words never move. */
+  check: { width: 20, alignItems: 'center' },
   /* A picker row: a line of text, a smaller circle, still past the tap floor. */
   compact: {
     minHeight: TapTarget + Spacing.x8,

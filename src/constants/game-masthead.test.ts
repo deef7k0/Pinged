@@ -105,7 +105,7 @@ describe('where the row sits in the fade', () => {
   it('retains clear visibility above the cover: around three quarters showing 34dp up', () => {
     const hero = 304;
     const showing = dissolveAt(ROW_ENTERS_AT - 34 / hero);
-    assert.ok(showing > 0.70 && showing < 0.80, `${showing}`);
+    assert.ok(showing > 0.7 && showing < 0.8, `${showing}`);
   });
 
   it('has let the art largely go by the title, 18dp under the top of the cover', () => {

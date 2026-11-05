@@ -22,7 +22,7 @@ import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
 import { clampScore, labelFor, scoreColor } from '@/constants/score';
-import { FontFamily, Palette, Spacing, withAlpha } from '@/constants/theme';
+import { Typeface, Palette, Spacing, withAlpha } from '@/constants/theme';
 import { useAnimatedCover } from '@/hooks/use-animated-cover';
 import { useTheme } from '@/hooks/use-theme';
 import { getRatingBreakdown } from '@/lib/api';
@@ -436,13 +436,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   title: {
-    fontFamily: FontFamily.extraBold,
+    fontFamily: Typeface.extraBold,
     fontSize: 24,
     lineHeight: 29,
     color: Palette.white,
   },
   credit: {
-    fontFamily: FontFamily.regular,
+    fontFamily: Typeface.regular,
     fontSize: 14,
     lineHeight: 19,
     color: withAlpha(Palette.white, 0.75),
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
   backBody: { paddingHorizontal: Spacing.x20, paddingBottom: Spacing.x24, gap: Spacing.x16 },
   backTitle: { paddingRight: INFO },
   scoreRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
-  score: { fontFamily: FontFamily.extraBold, fontSize: 40, lineHeight: 46 },
+  score: { fontFamily: Typeface.extraBold, fontSize: 40, lineHeight: 46 },
   fact: { gap: 2 },
   more: { alignItems: 'center', justifyContent: 'center', gap: Spacing.x12, padding: Spacing.x32 },
   moreLine: { textAlign: 'center' },

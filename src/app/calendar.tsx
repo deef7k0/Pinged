@@ -3,28 +3,28 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  FadeInLeft,
+  FadeInRight,
+  runOnJS,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 
 import { GameGridTile } from '@/components/game-grid-tile';
 import { PORTRAIT_COLUMNS, gridItemWidth } from '@/components/gaming/game-tile';
 import { Button } from '@/components/ui/button';
-import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
-import { IconButton } from '@/components/ui/icon-button';
+import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
 import { PageScrollView } from '@/components/ui/page-scroll';
 import { Poster } from '@/components/ui/poster';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { ErrorState, Screen } from '@/components/ui/screen';
-import { useSelectable } from '@/components/ui/selectable';
 import { Text } from '@/components/ui/text';
 import { scoreColor } from '@/constants/score';
-import {
-  ControlHeight,
-  MaxContentWidth,
-  Radius,
-  SmallControlRowGap,
-  SmallControlSlop,
-  Spacing,
-  Type,
-} from '@/constants/theme';
+import { MaxContentWidth, Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { calendarCover, getReleaseCalendar } from '@/lib/games/browse';
 import {
@@ -37,6 +37,11 @@ import {
   type CalendarGame,
 } from '@/lib/games/calendar';
 import { EARLIEST_IGDB_YEAR } from '@/lib/games/igdb';
+
+/** How much of a sideways drag the grid follows, and what turns the month. */
+const SWIPE_FOLLOW = 0.5;
+const SWIPE_TURN = 0.2;
+const SWIPE_FLICK = 600;
 
 const MONTHS = [
   'January',
@@ -124,7 +129,7 @@ const YEARS_AHEAD = 2;
  */
 export default function CalendarScreen() {
   const theme = useTheme();
-  const selectable = useSelectable();
+  const reduceMotion = useReducedMotion();
   const { width: windowWidth } = useWindowDimensions();
 
   /* Read once, when the screen mounts: "today" must not move between renders,
@@ -185,17 +190,42 @@ export default function CalendarScreen() {
     if (target > scrolled.current) scroller.current?.scrollTo({ y: target, animated: true });
   }, [day]);
 
-  function goToMonth(next: number) {
-    setMonth(next);
+  /*
+   * A month at a time, across the years (the Apple pass, 2026-11-05: the
+   * month is the large title, a ‹ › capsule beside it, and a swipe between
+   * months — the twelve pills and the year row are gone). Bounded by what
+   * IGDB has and by how far ahead anything is announced.
+   */
+  const [direction, setDirection] = useState<1 | -1>(1);
+  const atStart = year <= EARLIEST_IGDB_YEAR && month === 0;
+  const atEnd = year >= thisYear + YEARS_AHEAD && month === 11;
+
+  function stepMonth(by: 1 | -1) {
+    if (by < 0 ? atStart : atEnd) return;
+    const index = year * 12 + month + by;
+    setDirection(by);
+    setYear(Math.floor(index / 12));
+    setMonth(index % 12);
     setDay(null);
     setShowAll(false);
   }
 
-  function goToYear(next: number) {
-    setYear(next);
-    setDay(null);
-    setShowAll(false);
-  }
+  /* The grid follows a sideways finger a little, and a swipe past a fifth of
+     the page — or a flick — turns the month. A vertical drag is the page's. */
+  const drag = useSharedValue(0);
+  const swipe = Gesture.Pan()
+    .activeOffsetX([-18, 18])
+    .failOffsetY([-12, 12])
+    .onUpdate((event) => {
+      drag.set(event.translationX * SWIPE_FOLLOW);
+    })
+    .onEnd((event) => {
+      const far = Math.abs(event.translationX) > pageWidth * SWIPE_TURN;
+      const fast = Math.abs(event.velocityX) > SWIPE_FLICK;
+      if (far || fast) runOnJS(stepMonth)(event.translationX < 0 ? 1 : -1);
+      drag.set(withSpring(0, { damping: 22, stiffness: 260 }));
+    });
+  const dragStyle = useAnimatedStyle(() => ({ transform: [{ translateX: drag.get() }] }));
 
   const dayGames = day === null ? null : (byDay.get(day) ?? []);
   const listed = dayGames ?? (showAll ? ofMonth : ofMonth.slice(0, MONTH_LIMIT));
@@ -210,7 +240,29 @@ export default function CalendarScreen() {
           : 'This month';
 
   return (
-    <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="Release calendar" />}>
+    <Screen
+      edges={['bottom']}
+      insetHeader
+      topBar={
+        <FrostedTopBar
+          back
+          title={`${MONTHS[month]} ${year}`}
+          right={
+            <>
+              <TopBarDisc
+                icon="chevron-back"
+                label={atStart ? 'No earlier months' : `${MONTHS[(month + 11) % 12]}`}
+                onPress={() => stepMonth(-1)}
+              />
+              <TopBarDisc
+                icon="chevron-forward"
+                label={atEnd ? 'No later months' : `${MONTHS[(month + 1) % 12]}`}
+                onPress={() => stepMonth(1)}
+              />
+            </>
+          }
+        />
+      }>
       <PageScrollView
         ref={scroller}
         showsVerticalScrollIndicator={false}
@@ -222,88 +274,48 @@ export default function CalendarScreen() {
           scrolled.current = event.nativeEvent.contentOffset.y;
         }}
         scrollEventThrottle={64}>
-        {/* The bar says what this is; the page opens on which year, and the
-            year is also the control that changes it. */}
-        <View style={styles.yearRow}>
-          <IconButton
-            icon="chevron-back"
-            accessibilityLabel={`${year - 1}`}
-            size="small"
-            disabled={year <= EARLIEST_IGDB_YEAR}
-            onPress={() => goToYear(year - 1)}
-          />
-          <Text variant="display" accessibilityRole="header" style={styles.year}>
-            {year}
-          </Text>
-          <IconButton
-            icon="chevron-forward"
-            accessibilityLabel={`${year + 1}`}
-            size="small"
-            disabled={year >= thisYear + YEARS_AHEAD}
-            onPress={() => goToYear(year + 1)}
-          />
-        </View>
-
-        {/* January to December, all twelve in view: six to a row. Choices, so
-            they are outlined pills and the month in force takes the selected
-            state. A scrolling row would start on January with October chosen
-            somewhere off the edge. */}
-        <View style={styles.months} accessibilityRole="radiogroup" accessibilityLabel="Month">
-          {MONTHS.map((name, index) => {
-            const current = index === month;
-            const look = selectable(current);
-            return (
-              <PressableScale
-                key={name}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: current }}
-                accessibilityLabel={name}
-                onPress={() => goToMonth(index)}
-                hitSlop={SmallControlSlop}
-                scaleTo={0.94}
-                pressedColor={look.pressedColor}
-                focusRing={look.focusRing}
-                style={StyleSheet.flatten([styles.month, look.style])}>
-                <Text variant="bodySmall" color={look.label}>
-                  {name.slice(0, 3)}
-                </Text>
-              </PressableScale>
-            );
-          })}
-        </View>
-
         {calendar.isLoadingError ? (
           <ErrorState error={calendar.error} onRetry={() => calendar.refetch()} />
         ) : (
           <>
-            <View style={styles.grid}>
-              {rows.map((row, index) => (
-                <View key={index} style={styles.week}>
-                  {row.map((date, column) =>
-                    date === null ? (
-                      /* Past the month's last day: the square's room, kept, so
+            <GestureDetector gesture={swipe}>
+              <Animated.View
+                key={`${year}-${month}`}
+                entering={
+                  reduceMotion
+                    ? undefined
+                    : (direction > 0 ? FadeInRight : FadeInLeft).duration(240)
+                }
+                style={[styles.grid, dragStyle]}
+                accessibilityHint="Swipe left or right for another month">
+                {rows.map((row, index) => (
+                  <View key={index} style={styles.week}>
+                    {row.map((date, column) =>
+                      date === null ? (
+                        /* Past the month's last day: the square's room, kept, so
                          a short month is the same height as a long one. */
-                      <View
-                        key={`blank-${column}`}
-                        style={{ width: cell, height: NUMBER_BAND + Math.round(cell * 1.5) }}
-                      />
-                    ) : (
-                      <DayCell
-                        key={date}
-                        date={date}
-                        games={byDay.get(date)}
-                        size={cell}
-                        selected={day === date}
-                        today={today === date}
-                        loading={calendar.isLoading}
-                        label={`${date} ${MONTHS[month]}`}
-                        onSelect={toggleDay}
-                      />
-                    )
-                  )}
-                </View>
-              ))}
-            </View>
+                        <View
+                          key={`blank-${column}`}
+                          style={{ width: cell, height: NUMBER_BAND + Math.round(cell * 1.5) }}
+                        />
+                      ) : (
+                        <DayCell
+                          key={date}
+                          date={date}
+                          games={byDay.get(date)}
+                          size={cell}
+                          selected={day === date}
+                          today={today === date}
+                          loading={calendar.isLoading}
+                          label={`${date} ${MONTHS[month]}`}
+                          onSelect={toggleDay}
+                        />
+                      )
+                    )}
+                  </View>
+                ))}
+              </Animated.View>
+            </GestureDetector>
 
             <View
               style={styles.section}
@@ -638,27 +650,6 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MaxContentWidth,
   },
-  yearRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x16 },
-  year: { flex: 1, textAlign: 'center', fontVariant: ['tabular-nums'] },
-
-  /* Twelve pills, six to a row: each a sixth of the width less its gaps.
-     `SmallControlRowGap` between the rows, so their touch slop tiles. */
-  months: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    columnGap: Spacing.x4,
-    rowGap: SmallControlRowGap,
-  },
-  month: {
-    flexBasis: '15%',
-    flexGrow: 1,
-    height: ControlHeight.small,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
   grid: { gap: ROW_GAP },
   week: { flexDirection: 'row', gap: CELL_GAP },
   /* The band over a square that holds its number, centred on it. */

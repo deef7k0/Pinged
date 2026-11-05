@@ -6,15 +6,16 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 
-import { ChoiceChips } from '@/components/choice-chips';
 import { GamePicker } from '@/components/game-picker';
 import { Button } from '@/components/ui/button';
 import { CARD_INSET, cardShape } from '@/components/ui/card-material';
 import { FrostedTopBar } from '@/components/ui/frosted-top-bar';
+import { InsetGroup } from '@/components/ui/inset-group';
+import { PullDownRow } from '@/components/ui/pull-down-row';
+import { useBarConfirm } from '@/hooks/use-bar-confirm';
 import { IconButton } from '@/components/ui/icon-button';
 import { PageScrollView } from '@/components/ui/page-scroll';
 import { Poster } from '@/components/ui/poster';
-import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
 import { SelectField } from '@/components/ui/select-field';
 import { Text } from '@/components/ui/text';
@@ -111,7 +112,7 @@ export default function AddReleaseScreen() {
 
   let body: React.ReactNode;
   if (!userId) {
-    body = <EmptyState title="Sign in to add a release" />;
+    body = <EmptyState icon="disc-outline" title="Sign in to add a release" />;
   } else if (params.contribution && existing.isLoading) {
     body = <LoadingState />;
   } else if (params.contribution && !existing.data) {
@@ -136,6 +137,7 @@ export default function AddReleaseScreen() {
   } else if (!code) {
     body = (
       <EmptyState
+        icon="disc-outline"
         title="No barcode"
         message="Scan the barcode on the box first — a release is added for a barcode."
       />
@@ -160,7 +162,7 @@ export default function AddReleaseScreen() {
     body = game.isLoadingError ? (
       <ErrorState error={game.error} onRetry={() => void game.refetch()} />
     ) : (
-      <EmptyState title="Game not found" />
+      <EmptyState icon="search" title="Game not found" />
     );
   } else {
     body = (
@@ -214,9 +216,6 @@ function ReleaseForm({
   const [platform, setPlatform] = useState(existing?.platform ?? suggestedPlatform ?? '');
   const [region, setRegion] = useState<ReleaseRegion | null>(existing?.region ?? null);
   const [edition, setEdition] = useState(existing?.edition ?? 'Standard');
-  const [more, setMore] = useState(
-    !!(existing?.publisher || existing?.release_date || existing?.catalog_number || existing?.notes)
-  );
   const [publisher, setPublisher] = useState(existing?.publisher ?? '');
   const [releaseDate, setReleaseDate] = useState(existing?.release_date ?? '');
   const [catalog, setCatalog] = useState(existing?.catalog_number ?? '');
@@ -318,6 +317,20 @@ function ReleaseForm({
     );
   }
 
+  /* The commit is the ✓ in the bar (the Apple pass, 2026-11-05): Submit on
+     the form, then Done on what the database said. One registration for both,
+     so the two never race for the bar. */
+  useBarConfirm(
+    result
+      ? { label: 'Done', onPress: () => router.back() }
+      : {
+          label: existing ? 'Save changes' : 'Submit release',
+          onPress: () => submit.mutate(),
+          loading: submit.isPending,
+          disabled: !!missing || !!dateError || withdraw.isPending,
+        }
+  );
+
   if (result) {
     return <ResultView result={result} game={game} onEdit={() => setResult(null)} />;
   }
@@ -361,95 +374,74 @@ function ReleaseForm({
           <Button title="Change" size="small" variant="ghost" onPress={onChangeGame} />
         </View>
 
-        <SelectField
-          label="Platform"
-          sheetTitle="Platform"
-          value={platform}
-          options={platformOptions}
-          onChange={setPlatform}
-          placeholder="Choose"
-          clearable={false}
-        />
+        {/* Every field a row (the Apple pass, 2026-11-05): Platform and
+            Region pull-downs, the words rows, the optional facts a group of
+            their own (they were folded behind "More details"). */}
+        <InsetGroup footer="Edition as printed on the box — Standard, Platinum, Greatest Hits, Collector’s…">
+          <PullDownRow
+            title="Platform"
+            choices={platformOptions}
+            value={platform || null}
+            onChange={(next) => setPlatform(next ?? '')}
+          />
+          <PullDownRow
+            title="Region"
+            choices={REGIONS.map((value) => ({
+              value,
+              label: REGION_LABEL[value],
+              hint: REGION_HINT[value],
+            }))}
+            value={region}
+            onChange={(next) => next && setRegion(next)}
+          />
+          <TextField
+            variant="row"
+            label="Edition"
+            value={edition}
+            onChangeText={setEdition}
+            placeholder="Standard"
+            maxLength={80}
+          />
+        </InsetGroup>
 
-        <ChoiceChips
-          label="Region"
-          choices={REGIONS.map((value) => ({
-            value,
-            label: REGION_LABEL[value],
-            hint: REGION_HINT[value],
-          }))}
-          value={region}
-          onChange={setRegion}
-          clearable={false}
-        />
-
-        <TextField
-          label="Edition"
-          value={edition}
-          onChangeText={setEdition}
-          placeholder="Standard"
-          maxLength={80}
-          hint="As printed on the box — Standard, Platinum, Greatest Hits, Collector’s…"
-        />
-
-        {/* ---------------------------------------------------- optional */}
-        <PressableScale
-          accessibilityRole="button"
-          accessibilityState={{ expanded: more }}
-          onPress={() => setMore((open) => !open)}
-          scaleTo={0.98}
-          style={styles.moreToggle}>
-          <Text variant="h5" color="textSecondary">
-            More details
-          </Text>
-          <Text variant="caption" color="textMuted" style={styles.flex}>
-            Optional
-          </Text>
-          <Ionicons name={more ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textMuted} />
-        </PressableScale>
-
-        {more && (
-          <View style={styles.more}>
-            <TextField
-              label="Publisher"
-              value={publisher}
-              onChangeText={setPublisher}
-              maxLength={80}
-            />
-            <View style={styles.row}>
-              <View style={styles.flex}>
-                <TextField
-                  label="Release date"
-                  value={releaseDate}
-                  onChangeText={setReleaseDate}
-                  placeholder="1998-04-29"
-                  keyboardType="numbers-and-punctuation"
-                  maxLength={10}
-                  error={dateError}
-                />
-              </View>
-              <View style={styles.flex}>
-                <TextField
-                  label="Catalogue number"
-                  value={catalog}
-                  onChangeText={setCatalog}
-                  placeholder="SLES-00972"
-                  autoCapitalize="characters"
-                  maxLength={40}
-                />
-              </View>
-            </View>
-            <TextField
-              label="Notes"
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-              maxLength={500}
-              placeholder="Anything that tells this box apart from another"
-              hint={`${notes.length}/500`}
-            />
-          </View>
-        )}
+        <InsetGroup header="More details · optional">
+          <TextField
+            variant="row"
+            label="Publisher"
+            value={publisher}
+            onChangeText={setPublisher}
+            maxLength={80}
+          />
+          <TextField
+            variant="row"
+            label="Released"
+            value={releaseDate}
+            onChangeText={setReleaseDate}
+            placeholder="1998-04-29"
+            keyboardType="numbers-and-punctuation"
+            maxLength={10}
+            error={dateError}
+          />
+          <TextField
+            variant="row"
+            label="Catalogue"
+            value={catalog}
+            onChangeText={setCatalog}
+            placeholder="SLES-00972"
+            autoCapitalize="characters"
+            maxLength={40}
+          />
+          <TextField
+            variant="row"
+            value={notes}
+            onChangeText={setNotes}
+            multiline
+            maxLength={500}
+            accessibilityLabel="Notes"
+            placeholder="Notes — anything that tells this box apart"
+            hint={notes.length > 0 ? `${notes.length}/500` : undefined}
+          />
+        </InsetGroup>
 
         {/* ------------------------------------------------------ photos */}
         {!existing && (
@@ -537,13 +529,6 @@ function ReleaseForm({
           </Text>
         )}
 
-        <Button
-          title={existing ? 'Save changes' : 'Submit release'}
-          fullWidth
-          loading={submit.isPending}
-          disabled={!!missing || !!dateError || withdraw.isPending}
-          onPress={() => submit.mutate()}
-        />
         {missing && (
           <Text variant="caption" color="textMuted" style={styles.centred}>
             {missing}
@@ -589,8 +574,6 @@ function ResultView({
     queryFn: () => getRelease((result as { release_id: string }).release_id),
     enabled: result.status === 'exists',
   });
-
-  const done = () => router.back();
 
   let icon: keyof typeof Ionicons.glyphMap;
   let title: string;
@@ -713,7 +696,6 @@ function ResultView({
         {result.status === 'pending' && (
           <Button title="Edit what I sent" variant="secondary" fullWidth onPress={onEdit} />
         )}
-        <Button title="Done" variant="ghost" fullWidth onPress={done} />
       </View>
     </PageScrollView>
   );

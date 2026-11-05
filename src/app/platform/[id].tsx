@@ -164,7 +164,7 @@ export default function PlatformScreen() {
   if (!valid) {
     return (
       <Screen edges={['bottom']} insetHeader topBar={<FrostedTopBar back title="Platform" />}>
-        <EmptyState title="Platform not found" />
+        <EmptyState icon="search" title="Platform not found" />
       </Screen>
     );
   }
