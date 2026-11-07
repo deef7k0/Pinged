@@ -15,6 +15,7 @@ import { useHeaderHeight } from '@/hooks/use-header-height';
 import { FAVOURITES_MAX, getFavorites, getProfile } from '@/lib/api';
 import { displayNameFor } from '@/lib/format';
 import { sharpCoverUrl } from '@/lib/games/sharp-cover';
+import { DarkRoom } from '@/hooks/use-accent';
 
 /** The line of "Number 1", as tall as its type. */
 const NUMBER_LINE = 52;
@@ -33,7 +34,7 @@ const RANK_RISE = 0.27;
  * The favourites query is the profile's own (`['favorites', id]`), so it
  * opens on what the profile already loaded.
  */
-export default function TopTenScreen() {
+function TopTenScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { width, height } = useWindowDimensions();
@@ -199,3 +200,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.x24,
   },
 });
+
+/** A game's room: dark in either setting (Settings → Appearance). */
+export default function TopTenScreenRoute() {
+  return (
+    <DarkRoom>
+      <TopTenScreen />
+    </DarkRoom>
+  );
+}

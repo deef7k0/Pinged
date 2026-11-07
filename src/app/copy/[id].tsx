@@ -55,7 +55,7 @@ import { CONTRIBUTION_STATUS_LABEL } from '@/constants/physical';
 import { CASE_TEMPLATE_SIZE } from '@/constants/platform-cases';
 import { platformKeyForStored } from '@/constants/platform-family';
 import { Radius, Spacing, Type } from '@/constants/theme';
-import { AccentProvider, useAccent, useGameAccent } from '@/hooks/use-accent';
+import { AccentProvider, useAccent, useGameAccent, DarkRoom } from '@/hooks/use-accent';
 import { useCopyMesh } from '@/hooks/use-copy-mesh';
 import { SKIA_AVAILABLE } from '@/lib/skia-available';
 import { MeshBackdrop } from '@/components/ui/mesh-backdrop';
@@ -113,7 +113,7 @@ const REFUSAL_MS = 2600;
  * about one game, and the one where a case is an object you can pick up
  * (DESIGN.md § 4.3).
  */
-export default function CopyScreen() {
+function CopyScreen() {
   const { id, handover } = useLocalSearchParams<{ id: string; handover?: string }>();
   /* Opened from the physical shelf's Cover Flow, which has already flown the
      cover to where the case stands and faded the moving colours in: the case
@@ -709,3 +709,12 @@ const styles = StyleSheet.create({
   line: { height: Type.h2.fontSize, borderRadius: Radius.md },
   lineSmall: { height: Type.body.fontSize, borderRadius: Radius.md, marginTop: Spacing.x4 },
 });
+
+/** A game's room: dark in either setting (Settings → Appearance). */
+export default function CopyScreenRoute() {
+  return (
+    <DarkRoom>
+      <CopyScreen />
+    </DarkRoom>
+  );
+}

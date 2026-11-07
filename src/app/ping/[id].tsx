@@ -6,7 +6,7 @@ import { RefreshControl, StyleSheet, View, useWindowDimensions } from 'react-nat
 
 import { FamiliarityLine } from '@/components/pings/familiarity-line';
 import { StatusTag } from '@/components/pings/status-tag';
-import { SuggestionGroupCard } from '@/components/pings/suggestion-group';
+import { SuggestionGrid } from '@/components/pings/suggestion-group';
 import { ReportFlag } from '@/components/report-flag';
 import { Avatar } from '@/components/ui/avatar';
 import { ReferenceFan } from '@/components/pings/ping-spotlight';
@@ -531,9 +531,7 @@ function Suggestions({
               : 'Nobody suggested anything.'}
         </Text>
       ) : (
-        groups.map((group) => (
-          <SuggestionGroupCard key={group.gameId} group={group} isOwner={mine} pingId={ping.id} />
-        ))
+        <SuggestionGrid groups={groups} isOwner={mine} pingId={ping.id} />
       )}
     </View>
   );

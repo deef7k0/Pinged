@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <!-- A D-pad (arm 72, span 200) whose lower arm ends in a bookmark notch. Outer corners r 12. -->
-  <path fill="#000" d="
-    M 104 28 H 152 Q 164 28 164 40 V 92 H 216 Q 228 92 228 104 V 152 Q 228 164 216 164 H 164
-    V 228 L 128 196 L 92 228 V 164 H 40 Q 28 164 28 152 V 104 Q 28 92 40 92 H 92 V 40 Q 92 28 104 28 Z"/>
-</svg>

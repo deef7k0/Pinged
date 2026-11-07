@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
-import { createConfirmSlot, type ConfirmSlot } from '@/hooks/use-bar-confirm';
+import { createConfirmSlot, type ConfirmSlot } from '@/lib/confirm-slot';
 import type { View } from 'react-native';
 import { useSharedValue, type SharedValue } from 'react-native-reanimated';
 

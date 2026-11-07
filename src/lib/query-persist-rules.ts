@@ -104,6 +104,7 @@ const NEVER_PERSIST: ReadonlySet<string> = new Set([
   'game-colours',
   'animated-artwork',
   'game-title',
+  'key-color',
   'copy-stage-3d',
   'trailers',
   'album-art-color',

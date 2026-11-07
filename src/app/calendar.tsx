@@ -279,41 +279,46 @@ export default function CalendarScreen() {
         ) : (
           <>
             <GestureDetector gesture={swipe}>
-              <Animated.View
-                key={`${year}-${month}`}
-                entering={
-                  reduceMotion
-                    ? undefined
-                    : (direction > 0 ? FadeInRight : FadeInLeft).duration(240)
-                }
-                style={[styles.grid, dragStyle]}
-                accessibilityHint="Swipe left or right for another month">
-                {rows.map((row, index) => (
-                  <View key={index} style={styles.week}>
-                    {row.map((date, column) =>
-                      date === null ? (
-                        /* Past the month's last day: the square's room, kept, so
+              {/* The drag's transform on the outer view, the month's entrance
+                  on the inner one: a layout animation would overwrite a
+                  transform on its own view (Reanimated's warning). */}
+              <Animated.View style={dragStyle}>
+                <Animated.View
+                  key={`${year}-${month}`}
+                  entering={
+                    reduceMotion
+                      ? undefined
+                      : (direction > 0 ? FadeInRight : FadeInLeft).duration(240)
+                  }
+                  style={styles.grid}
+                  accessibilityHint="Swipe left or right for another month">
+                  {rows.map((row, index) => (
+                    <View key={index} style={styles.week}>
+                      {row.map((date, column) =>
+                        date === null ? (
+                          /* Past the month's last day: the square's room, kept, so
                          a short month is the same height as a long one. */
-                        <View
-                          key={`blank-${column}`}
-                          style={{ width: cell, height: NUMBER_BAND + Math.round(cell * 1.5) }}
-                        />
-                      ) : (
-                        <DayCell
-                          key={date}
-                          date={date}
-                          games={byDay.get(date)}
-                          size={cell}
-                          selected={day === date}
-                          today={today === date}
-                          loading={calendar.isLoading}
-                          label={`${date} ${MONTHS[month]}`}
-                          onSelect={toggleDay}
-                        />
-                      )
-                    )}
-                  </View>
-                ))}
+                          <View
+                            key={`blank-${column}`}
+                            style={{ width: cell, height: NUMBER_BAND + Math.round(cell * 1.5) }}
+                          />
+                        ) : (
+                          <DayCell
+                            key={date}
+                            date={date}
+                            games={byDay.get(date)}
+                            size={cell}
+                            selected={day === date}
+                            today={today === date}
+                            loading={calendar.isLoading}
+                            label={`${date} ${MONTHS[month]}`}
+                            onSelect={toggleDay}
+                          />
+                        )
+                      )}
+                    </View>
+                  ))}
+                </Animated.View>
               </Animated.View>
             </GestureDetector>
 

@@ -28,7 +28,6 @@ export type MemberReviewCardProps = {
   /** 0-100, or null for a review that gave none. */
   score: number | null;
   likes: number;
-  comments: number;
   /** The person looking has liked it: the heart is lit. */
   likedByViewer?: boolean;
   /** Lines of the text before the clamp. */
@@ -75,7 +74,7 @@ export type MemberReviewCardProps = {
  * the two halves.
  *
  * **At the far right, where the reference has a chip**, are the counts the
- * card has always carried: how many liked the review and how many replied,
+ * card has always carried: how many liked the review,
  * each drawn only when there is one (a new review is a face, a name, a score
  * and its words, not "0 likes"). The heart lights when *you* have liked it.
  *
@@ -105,7 +104,6 @@ export const MemberReviewCard = memo(function MemberReviewCard({
   display = null,
   score,
   likes,
-  comments,
   likedByViewer = false,
   lines,
   spoiler = false,
@@ -170,7 +168,7 @@ export const MemberReviewCard = memo(function MemberReviewCard({
           {rounded !== null && <ScoreLine score={rounded} />}
         </View>
 
-        {(likes > 0 || comments > 0) && (
+        {likes > 0 && (
           <View style={styles.counts}>
             {likes > 0 && (
               <View style={styles.count}>
@@ -181,14 +179,6 @@ export const MemberReviewCard = memo(function MemberReviewCard({
                 />
                 <Text variant="bodySmall" color="textSecondary" style={styles.figure}>
                   {likes.toLocaleString()}
-                </Text>
-              </View>
-            )}
-            {comments > 0 && (
-              <View style={styles.count}>
-                <Ionicons name="chatbubble" size={12} color={theme.textSecondary} />
-                <Text variant="bodySmall" color="textSecondary" style={styles.figure}>
-                  {comments.toLocaleString()}
                 </Text>
               </View>
             )}

@@ -54,7 +54,7 @@ import { usePulse } from '@/hooks/use-pulse';
 import { useScreenChrome } from '@/hooks/use-screen-chrome';
 import { useAccent } from '@/hooks/use-accent';
 import { useSlotConfirm, type ConfirmAction } from '@/hooks/use-bar-confirm';
-import { useTheme } from '@/hooks/use-theme';
+import { SchemeProvider, useTheme } from '@/hooks/use-theme';
 import { filledRoles } from '@/lib/filled';
 
 export type { ConfirmAction };
@@ -940,7 +940,10 @@ function GlassGroup({ intensity = 60, children }: { intensity?: number; children
         <View style={[styles.fill, { backgroundColor: withAlpha(theme.shadowInk, PANE_SCRIM) }]} />
         <View style={[styles.fill, { experimental_backgroundImage: SHEEN }]} />
       </View>
-      <TopBarForm.Provider value="group">{children}</TopBarForm.Provider>
+      {/* Its keys stand on a dark scrim over artwork: white, in either room. */}
+      <SchemeProvider scheme="dark">
+        <TopBarForm.Provider value="group">{children}</TopBarForm.Provider>
+      </SchemeProvider>
     </View>
   );
 }
@@ -1050,7 +1053,13 @@ function GlassDisc({ icon, label, onPress, intensity = 60, nudge = 0 }: TopBarDi
       )}
 
       <PressGlyph>
-        <Ionicons name={icon} size={24} color={theme.text} style={{ marginLeft: nudge }} />
+        {/* Over the dark scrim on artwork: white in either room. */}
+        <Ionicons
+          name={icon}
+          size={24}
+          color={liquid ? theme.text : Palette.white}
+          style={{ marginLeft: nudge }}
+        />
       </PressGlyph>
     </PressableScale>
   );

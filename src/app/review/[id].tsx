@@ -3,18 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  View,
-  useWindowDimensions,
-  type TextStyle,
-} from 'react-native';
+import { StyleSheet, View, useWindowDimensions, type TextStyle } from 'react-native';
 
-import { CommentSection } from '@/components/comment-section';
 import { QuoteBlock } from '@/components/quote-block';
-import { ReplyComposer } from '@/components/reply-composer';
 import { ReportFlag, useCanReport } from '@/components/report-flag';
 import { PING_GLYPH, usePingTo } from '@/components/pings/use-ping-to';
 import { ReviewShareSheet } from '@/components/review-share-sheet';
@@ -43,7 +34,6 @@ import {
   PLATFORM_ICON,
   PLATFORM_TOP,
   QUOTE_GAP,
-  REPLIES_TOP,
   REVIEW_MARGIN,
   REVIEW_MAX_COLUMN,
   REVIEW_ROW,
@@ -56,7 +46,7 @@ import { wordsTop } from '@/constants/game-header';
 import { labelFor, scoreColor } from '@/constants/score';
 import { TOP_BAR_ROW, handoffBand, revealOffset } from '@/constants/top-bar';
 import { Typeface, Palette, Spacing, withAlpha } from '@/constants/theme';
-import { AccentProvider, useAccent } from '@/hooks/use-accent';
+import { AccentProvider, useAccent, DarkRoom } from '@/hooks/use-accent';
 import { useLikeToggle } from '@/hooks/use-like-toggle';
 import { useAnimatedCover } from '@/hooks/use-animated-cover';
 import { useGameColours } from '@/hooks/use-game-colours';
@@ -99,8 +89,8 @@ import { useAuth } from '@/store/auth';
  *   listener liked, under the platform's mark.
  * - **The like and share**; the report flag beside share for anyone but the
  *   writer.
- * - **"Replies"**, and the reply composer docked at the foot of the screen
- *   (`<ReplyComposer>`): bold, italic, the count against 500, send.
+ * - No replies, and no composer: the owner had comments taken off review
+ *   pages (2026-11-06).
  *
  * ## It runs on the game's colour, unless the reader turns that off
  *
@@ -112,7 +102,7 @@ import { useAuth } from '@/store/auth';
  * 2026-10-20) the page is the app's own room already, and the disc is not
  * drawn: it would be a switch for something that cannot happen.
  */
-export default function ReviewScreen() {
+function ReviewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colour = useReviewColour();
   const gameColours = useGameColours();
@@ -369,11 +359,7 @@ function ReviewPage({
             }
           />
         }>
-        {/* The composer is docked under the page, so the two rise together
-            over the keyboard — as the comment thread's screen does it. */}
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.flex}>
           <PageScrollView
             style={styles.flex}
             settle={handoff}
@@ -590,26 +576,12 @@ function ReviewPage({
                   </View>
                 )}
 
-                {/* The conversation; its composer is docked under the page. */}
-                <View style={styles.replies}>
-                  <CommentSection
-                    targetType="log"
-                    targetId={review.id}
-                    title="Replies"
-                    docked
-                    headingStyle={styles.repliesHeading}
-                  />
-                </View>
+                {/* No replies here: the owner had comments taken off review
+                    pages (2026-11-06), the composer docked under it with them. */}
               </View>
             </View>
           </PageScrollView>
-
-          <ReplyComposer
-            targetType="log"
-            targetId={review.id}
-            fill={colourful ? accent.card : theme.surface}
-          />
-        </KeyboardAvoidingView>
+        </View>
       </Screen>
 
       {/* A sibling of `<Screen>`, as the game page's sheets are: it rises over
@@ -781,8 +753,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'center',
   },
-  replies: { marginTop: REPLIES_TOP },
-  repliesHeading: lineStyle(REVIEW_TYPE.replies),
   /* The album page's head: the art's room, then the words on its foot. */
   masthead: { alignSelf: 'stretch', alignItems: 'center' },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.x8 },
@@ -839,3 +809,12 @@ const styles = StyleSheet.create({
   },
   solid: { alignSelf: 'stretch', alignItems: 'center', paddingTop: Spacing.x8 },
 });
+
+/** A game's room: dark in either setting (Settings → Appearance). */
+export default function ReviewScreenRoute() {
+  return (
+    <DarkRoom>
+      <ReviewScreen />
+    </DarkRoom>
+  );
+}

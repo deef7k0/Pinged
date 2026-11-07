@@ -41,7 +41,7 @@ import {
 } from '@/constants/progress';
 import { averageMetrics, countMetrics, parseReviewMetrics } from '@/constants/review-metrics';
 import { ControlHeight, Radius, Spacing, TapTarget, Type } from '@/constants/theme';
-import { AccentProvider } from '@/hooks/use-accent';
+import { AccentProvider, DarkRoom } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
 import {
   cachedGameOf,
@@ -92,7 +92,7 @@ function playFrom(coop: boolean | null | undefined): ReviewPlayFilter | '' {
   return coop === true ? 'coop' : coop === false ? 'solo' : '';
 }
 
-export default function LogGameScreen() {
+function LogGameScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const userId = useAuth((state) => state.session?.user.id);
 
@@ -1236,3 +1236,12 @@ const styles = StyleSheet.create({
      `x16`, and a rule that stops 12dp short of both edges reads as a stray line
      rather than as the top of a shelf. */
 });
+
+/** A game's room: dark in either setting (Settings → Appearance). */
+export default function LogGameScreenRoute() {
+  return (
+    <DarkRoom>
+      <LogGameScreen />
+    </DarkRoom>
+  );
+}

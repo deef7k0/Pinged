@@ -1,12 +1,24 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text as RNText, View, useWindowDimensions } from 'react-native';
 
 import { ReviewHighlighter } from '@/components/review-highlighter';
 import { ReviewPodiumCard } from '@/components/review-podium-card';
+import {
+  ColourShareCard,
+  FRAME_ASPECT,
+  PosterShareCard,
+  type PosterFrame,
+  type PosterLayout,
+  type PosterOverlay,
+  type ShareArtShows,
+} from '@/components/review-share-art-cards';
 import { ReviewShareCard } from '@/components/review-share-card';
 import { SpoilerNotice } from '@/components/spoiler-notice';
 import { PressableScale } from '@/components/ui/pressable-scale';
+import { SeekBar } from '@/components/ui/seek-bar';
+import { Segmented } from '@/components/ui/segmented';
+import { Switch } from '@/components/ui/switch';
 import { SlideUpSheet } from '@/components/ui/slide-up-sheet';
 import { TabBar } from '@/components/ui/tab-bar';
 import { Text } from '@/components/ui/text';
@@ -23,6 +35,8 @@ import {
 import { Typeface, Radius, Spacing, withAlpha } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useAlbumArtColor } from '@/hooks/use-album-art-color';
+import { useArtGround } from '@/hooks/use-key-color';
+import { usePosterArt } from '@/hooks/use-poster-art';
 import { useSquareCover } from '@/hooks/use-square-cover';
 import { useTheme } from '@/hooks/use-theme';
 import type { LogWithRelations } from '@/lib/database.types';
@@ -47,12 +61,32 @@ export type ReviewShareSheetProps = {
 
 type Mode = 'quote' | 'text';
 
-/** The two cards a review can be shared as. */
-type CardLook = 'classic' | 'podium';
+/** The cards a review can be shared as. */
+type CardLook = 'classic' | 'podium' | 'colour' | 'poster';
 const CARD_LOOKS: { key: CardLook; label: string }[] = [
+  { key: 'colour', label: 'Colour' },
+  { key: 'poster', label: 'Poster' },
   { key: 'classic', label: 'Words' },
   { key: 'podium', label: 'Rating' },
 ];
+
+const FRAMES: { value: PosterFrame; label: string }[] = [
+  { value: '9:16', label: '9:16' },
+  { value: '4:5', label: '4:5' },
+  { value: '1:1', label: '1:1' },
+  { value: '16:9', label: '16:9' },
+];
+const LAYOUTS: { value: PosterLayout; label: string }[] = [
+  { value: 'centred', label: 'Centred' },
+  { value: 'side', label: 'Beside' },
+];
+const OVERLAYS: { value: PosterOverlay; label: string }[] = [
+  { value: 'colour', label: 'Dynamic colour' },
+  { value: 'blur', label: 'Blur' },
+  { value: 'black', label: 'Black' },
+];
+/** The poster card's preview is never taller than this share of the display. */
+const POSTER_MAX_HEIGHT = 0.56;
 
 /**
  * Make an image of a review, to save or to send — the owner's direction
@@ -294,19 +328,57 @@ function CardStep({
   onBack: () => void;
 }) {
   const theme = useTheme();
+  const { height: windowHeight } = useWindowDimensions();
   const game = review.game;
+
+  /* The game's landscape art and logo, as its review card draws them, and
+     the art's key colour — the Colour and Poster cards' own colour. */
+  const poster = usePosterArt(review.game_id);
+  const landscape =
+    poster.data?.artUrl ?? game?.hero_url ?? game?.screenshots?.[0] ?? game?.cover_url ?? null;
+  const keyColour = useArtGround(
+    landscape,
+    { width: cardWidth, height: Math.round((cardWidth * 9) / 16) },
+    { x: 0.5, y: 0.35 }
+  );
 
   /* The game's own colour, read off its cover — the first swatch and the one
      the card opens on, as SimpMusic's opens on the song's. */
   const own = useAlbumArtColor(game?.cover_url, { fallback });
+  /* Which card: the coloured one (first, the owner's of 2026-11-06),
+     Muvy's poster, SimpMusic's words, or the rating card. */
+  const [look, setLook] = useState<CardLook>('colour');
+  const artLook = look === 'colour' || look === 'poster';
+  /* The first swatch is the game's own: its art's key colour on the two art
+     cards, its cover's colour on the other two. */
+  const first = artLook ? keyColour : own;
   const swatches = useMemo(
-    () => [own, ...SHARE_SWATCHES.map((token) => theme[token])],
-    [own, theme]
+    () => [first, ...SHARE_SWATCHES.map((token) => theme[token])],
+    [first, theme]
   );
   const [chosen, setChosen] = useState(0);
-  const background = swatches[chosen] ?? own;
-  /* Which card: SimpMusic's, or the rating card the owner pointed at. */
-  const [look, setLook] = useState<CardLook>('classic');
+  const background = swatches[chosen] ?? first;
+
+  /* The art cards' switches, and the poster's frame. */
+  const [shows, setShows] = useState<ShareArtShows>({
+    title: true,
+    rating: rating !== null,
+    profile: true,
+    words: true,
+  });
+  const toggle = (key: keyof ShareArtShows) =>
+    setShows((current) => ({ ...current, [key]: !current[key] }));
+  const [frame, setFrame] = useState<PosterFrame>('9:16');
+  const [layout, setLayout] = useState<PosterLayout>('centred');
+  const [overlay, setOverlay] = useState<PosterOverlay>('colour');
+  const [intensity, setIntensity] = useState(0.2);
+  const [opacity, setOpacity] = useState(0.55);
+  const [fullBackground, setFullBackground] = useState(false);
+  /* A wide frame has no room for the poster over the words. */
+  const posterLayout: PosterLayout = frame === '16:9' ? 'side' : layout;
+  const aspect = FRAME_ASPECT[frame];
+  const posterWidth = Math.min(cardWidth, windowHeight * POSTER_MAX_HEIGHT * aspect);
+  const posterHeight = Math.round(posterWidth / aspect);
   const credit = [game?.developer, game?.release_year].filter(Boolean).join(' · ');
   const handle = review.profile?.username ? `@${review.profile.username}` : authorName;
 
@@ -399,7 +471,49 @@ function CardStep({
         </Text>
       </PressableScale>
 
-      {look === 'classic' ? (
+      {look === 'colour' ? (
+        <ColourShareCard
+          ref={card}
+          width={cardWidth}
+          gameTitle={gameTitle}
+          logo={poster.data?.logo ?? null}
+          credit={credit}
+          handle={handle}
+          avatarUrl={review.profile?.avatar_url ?? null}
+          text={words}
+          asQuote={asQuote}
+          score={rating}
+          shows={shows}
+          artUri={landscape}
+          ground={background}
+        />
+      ) : look === 'poster' ? (
+        <PosterShareCard
+          ref={card}
+          width={posterWidth}
+          height={posterHeight}
+          gameTitle={gameTitle}
+          logo={poster.data?.logo ?? null}
+          credit={credit}
+          handle={handle}
+          avatarUrl={review.profile?.avatar_url ?? null}
+          text={words}
+          asQuote={asQuote}
+          score={rating}
+          shows={shows}
+          backdropUri={landscape}
+          coverUri={game?.cover_url ?? null}
+          layout={posterLayout}
+          overlay={overlay}
+          colour={background}
+          intensity={intensity}
+          opacity={opacity}
+          fullBackground={fullBackground}
+          genres={(game?.genres ?? []).slice(0, 2).join(', ')}
+          year={game?.release_year ?? null}
+          developer={game?.developer ?? null}
+        />
+      ) : look === 'classic' ? (
         <ReviewShareCard
           ref={card}
           width={cardWidth}
@@ -434,29 +548,101 @@ function CardStep({
         <TabBar tabs={CARD_LOOKS} value={look} onChange={(next: CardLook) => setLook(next)} />
       </View>
 
-      <Text variant="bodySmall" style={[styles.paletteLabel, { color: withAlpha(ink, 0.6) }]}>
-        Background
-      </Text>
-      <View style={styles.palette}>
-        {swatches.map((swatch, index) => (
-          <PressableScale
-            key={`${index}:${swatch}`}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: index === chosen }}
-            accessibilityLabel={index === 0 ? 'The game’s colour' : `Background ${index + 1}`}
-            hitSlop={SWATCH_SLOP}
-            onPress={() => setChosen(index)}
-            scaleTo={0.9}>
-            <View
-              style={[
-                styles.swatch,
-                { backgroundColor: swatch },
-                index === chosen && { borderWidth: SHARE_SHEET.swatchRing, borderColor: ink },
-              ]}
+      {look === 'poster' && (
+        <View style={styles.options}>
+          <OptionRow label="Frame" ink={ink}>
+            <Segmented label="Frame" options={FRAMES} value={frame} onChange={setFrame} />
+          </OptionRow>
+          {frame !== '16:9' && (
+            <OptionRow label="Poster" ink={ink}>
+              <Segmented label="Poster" options={LAYOUTS} value={layout} onChange={setLayout} />
+            </OptionRow>
+          )}
+          <OptionRow label="Overlay" ink={ink}>
+            <Segmented label="Overlay" options={OVERLAYS} value={overlay} onChange={setOverlay} />
+          </OptionRow>
+          <SliderRow
+            label="Intensity"
+            ink={ink}
+            value={intensity}
+            onChange={setIntensity}
+            hint="How blurred the art is"
+          />
+          <SliderRow
+            label="Opacity"
+            ink={ink}
+            value={opacity}
+            onChange={setOpacity}
+            hint="How strongly the overlay covers it"
+          />
+          <ToggleRow
+            label="Full background"
+            ink={ink}
+            value={fullBackground}
+            onChange={setFullBackground}
+          />
+        </View>
+      )}
+
+      {(look !== 'poster' || overlay === 'colour') && (
+        <Text variant="bodySmall" style={[styles.paletteLabel, { color: withAlpha(ink, 0.6) }]}>
+          {artLook ? 'Colour' : 'Background'}
+        </Text>
+      )}
+      {(look !== 'poster' || overlay === 'colour') && (
+        <View style={styles.palette}>
+          {swatches.map((swatch, index) => (
+            <PressableScale
+              key={`${index}:${swatch}`}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: index === chosen }}
+              accessibilityLabel={index === 0 ? 'The game’s colour' : `Colour ${index + 1}`}
+              hitSlop={SWATCH_SLOP}
+              onPress={() => setChosen(index)}
+              scaleTo={0.9}>
+              <View
+                style={[
+                  styles.swatch,
+                  { backgroundColor: swatch },
+                  index === chosen && { borderWidth: SHARE_SHEET.swatchRing, borderColor: ink },
+                ]}
+              />
+            </PressableScale>
+          ))}
+        </View>
+      )}
+
+      {artLook && (
+        <View style={styles.options}>
+          <ToggleRow label="Title" ink={ink} value={shows.title} onChange={() => toggle('title')} />
+          {rating !== null && (
+            <ToggleRow
+              label="My rating"
+              ink={ink}
+              value={shows.rating}
+              onChange={() => toggle('rating')}
             />
-          </PressableScale>
-        ))}
-      </View>
+          )}
+          <ToggleRow
+            label="The review"
+            ink={ink}
+            value={shows.words}
+            onChange={() => toggle('words')}
+          />
+          <ToggleRow
+            label="My profile"
+            ink={ink}
+            value={shows.profile}
+            onChange={() => toggle('profile')}
+          />
+        </View>
+      )}
+
+      {artLook && (
+        <Text variant="caption" style={[styles.transparentNote, { color: withAlpha(ink, 0.55) }]}>
+          Saved as a PNG: the card alone, transparent round its corners.
+        </Text>
+      )}
 
       <View style={styles.pills}>
         <SharePill
@@ -528,6 +714,72 @@ async function saveToPhotos(uri: string): Promise<'saved' | 'denied' | 'missing'
 
 function isMissingModule(error: unknown): boolean {
   return error instanceof Error && /native module/i.test(error.message);
+}
+
+/** A labelled row of the share options: the name, its control at the end. */
+function OptionRow({ label, ink, children }: { label: string; ink: string; children: ReactNode }) {
+  return (
+    <View style={styles.optionColumn}>
+      <Text variant="h5" style={{ color: ink }}>
+        {label}
+      </Text>
+      {children}
+    </View>
+  );
+}
+
+function ToggleRow({
+  label,
+  ink,
+  value,
+  onChange,
+}: {
+  label: string;
+  ink: string;
+  value: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <View style={styles.optionRow}>
+      <Text variant="body" style={[styles.optionLabel, { color: ink }]}>
+        {label}
+      </Text>
+      <Switch label={label} value={value} onValueChange={onChange} />
+    </View>
+  );
+}
+
+function SliderRow({
+  label,
+  hint,
+  ink,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  ink: string;
+  value: number;
+  onChange: (next: number) => void;
+}) {
+  return (
+    <View style={styles.optionColumn} accessible accessibilityLabel={`${label}: ${hint}`}>
+      <View style={styles.optionRow}>
+        <Text variant="h5" style={{ color: ink }}>
+          {label}
+        </Text>
+        <Text variant="bodySmall" style={{ color: withAlpha(ink, 0.6) }}>
+          {`${Math.round(value * 100)}%`}
+        </Text>
+      </View>
+      <SeekBar
+        value={value}
+        onValueChange={onChange}
+        activeColor={ink}
+        inactiveColor={withAlpha(ink, 0.18)}
+      />
+    </View>
+  );
 }
 
 /**
@@ -622,6 +874,16 @@ const styles = StyleSheet.create({
   },
   looks: { alignSelf: 'stretch', marginTop: Spacing.x20 },
   paletteLabel: { marginTop: Spacing.x16 },
+  options: { alignSelf: 'stretch', gap: Spacing.x16, marginTop: Spacing.x20 },
+  optionColumn: { gap: Spacing.x8 },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.x12,
+  },
+  optionLabel: { flex: 1 },
+  transparentNote: { marginTop: Spacing.x16, textAlign: 'center' },
   palette: {
     flexDirection: 'row',
     gap: SHARE_SHEET.swatchGap,

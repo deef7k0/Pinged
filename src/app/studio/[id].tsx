@@ -13,7 +13,7 @@ import { LOGO_WIDTH_RATIO, StudioIdentity } from '@/components/studio-identity';
 import { TrailerBackdrop } from '@/components/trailer-backdrop';
 import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
 import { HandoffTitle } from '@/components/ui/handoff-title';
-import { PageFill, PinnedHero, shownTail } from '@/components/ui/pinned-hero';
+import { PageFill, PinnedHero } from '@/components/ui/pinned-hero';
 import { PageScrollView } from '@/components/ui/page-scroll';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { RevealScope } from '@/components/ui/reveal';
@@ -36,9 +36,10 @@ import {
 import { useStudioLogo } from '@/hooks/use-studio-logo';
 import { useGameTrailer, useTrailerSetting } from '@/hooks/use-game-trailer';
 import { useTheme } from '@/hooks/use-theme';
-import { AccentProvider, useGameAccent } from '@/hooks/use-accent';
+import { AccentProvider, useGameAccent, DarkRoom } from '@/hooks/use-accent';
 import { useTopBarInset } from '@/hooks/use-header-height';
 import { TOP_BAR_ROW, handoffBand, revealOffset } from '@/constants/top-bar';
+import { BAND } from '@/lib/progressive-blur';
 import { footFade, smoothScrimStops } from '@/lib/scrim';
 import { sortGames, type GameSearchResult } from '@/lib/games';
 import { facetParams } from '@/lib/games/facets';
@@ -289,7 +290,7 @@ function yearsOf(games: readonly GameSearchResult[]): string | null {
  * IGDB-only. Company ids come from `getGameExtras` and nothing else in the app
  * has an equivalent, so studio names are only tappable on IGDB titles.
  */
-export default function StudioScreen() {
+function StudioScreen() {
   const theme = useTheme();
   const { width, height } = useWindowDimensions();
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
@@ -367,6 +368,14 @@ export default function StudioScreen() {
     topInset + TOP_BAR_ROW
   );
 
+  /* The band, in dp from the banner's top: from a lead above the name (its
+     measured height, estimated until then) to the solid part's top. */
+  const nameTop = barHeader - (nameHeight ?? NAME_ESTIMATE);
+  const studioBand = {
+    from: nameTop - BAND.lead,
+    to: Math.max(nameTop - BAND.lead + 40, bannerHeight),
+  };
+
   /* The logo, when Commons has a free one. The name is on screen from the
      route in the meantime, and stays whenever there is none. */
   const logo = useStudioLogo(companyId, name);
@@ -415,9 +424,12 @@ export default function StudioScreen() {
               solidAt={solidAt}
               scrim={0.4}
               veil={VEIL}
-              /* Convx's long blur and its mirrored tail: the fade from the
-                 banner into the page is the blur's own. */
+              /* The game page's blur (the owner's, 2026-11-05): a band from
+                 just above the name to where the page goes solid — heavy
+                 early, the page's colour whole at its end — in place of
+                 Convx's long mirrored tail. */
               tail
+              band={studioBand}
               onLoad={({ width: artWidth, height: artHeight }) => {
                 if (
                   banner &&
@@ -463,9 +475,7 @@ export default function StudioScreen() {
           <View>
             {/* The solid part's soft top edge, under the name block: the art
                     the name floats on gives way to the page here. */}
-            <View
-              pointerEvents="none"
-              style={[styles.lip, { top: bannerHeight + shownTail(bannerHeight) - LIP }]}>
+            <View pointerEvents="none" style={[styles.lip, { top: bannerHeight - LIP }]}>
               <LinearGradient
                 colors={lipColours(page)}
                 locations={LIP_STOPS.locations as unknown as readonly [number, number, ...number[]]}
@@ -500,9 +510,6 @@ export default function StudioScreen() {
                 )}
               </View>
             </View>
-
-            {/* The blurred tail under the banner, before the solid part. */}
-            <View style={{ height: shownTail(bannerHeight) }} />
 
             {/* The page's solid part: the rails, opaque, rising over the art. */}
             <View style={[styles.solid, { backgroundColor: page }]}>
@@ -913,3 +920,12 @@ const styles = StyleSheet.create({
   railBleed: { marginHorizontal: -Spacing.x16 },
   skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
 });
+
+/** A game's room: dark in either setting (Settings → Appearance). */
+export default function StudioScreenRoute() {
+  return (
+    <DarkRoom>
+      <StudioScreen />
+    </DarkRoom>
+  );
+}

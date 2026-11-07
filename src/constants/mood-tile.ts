@@ -75,6 +75,15 @@ export const TILE_GAP = 12;
 export const ART_SIZE = 64;
 export const ART_RADIUS = 2;
 
+/**
+ * The cover's height: a portrait at IGDB's 3:4, not the reference's square
+ * (the owner's, 2026-11-06: square covers cut the box art off). Its width is
+ * the reference's 64 and it hangs from the same corner, so it only grows
+ * upward, under the tile's clip; its left edge stays clear of the name
+ * (checked: at the name's second line it is 12dp past `TILE_PAD.end`).
+ */
+export const ART_HEIGHT = Math.round((ART_SIZE * 4) / 3);
+
 /** `rotate(25f)`, and the `offset(x = 8.dp, y = 12.dp)` applied before it. */
 export const ART_TURN = 25;
 export const ART_OFFSET = { x: 8, y: 12 } as const;

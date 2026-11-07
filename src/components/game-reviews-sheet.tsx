@@ -557,16 +557,16 @@ export function GameReviewsSheet({
 /**
  * One review, as the owner's reference draws one (2026-10-20): the words
  * first, a rule under them, and the writer along the foot — face, name, and
- * the score as GameLog says it, with the likes and replies at the far end.
+ * the score as GameLog says it, with the likes at the far end.
  *
  *     the first line of the review…
  *     the second line…
  *     ──────────────────────────────
- *     ◍  username   84 GREAT   ♥ 12  ◔ 3
+ *     ◍  username   84 GREAT   ♥ 12
  *
  * The card is `<MemberReviewCard>` — the one the game page's Overview shows
  * the most liked review in, so a row here and that card are the same object
- * (the owner's direction, 2026-10-09). The likes and replies it prints are
+ * (the owner's direction, 2026-10-09). The likes it prints are
  * already in this list's query; nothing more is asked for.
  *
  * **Neutral, not the game's colour.** On the game page the card takes the
@@ -601,9 +601,6 @@ const ReviewRow = memo(function ReviewRow({ item }: { item: ReviewListItem }) {
           log.rating !== null ? `scored ${Math.round(log.rating)}` : null,
           log.spoilers ? 'Contains spoilers' : null,
           item.likes > 0 ? `${item.likes} ${item.likes === 1 ? 'like' : 'likes'}` : null,
-          item.comments > 0
-            ? `${item.comments} ${item.comments === 1 ? 'reply' : 'replies'}`
-            : null,
           'Read all of it.',
         ]
           .filter(Boolean)
@@ -618,7 +615,6 @@ const ReviewRow = memo(function ReviewRow({ item }: { item: ReviewListItem }) {
           display={log.review_display}
           score={log.rating}
           likes={item.likes}
-          comments={item.comments}
           likedByViewer={item.likedByViewer}
           lines={REVIEW_LINES}
           spoiler={!!log.spoilers}

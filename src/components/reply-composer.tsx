@@ -125,7 +125,7 @@ export function ReplyComposer({
           scaleTo={0.9}
           style={StyleSheet.flatten([
             styles.send,
-            { backgroundColor: canSend ? theme.white : theme.controlFill },
+            { backgroundColor: canSend ? theme.primary : theme.controlFill },
           ])}>
           {send.isPending ? (
             <Loader size="small" color={theme.textMuted} />
@@ -133,7 +133,7 @@ export function ReplyComposer({
             <Ionicons
               name="arrow-up"
               size={18}
-              color={canSend ? theme.background : theme.textMuted}
+              color={canSend ? theme.onPrimary : theme.textMuted}
             />
           )}
         </PressableScale>

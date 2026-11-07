@@ -1,12 +1,19 @@
 import { BlurView } from 'expo-blur';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { useEffect, useSyncExternalStore, type ComponentType } from 'react';
-import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  Platform,
+  StyleSheet,
+  UIManager,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 
 import { withAlpha } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useScreenChrome } from '@/hooks/use-screen-chrome';
-import { useTheme } from '@/hooks/use-theme';
+import { useColorScheme, useTheme } from '@/hooks/use-theme';
 import { liquidGlassOn, loadLiquidGlass, subscribeLiquidGlass } from '@/lib/liquid-glass';
 import { useAuth } from '@/store/auth';
 
@@ -36,11 +43,55 @@ import { useAuth } from '@/store/auth';
  *    blurred (Android outside a `<Screen>`, which owns the blur target), the
  *    tint thickens to 62% — Podium's "solid" tier, a surface, not a hole.
  *
+ * **First, on both platforms: `react-native-liquid-glassmorphism`** (the
+ * owner's pick, 2026-11-06; MIT, himanshu-lal4). Apple's `UIGlassEffect` on
+ * iOS 26 (a `UIBlurEffect` material below), and on Android its own AGSL
+ * refraction shader from API 33 — edge lensing, dispersion, a Fresnel rim —
+ * with `RenderEffect` blur on 31–32 and a tinted pane below that. It samples
+ * the backdrop itself, so it needs no blur target. A Fabric view with no
+ * TurboModule, so it is found by asking React Native's component registry
+ * (`hasViewManagerConfig`) before its JavaScript is loaded: Expo Go and an
+ * APK built before it have no such view and keep the two engines above.
+ *
  * A control opts in by drawing `<GlassSurface>` as its first child and going
  * clear itself while `useLiquidGlass()` is true.
  */
 
-const NATIVE = Platform.OS === 'ios' && !!requireOptionalNativeModule('ExpoLiquidGlass');
+/* Whether this build has the glassmorphism view. Never throws: an older
+   runtime without the registry answers no. */
+const MORPH = (() => {
+  if (Platform.OS !== 'ios' && Platform.OS !== 'android') return false;
+  try {
+    return UIManager.hasViewManagerConfig('LiquidGlassmorphismView');
+  } catch {
+    return false;
+  }
+})();
+
+type MorphGlassProps = {
+  variant?: 'regular' | 'clear';
+  borderRadius?: number;
+  tintColor?: string;
+  intensity?: number;
+  interactive?: boolean;
+  rim?: boolean;
+  specular?: boolean;
+  refraction?: boolean;
+  style?: StyleProp<ViewStyle>;
+};
+
+type MorphModule = { LiquidGlassView: ComponentType<MorphGlassProps> };
+
+function loadMorphGlass(): ComponentType<MorphGlassProps> | null {
+  if (!MORPH) return null;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const glass = require('react-native-liquid-glassmorphism') as MorphModule;
+  return glass.LiquidGlassView;
+}
+
+const MorphGlass = loadMorphGlass();
+
+const NATIVE = !MORPH && Platform.OS === 'ios' && !!requireOptionalNativeModule('ExpoLiquidGlass');
 
 type NativeGlassProps = {
   variant?: 'regular' | 'clear';
@@ -104,8 +155,27 @@ export type GlassSurfaceProps = {
  */
 export function GlassSurface({ radius, flat = false, overPage = false }: GlassSurfaceProps) {
   const theme = useTheme();
+  const light = useColorScheme() === 'light';
   const accent = useAccent();
   const chrome = useScreenChrome();
+
+  if (MorphGlass) {
+    return (
+      <View
+        pointerEvents="none"
+        style={[styles.fill, { borderRadius: radius }, !flat && { boxShadow: GLASS.shadow }]}>
+        <MorphGlass
+          variant="regular"
+          borderRadius={radius}
+          /* The room's own wash, with a breath of the accent in the dark one
+             (the game's colour on a game's page). */
+          tintColor={light ? withAlpha(theme.background, 0.3) : withAlpha(accent.color, 0.12)}
+          intensity={GLASS.blur * 5}
+          style={StyleSheet.absoluteFill}
+        />
+      </View>
+    );
+  }
 
   if (NativeGlass) {
     return (
@@ -145,7 +215,7 @@ export function GlassSurface({ radius, flat = false, overPage = false }: GlassSu
         {blurs && (
           <BlurView
             intensity={GLASS.blur * 5}
-            tint="dark"
+            tint={light ? 'light' : 'dark'}
             style={StyleSheet.absoluteFill}
             {...(Platform.OS === 'android'
               ? {
@@ -159,7 +229,12 @@ export function GlassSurface({ radius, flat = false, overPage = false }: GlassSu
         <View
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: withAlpha(theme.shadowInk, blurs ? GLASS.tint : GLASS.solidTint) },
+            {
+              backgroundColor: withAlpha(
+                light ? theme.background : theme.shadowInk,
+                blurs ? GLASS.tint : GLASS.solidTint
+              ),
+            },
           ]}
         />
         <View style={[StyleSheet.absoluteFill, { experimental_backgroundImage: glow }]} />

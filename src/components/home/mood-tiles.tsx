@@ -12,6 +12,7 @@ import { identityColorFor } from '@/constants/identity';
 import {
   ART_OFFSET,
   ART_RADIUS,
+  ART_HEIGHT,
   ART_SIZE,
   ART_TURN,
   GRADIENT_ANGLE,
@@ -311,7 +312,7 @@ const styles = StyleSheet.create({
     right: -ART_OFFSET.x,
     bottom: -ART_OFFSET.y,
     width: ART_SIZE,
-    height: ART_SIZE,
+    height: ART_HEIGHT,
     transform: [{ rotate: `${ART_TURN}deg` }],
   },
   art: { width: '100%', height: '100%', borderRadius: ART_RADIUS },

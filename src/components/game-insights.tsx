@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { MemberReviewCard } from '@/components/member-review-card';
 import { ScoreSummary } from '@/components/score-summary';
@@ -139,6 +139,8 @@ export function RatingsCard({
  */
 export function GameAudienceCard({ gameId, title }: { gameId: string; title: string }) {
   const accent = useAccent();
+  const inset = useSectionInset();
+  const { width } = useWindowDimensions();
   const audience = useQuery({
     queryKey: ['game-audience', gameId],
     queryFn: () => getGameAudience(gameId),
@@ -148,8 +150,8 @@ export function GameAudienceCard({ gameId, title }: { gameId: string; title: str
 
   if (audience.isLoadingError) {
     return (
-      <Panel title="On Pinged">
-        <View style={styles.failed}>
+      <Section title="On Pinged">
+        <View style={[styles.failed, { paddingHorizontal: inset }]}>
           <Text variant="body" color="textSecondary">
             These counts couldn’t be loaded.
           </Text>
@@ -161,7 +163,7 @@ export function GameAudienceCard({ gameId, title }: { gameId: string; title: str
             onPress={() => void audience.refetch()}
           />
         </View>
-      </Panel>
+      </Section>
     );
   }
 
@@ -169,62 +171,85 @@ export function GameAudienceCard({ gameId, title }: { gameId: string; title: str
   const count = (n: number, one: string, many: string) =>
     `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
-  /* One row a figure, centred: its glyph, then the number and what it counts
-     (the owner's, 2026-11-03). */
+  /* Three squares, as Where to buy draws its stores (the owner's,
+     2026-11-05): a glyph on the game's container colour, and under it what
+     it counts and how many. */
   const rows: AudienceRow[] = data
     ? [
         {
           key: 'wishlisted',
           icon: 'bookmark',
-          line: `${data.wishlisted.toLocaleString()} wishlisted`,
+          name: 'Wishlisted',
+          amount: count(data.wishlisted, 'person', 'people'),
           a11y: `${count(data.wishlisted, 'person has', 'people have')} ${title} on their wishlist`,
         },
         {
           key: 'playing',
           icon: 'game-controller',
-          line: `${data.playing.toLocaleString()} playing now`,
+          name: 'Playing now',
+          amount: count(data.playing, 'person', 'people'),
           a11y: `${count(data.playing, 'person is', 'people are')} playing it now`,
         },
         {
           key: 'played',
           icon: 'checkmark-circle',
-          line: `${data.played.toLocaleString()} played`,
+          name: 'Played',
+          amount: count(data.played, 'person', 'people'),
           a11y: `${count(data.played, 'person has', 'people have')} played it`,
         },
       ]
     : [];
 
+  const square = Math.floor((width - inset * 2 - AUDIENCE_GAP * 2) / 3);
+  const fill = accent.m3.primaryContainer;
+  const ink = accent.m3.onPrimaryContainer;
+
   return (
-    <Panel title="On Pinged">
-      {data ? (
-        <View style={styles.audience}>
-          {rows.map((row) => (
-            <View key={row.key} style={styles.audienceRow} accessible accessibilityLabel={row.a11y}>
-              <Ionicons name={row.icon} size={26} color={accent.onSurface} />
-              <Text variant="h4" style={styles.audienceLine}>
-                {row.line}
-              </Text>
-            </View>
-          ))}
-        </View>
-      ) : (
-        <View style={styles.audience}>
-          {[0, 1, 2].map((index) => (
-            <View key={index} style={styles.audienceRow}>
-              <Skeleton width={26} height={26} radius={13} />
-              <Skeleton width={120} height={16} />
-            </View>
-          ))}
-        </View>
-      )}
-    </Panel>
+    <Section title="On Pinged">
+      <View style={[styles.audience, { paddingHorizontal: inset }]}>
+        {data
+          ? rows.map((row) => (
+              <View
+                key={row.key}
+                style={[styles.audienceItem, { width: square }]}
+                accessible
+                accessibilityLabel={row.a11y}>
+                <View
+                  style={[
+                    styles.audienceSquare,
+                    { width: square, height: square, backgroundColor: fill },
+                  ]}>
+                  <Ionicons name={row.icon} size={Math.round(square * 0.36)} color={ink} />
+                </View>
+                <Text variant="itemTitle" numberOfLines={1}>
+                  {row.name}
+                </Text>
+                <Text variant="bodySmall" color="textSecondary" numberOfLines={1}>
+                  {row.amount}
+                </Text>
+              </View>
+            ))
+          : [0, 1, 2].map((index) => (
+              <View key={index} style={[styles.audienceItem, { width: square }]}>
+                <Skeleton width={square} height={square} radius={AUDIENCE_RADIUS} />
+                <Skeleton width={square * 0.7} height={14} />
+                <Skeleton width={square * 0.5} height={12} />
+              </View>
+            ))}
+      </View>
+    </Section>
   );
 }
+
+/** Where to buy's tiles: the corner, and the gap between the three. */
+const AUDIENCE_RADIUS = 12;
+const AUDIENCE_GAP = Spacing.x12;
 
 type AudienceRow = {
   key: string;
   icon: keyof typeof Ionicons.glyphMap;
-  line: string;
+  name: string;
+  amount: string;
   a11y: string;
 };
 
@@ -450,7 +475,6 @@ export function TopReview({
           display={log.review_display}
           score={log.rating}
           likes={review.likes}
-          comments={review.comments}
           likedByViewer={review.likedByViewer}
           lines={TOP_REVIEW_LINES}
           spoiler={!!log.spoilers}
@@ -463,9 +487,15 @@ export function TopReview({
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  audience: { gap: Spacing.x20, paddingVertical: Spacing.x8 },
-  audienceRow: { alignItems: 'center', gap: Spacing.x8 },
-  audienceLine: { textAlign: 'center' },
+  audience: { flexDirection: 'row', gap: AUDIENCE_GAP },
+  audienceItem: { gap: 2 },
+  audienceSquare: {
+    borderRadius: AUDIENCE_RADIUS,
+    borderCurve: 'continuous',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.x8,
+  },
   /* A failed card: the sentence, then its way out. */
   failed: { gap: Spacing.x12, alignItems: 'flex-start' },
   /* Two equal squares, a panel's gap apart; `stretch` (the default) keeps them

@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <title>GameLog — Save Point</title>
-  <!-- D-pad: arms 72 wide, span 200, outer corners r 12; the centre dip a 34 hole;
-       the lower arm ends in a bookmark notch 34 deep. -->
-  <path fill="#000" fill-rule="evenodd" d="
-    M 104 28 H 152 Q 164 28 164 40 V 92 H 216 Q 228 92 228 104 V 152 Q 228 164 216 164 H 164
-    V 228 L 128 192 L 92 228 V 164 H 40 Q 28 164 28 152 V 104 Q 28 92 40 92 H 92 V 40 Q 92 28 104 28 Z
-    M 128 111 A 17 17 0 1 0 128 145 A 17 17 0 1 0 128 111 Z"/>
-</svg>

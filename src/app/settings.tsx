@@ -21,11 +21,13 @@ import { Text } from '@/components/ui/text';
 import { Spacing } from '@/constants/theme';
 import { useAnimatedArtwork } from '@/hooks/use-animated-artwork';
 import { useGameTitle } from '@/hooks/use-game-title';
+import { Segmented } from '@/components/ui/segmented';
 import { setLiquidGlass } from '@/lib/liquid-glass';
 import { useCopyStage3d } from '@/hooks/use-copy-stage-3d';
 import { STAGE_3D_AVAILABLE, THIRTY_TWO_BIT } from '@/lib/copy-stage-3d';
 import { useGameColours } from '@/hooks/use-game-colours';
-import { useTheme } from '@/hooks/use-theme';
+import { useChosenColorScheme, useTheme } from '@/hooks/use-theme';
+import { setColorScheme, type ColorScheme } from '@/lib/color-scheme';
 import { isModerator } from '@/lib/api';
 import { useAuth } from '@/store/auth';
 import { Loader } from '@/components/ui/loader';
@@ -111,6 +113,7 @@ export default function SettingsScreen() {
   const animatedArtwork = useAnimatedArtwork();
   const gameTitle = useGameTitle();
   const liquidGlass = useLiquidGlass();
+  const colorScheme = useChosenColorScheme();
   const copyStage3d = useCopyStage3d();
   const [signingOut, setSigningOut] = useState(false);
 
@@ -165,6 +168,29 @@ export default function SettingsScreen() {
             handful of choices; one open at a time, the rest folded to the
             line that says what is set. */}
         <Accordion>
+          <AccordionItem value="appearance">
+            <AccordionTrigger
+              icon={colorScheme === 'light' ? 'sunny-outline' : 'moon-outline'}
+              title="Appearance"
+              summary={colorScheme === 'light' ? 'Light' : 'Dark'}
+            />
+            <AccordionContent>
+              <View style={styles.choices}>
+                <Segmented
+                  label="Appearance"
+                  options={APPEARANCE_OPTIONS}
+                  value={colorScheme}
+                  onChange={setColorScheme}
+                />
+                <Text variant="bodySmall" color="textSecondary" style={styles.note}>
+                  {colorScheme === 'light'
+                    ? 'The app is light. A game’s own screens — its page, reviews, Surprise Me, collections and studios — stay dark, built from its art.'
+                    : 'The app is dark, on a black page.'}
+                </Text>
+              </View>
+            </AccordionContent>
+          </AccordionItem>
+
           <AccordionItem value="colours">
             <AccordionTrigger
               icon="color-palette-outline"
@@ -360,6 +386,11 @@ export default function SettingsScreen() {
     </Screen>
   );
 }
+
+const APPEARANCE_OPTIONS: readonly { value: ColorScheme; label: string }[] = [
+  { value: 'dark', label: 'Dark' },
+  { value: 'light', label: 'Light' },
+];
 
 const styles = StyleSheet.create({
   content: { gap: Spacing.x32, paddingTop: Spacing.x24, paddingBottom: Spacing.x48 },

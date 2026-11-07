@@ -341,14 +341,16 @@ export function mixOklab(from: string, to: string, fraction: number): string {
   return fromOklab([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]);
 }
 
-type Oklab = [l: number, a: number, b: number];
+export type Oklab = [l: number, a: number, b: number];
 
-function toOklab(hex: string): Oklab | null {
+export function toOklab(hex: string): Oklab | null {
   const rgb = hexToRgb(hex);
   if (!rgb) return null;
-  const r = toLinear(rgb.r / 255);
-  const g = toLinear(rgb.g / 255);
-  const b = toLinear(rgb.b / 255);
+  return linearToOklab(toLinear(rgb.r / 255), toLinear(rgb.g / 255), toLinear(rgb.b / 255));
+}
+
+/** Oklab from linear-light sRGB channels, 0–1 — for a caller converting pixels in bulk (`lib/key-color`). */
+export function linearToOklab(r: number, g: number, b: number): Oklab {
   const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
   const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
   const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
@@ -359,7 +361,7 @@ function toOklab(hex: string): Oklab | null {
   ];
 }
 
-function fromOklab([L, A, B]: Oklab): string {
+export function fromOklab([L, A, B]: Oklab): string {
   const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3;
   const m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3;
   const s = (L - 0.0894841775 * A - 1.291485548 * B) ** 3;
@@ -368,4 +370,15 @@ function fromOklab([L, A, B]: Oklab): string {
     g: toByte(Math.max(0, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s)),
     b: toByte(Math.max(0, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s)),
   });
+}
+
+/**
+ * `lerp(color, black, fraction)` in Oklab, where black is the origin, so the
+ * hue holds as the colour darkens. The key colour's darker tone (`keyPage`).
+ */
+export function towardBlack(color: string, fraction: number): string {
+  const lab = toOklab(color);
+  if (!lab) return color;
+  const keep = 1 - Math.min(1, Math.max(0, fraction));
+  return fromOklab([lab[0] * keep, lab[1] * keep, lab[2] * keep]);
 }

@@ -43,3 +43,19 @@ example
 # generated native folders
 /ios
 /android
+
+# AI agent tooling, skills and local scratch work (not part of the app)
+.claude/
+.agents/
+.impeccable/
+.design/
+.logo-design-skill/
+logo-design-skill
+skills-lock.json
+
+# editors
+.idea/
+.vscode/
+
+# Supabase CLI local state
+.supabase/

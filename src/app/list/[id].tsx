@@ -18,7 +18,6 @@ import {
   collectionCover,
 } from '@/components/collection-header';
 import { CaptionedGrid } from '@/components/captioned-grid';
-import { CommentSection } from '@/components/comment-section';
 import { CollectionRow } from '@/components/collection-row';
 import { CollectionToolbar, type CollectionLayout } from '@/components/collection-toolbar';
 import { PORTRAIT_COLUMNS, gridItemWidth } from '@/components/gaming/game-tile';
@@ -34,11 +33,12 @@ import { Text } from '@/components/ui/text';
 import { displayNameFor } from '@/lib/format';
 import { ArtRowWindow, CoverGridWindow } from '@/constants/list-window';
 import { ControlHeight, Radius, Spacing, Type, type ThemePalette } from '@/constants/theme';
-import { AccentProvider, useGameAccent } from '@/hooks/use-accent';
+import { AccentProvider, useGameAccent, DarkRoom } from '@/hooks/use-accent';
 import { useTopBarInset } from '@/hooks/use-header-height';
 import { useSquareCover } from '@/hooks/use-square-cover';
 import { useTheme } from '@/hooks/use-theme';
 import { TOP_BAR_ROW, handoffBand, revealOffset } from '@/constants/top-bar';
+import { BAND } from '@/lib/progressive-blur';
 import {
   deleteList,
   getEngagement,
@@ -107,7 +107,7 @@ function tierColor(tier: string, theme: ThemePalette): string {
   return ramp[tier] ?? theme.surfaceElevated;
 }
 
-export default function ListDetailScreen() {
+function ListDetailScreen() {
   const theme = useTheme();
   const router = useRouter();
   const pingTo = usePingTo();
@@ -192,6 +192,13 @@ export default function ListDetailScreen() {
     barHeader,
     topInset + TOP_BAR_ROW
   );
+  /* Its blur's band, in dp from the art's top: from a lead above the name to
+     the art's foot, where the solid part begins — the game page's length. */
+  const nameTop = barHeader - (titleHeight ?? COLLECTION_TITLE_ESTIMATE);
+  const collectionBand = {
+    from: nameTop - BAND.lead,
+    to: Math.max(nameTop - BAND.lead + 40, coverHeight),
+  };
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ['list', id] });
@@ -475,10 +482,11 @@ export default function ListDetailScreen() {
             solidAt={solidAt}
             scrim={COLLECTION_SCRIM_TOP}
             contentPosition={heroArt.contentPosition}
-            /* Convx's long blur and its mirrored tail: the fade from the art
-               into the page is the blur's own (`<CollectionHeader>` leaves
-               part of the tail showing before its solid part). */
+            /* The game page's blur (the owner's, 2026-11-05): a band from
+               just above the name to where `<CollectionHeader>`'s solid part
+               starts, in place of Convx's long mirrored tail. */
             tail
+            band={collectionBand}
           />
         )}
       </>
@@ -606,24 +614,9 @@ export default function ListDetailScreen() {
     </View>
   );
 
-  /*
-   * The conversation about the collection, under it.
-   *
-   * Migration 0018 is what makes this possible — `comments` only accepted a post
-   * or a log until then, which is why a collection could be liked but not
-   * answered. Curation is an argument (the About says so in the owner's own
-   * words) and an argument nobody can reply to is a broadcast.
-   *
-   * Not rendered while picking a cover or choosing games to remove: both modes
-   * turn every tile into a different control, and a composer underneath them is
-   * an invitation to tap something that does something else.
-   */
-  const footer =
-    pickingCover || selecting ? null : (
-      <View style={styles.comments}>
-        <CommentSection targetType="list" targetId={data.id} />
-      </View>
-    );
+  /* No conversation under a collection: the owner had comments taken off
+     collections (2026-11-06). The list keeps its foot's room. */
+  const footer = <View style={styles.foot} />;
 
   /*
    * The selection's one action, pinned to the foot of the screen while games
@@ -689,7 +682,7 @@ export default function ListDetailScreen() {
    * columns, different tile, different tap target on the caption.
    *
    * Rendered inside a single-item list rather than as its own `numColumns` grid
-   * so the masthead, the comments and the board scroll as one column; the grid
+   * so the masthead and the board scroll as one column; the grid
    * lays itself out with `flexWrap`, which a `numColumns` FlatList cannot be
    * given without also handing it the tile height in advance.
    */
@@ -1172,7 +1165,7 @@ function RowRule() {
 }
 
 const styles = StyleSheet.create({
-  comments: { paddingHorizontal: Spacing.x16, paddingTop: Spacing.x32 },
+  foot: { height: Spacing.x32 },
   rowRule: { height: StyleSheet.hairlineWidth, marginLeft: Spacing.x16 },
   grid: { paddingHorizontal: Spacing.x16, paddingBottom: Spacing.x48, gap: GRID_GAP },
   column: { gap: GRID_GAP },
@@ -1288,3 +1281,12 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
 });
+
+/** A game's room: dark in either setting (Settings → Appearance). */
+export default function ListDetailScreenRoute() {
+  return (
+    <DarkRoom>
+      <ListDetailScreen />
+    </DarkRoom>
+  );
+}

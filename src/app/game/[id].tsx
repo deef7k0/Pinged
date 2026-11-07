@@ -22,6 +22,7 @@ import { useCriticSummary } from '@/components/critic-reviews';
 import { ExternalLink } from '@/components/external-link';
 import { GameAwards } from '@/components/game-awards';
 import { GameDetailsCard } from '@/components/game-details-card';
+import { FriendsPlayedList } from '@/components/friends-played';
 import { GameHeaderWords } from '@/components/game-header';
 import { GameInformation } from '@/components/game-information';
 import { GameAudienceCard } from '@/components/game-insights';
@@ -47,7 +48,6 @@ import { FrostedTopBar, TopBarDisc } from '@/components/ui/frosted-top-bar';
 import { heroHeightFor } from '@/components/ui/hero-art';
 import { InfoCard, InfoCardButton } from '@/components/ui/info-card';
 import { PageScrollView } from '@/components/ui/page-scroll';
-import { PinnedTabBar } from '@/components/ui/pinned-tab-bar';
 import {
   HERO_ANIMATES,
   MASTHEAD_FADE,
@@ -56,6 +56,8 @@ import {
   TRAILER_FADE,
 } from '@/components/ui/pinned-hero';
 import { RevealScope } from '@/components/ui/reveal';
+import { Loader } from '@/components/ui/loader';
+import { PINNED_HERO } from '@/lib/scroll-motion';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
 import { Section, SectionInsetProvider } from '@/components/ui/section';
 import { SlideUpSheet } from '@/components/ui/slide-up-sheet';
@@ -68,13 +70,14 @@ import { hasCase, platformKeysFor, type PlatformKey } from '@/constants/platform
 import { platformKeyForStored } from '@/constants/platform-family';
 import { TOP_BAR_ROW, handoffBand, revealOffset } from '@/constants/top-bar';
 import { Spacing, withAlpha } from '@/constants/theme';
-import { AccentProvider, useGameAccent } from '@/hooks/use-accent';
+import { AccentProvider, useGameAccent, DarkRoom } from '@/hooks/use-accent';
 import { useAnimatedCover } from '@/hooks/use-animated-cover';
 import { useArtworkMesh } from '@/hooks/use-artwork-mesh';
 import { useGameTitle } from '@/hooks/use-game-title';
+import { useKeyColor } from '@/hooks/use-key-color';
 import { useGameStorefronts } from '@/hooks/use-game-prices';
 import { useGameTrailer, useTrailerSetting } from '@/hooks/use-game-trailer';
-import { useHeaderHeight, useTopBarInset } from '@/hooks/use-header-height';
+import { useTopBarInset } from '@/hooks/use-header-height';
 import { getAchievementsForGame, getCopies, getMyLog } from '@/lib/api';
 import type { GameLog } from '@/lib/database.types';
 import { skiaAnimates } from '@/lib/animated-cover';
@@ -112,6 +115,9 @@ const TRAILER_OVERLAP = 16;
 /** "At the top": within this of it, the cover can be brought to the front. */
 const TOP_SLACK = 4;
 
+/** The longest the page waits for its cover and blur before it shows anyway. */
+const HERO_WAIT_MS = 6000;
+
 /** Between two of the Overview's sections, Apple TV's page's. */
 const SECTION_GAP = 34;
 
@@ -130,7 +136,7 @@ function lipColours(page: string) {
 }
 
 /** The sheets this page raises. */
-type SheetName = 'reviews' | 'similar' | 'lists' | 'progress' | 'about';
+type SheetName = 'reviews' | 'similar' | 'lists' | 'progress' | 'about' | 'friends';
 
 /**
  * Which sheet is open, held outside React state so that opening one re-renders
@@ -185,7 +191,7 @@ function createSheetStore(): SheetStore {
  * then Ratings & Reviews (the score, its graph, a rail of reviews), the
  * people who played it as faces, and the rest without cards.
  */
-export default function GameDetailScreen() {
+function GameDetailScreen() {
   const router = useRouter();
   const { width, height: windowHeight } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -193,11 +199,8 @@ export default function GameDetailScreen() {
   const focused = useIsFocused();
   const reduceMotion = useReducedMotion();
   const topInset = useTopBarInset();
-  const headerHeight = useHeaderHeight();
   const scroller = useRef<ScrollView>(null);
   const [tab, setTab] = useState<GameTab>('overview');
-  const [tabsY, setTabsY] = useState<number | null>(null);
-  const [solidPartAt, setSolidPartAt] = useState<number | null>(null);
 
   const [sheets] = useState(createSheetStore);
   const openReviews = useCallback(() => sheets.set('reviews'), [sheets]);
@@ -205,6 +208,7 @@ export default function GameDetailScreen() {
   const openLists = useCallback(() => sheets.set('lists'), [sheets]);
   const openProgress = useCallback(() => sheets.set('progress'), [sheets]);
   const openAbout = useCallback(() => sheets.set('about'), [sheets]);
+  const openFriends = useCallback(() => sheets.set('friends'), [sheets]);
 
   const [platform, setPlatform] = useState<PlatformKey | null>(null);
   const caseWidth = Math.min(CASE_MAX_WIDTH, Math.round(width * CASE_WIDTH_RATIO));
@@ -269,6 +273,24 @@ export default function GameDetailScreen() {
   const [mode, setMode] = useState<HeaderMode>('portrait');
   const [swapping, setSwapping] = useState(false);
   const [autoplayed, setAutoplayed] = useState(false);
+  /*
+   * The page holds itself back until its cover is in and its blur is drawn —
+   * the first thing it loads (the owner's, 2026-11-05: "the game page screen
+   * doesnt load until the blur loads, and make that the very first thing
+   * that must load along with the portrait"). Until then the loader stands
+   * on the page's colour, the words are laid out unseen (the blur's band is
+   * measured from them) and the tabs are not mounted, so nothing they draw
+   * competes with the cover for the network. A slow cover gives way after
+   * `HERO_WAIT_MS`, so the page is never held for good.
+   */
+  const [heroWholeFor, setHeroWholeFor] = useState<string | null>(null);
+  const [waitedFor, setWaitedFor] = useState<string | null>(null);
+  const onHeroWhole = useCallback(() => setHeroWholeFor(id), [id]);
+  useEffect(() => {
+    const timer = setTimeout(() => setWaitedFor(id), HERO_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [id]);
+  const heroShown = heroWholeFor === id || waitedFor === id;
   /* The animated cover, by the bar's key — see `animatedCover` below. */
   const [coverMotion, setCoverMotion] = useState<'auto' | 'on' | 'off'>('auto');
   /* An animation Skia would not play in the hero: drawn over the art instead. */
@@ -299,6 +321,7 @@ export default function GameDetailScreen() {
     !autoplayed &&
     mode === 'portrait' &&
     !reduceMotion &&
+    heroShown &&
     focused;
   useEffect(() => {
     if (!autoplay) return;
@@ -352,7 +375,8 @@ export default function GameDetailScreen() {
     gameId: id,
     title: game.data?.title,
     aspect: 'portrait',
-    enabled: mode === 'portrait' && coverMotion !== 'off',
+    /* Not before the header is up: the cover and its blur load first. */
+    enabled: mode === 'portrait' && coverMotion !== 'off' && heroShown,
     explicit: coverMotion === 'on',
   });
 
@@ -380,8 +404,9 @@ export default function GameDetailScreen() {
    * The game's colours, Material 3, seeded by the cover — the art the page
    * opens on and drains into now. With game colours off, the grey room.
    */
-  const accent = useGameAccent(game.data?.coverUrl ?? game.data?.heroUrl, game.data?.genres);
-  const page = accent.page;
+  const accent = useGameAccent(game.data?.coverUrl ?? game.data?.heroUrl, game.data?.genres, {
+    keyColour: false,
+  });
 
   /*
    * The geometry: the art's height for the shape in force, the words placed
@@ -395,6 +420,35 @@ export default function GameDetailScreen() {
   const artHeight = landscape
     ? heroHeightFor(width, windowHeight)
     : coverHeight(width, coverAspect);
+
+  /*
+   * The page's own colour: Apple Music's key colour — the colour the cover's
+   * edges end in, its foot above all (`useKeyColor`) — so the cover runs out
+   * into the page with no seam.
+   * Only the page; the controls and cards keep the cover's Material 3
+   * scheme, whose page stands in until the colour is read (and with game
+   * colours off). Read off the cover alone, so a trailer does not repaint it.
+   */
+  const key = useKeyColor(game.data?.coverUrl, {
+    frame: { width, height: coverHeight(width, coverAspect) },
+    ink: accent.quietInk,
+  });
+  const page = key.bright ?? accent.page;
+  /* The page is shown once the hero is whole and its colour is known. */
+  const pageShown = waitedFor === id || (heroShown && key.resolved);
+  /*
+   * Then the rest: the tabs mount once the header has finished coming in
+   * (`PINNED_HERO.arriveMs`), so the Overview's requests and images start
+   * after the cover and its blur, and its first render does not land in the
+   * header's fade.
+   */
+  const [restFor, setRestFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pageShown) return;
+    const timer = setTimeout(() => setRestFor(id), PINNED_HERO.arriveMs);
+    return () => clearTimeout(timer);
+  }, [pageShown, id]);
+  const restShown = pageShown && restFor === id;
   const [titleBox, setTitleBox] = useState<LayoutRectangle | null>(null);
   /* With the trailer playing the words start under the video, on its
      faded foot, not over it (the owner's, 2026-11-04: "the fade effects get
@@ -429,7 +483,6 @@ export default function GameDetailScreen() {
         ? contentTop + rows.keys + 70
         : contentTop + 120;
   const blurBand = { from: bandStart, to: Math.max(bandStart + 40, bandEnd) };
-  const tabsAt = solidPartAt !== null && tabsY !== null ? solidPartAt + tabsY : null;
 
   const availablePlatforms = platformKeysFor(game.data?.platforms);
   const playedOn = platformKeyForStored(myLog.data?.played_on);
@@ -486,6 +539,7 @@ export default function GameDetailScreen() {
     animatedCover.animatedUrl &&
     !landscape &&
     focused &&
+    pageShown &&
     coverMotion !== 'off'
       ? animatedCover
       : null;
@@ -761,7 +815,8 @@ export default function GameDetailScreen() {
                 solidAt={solidAt}
                 /* Only the status bar's band darkened over the trailer. */
                 scrim={landscape ? 0.18 : 0.4}
-                ready={!swapping}
+                ready={!swapping && pageShown}
+                onReady={onHeroWhole}
                 media={(art) =>
                   landscape ? (
                     <TrailerBackdrop
@@ -894,9 +949,9 @@ export default function GameDetailScreen() {
             {/* The page's words and all under them, fading out while the
                 cover is in front, and back. */}
             <Animated.View
-              pointerEvents={coverFront ? 'none' : 'auto'}
+              pointerEvents={coverFront || !pageShown ? 'none' : 'auto'}
               style={{
-                opacity: coverFront ? 0 : 1,
+                opacity: coverFront || !pageShown ? 0 : 1,
                 transitionProperty: 'opacity',
                 transitionDuration: 360,
               }}>
@@ -940,22 +995,32 @@ export default function GameDetailScreen() {
                     onOpenProgress={openProgress}
                     onOpenLists={openLists}
                     onReadMore={openAbout}
+                    onOpenFriends={openFriends}
                   />
                 </Animated.View>
               </View>
 
               {/* The page's solid part: the tabs and what they hold, opaque,
                 rising over the pinned cover. */}
-              <View
-                onLayout={(event) => setSolidPartAt(event.nativeEvent.layout.y)}
-                style={{ backgroundColor: page }}>
-                <View onLayout={(event) => setTabsY(event.nativeEvent.layout.y)}>
-                  <TabBar tabs={TABS} value={tab} onChange={setTab} align="spread" />
-                </View>
-                <RevealScope>{renderTab()}</RevealScope>
+              <View style={{ backgroundColor: page }}>
+                {/* The tabs stay in the page and scroll with it — they no
+                    longer pin under the bar (the owner's, 2026-11-05). */}
+                <TabBar tabs={TABS} value={tab} onChange={setTab} align="spread" />
+                {restShown ? (
+                  <RevealScope>{renderTab()}</RevealScope>
+                ) : (
+                  <View style={styles.restHolding}>
+                    <Loader />
+                  </View>
+                )}
               </View>
             </Animated.View>
           </PageScrollView>
+          {!pageShown && (
+            <View pointerEvents="none" style={styles.holding}>
+              <Loader size="large" />
+            </View>
+          )}
           {/* With the cover in front, a tap anywhere — or back — puts the
               page back. */}
           {coverFront && (
@@ -966,21 +1031,9 @@ export default function GameDetailScreen() {
               onPress={() => setCoverFront(false)}
             />
           )}
-          <PinnedTabBar
-            at={coverFront ? null : tabsAt}
-            background={page}
-            tabs={TABS}
-            value={tab}
-            onChange={(next) => {
-              setTab(next);
-              if (tabsAt !== null)
-                scroller.current?.scrollTo({ y: tabsAt - headerHeight, animated: false });
-            }}
-            align="spread"
-          />
         </Screen>
 
-        <GameSheets store={sheets} game={data} log={logged} />
+        {restShown && <GameSheets store={sheets} game={data} log={logged} />}
       </>
     </AccentProvider>
   );
@@ -1010,6 +1063,11 @@ function GameSheets({ store, game, log }: { store: SheetStore; game: Game; log: 
 
       <SlideUpSheet visible={open === 'similar'} onClose={close} title={game.title}>
         <CommunitySimilarSheet gameId={game.id} gameTitle={game.title} />
+      </SlideUpSheet>
+
+      {/* Who in your circle played it — the header's friends row. */}
+      <SlideUpSheet visible={open === 'friends'} onClose={close} title="Friends who played">
+        <FriendsPlayedList gameId={game.id} onLeave={close} />
       </SlideUpSheet>
 
       <SlideUpSheet visible={open === 'lists'} onClose={close} title="In collections">
@@ -1058,6 +1116,16 @@ function shareGame(game: Game) {
 const styles = StyleSheet.create({
   content: { paddingBottom: Spacing.x48 },
   fill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  restHolding: { alignItems: 'center', paddingVertical: 48 },
+  holding: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   lip: { position: 'absolute', left: 0, right: 0, bottom: 0, height: LIP },
   words: { paddingBottom: Spacing.x24 },
   overview: { gap: SECTION_GAP, paddingTop: Spacing.x16, paddingBottom: Spacing.x16 },
@@ -1101,5 +1169,14 @@ function GameMoreKey({
         ))}
       </AnchoredMenu>
     </>
+  );
+}
+
+/** A game's room: dark in either setting (Settings → Appearance). */
+export default function GameDetailScreenRoute() {
+  return (
+    <DarkRoom>
+      <GameDetailScreen />
+    </DarkRoom>
   );
 }

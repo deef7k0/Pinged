@@ -14,7 +14,7 @@ import { useSectionInset } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/surface';
 import { Text } from '@/components/ui/text';
 import { RAIL_FOOT, railLayout, type RailLayout } from '@/constants/cover-rail';
-import { Radius } from '@/constants/theme';
+import { PosterAspectRatio, Radius } from '@/constants/theme';
 import { useRailDrift } from '@/hooks/use-rail-drift';
 import type { GameSearchResult } from '@/lib/games';
 
@@ -42,6 +42,8 @@ export type CoverRailProps<T> = {
   footOf?: (item: T, width: number) => ReactNode;
   /** What a screen reader says for an item. The game's title, when absent. */
   labelOf?: (item: T) => string;
+  /** Drawn on the cover itself, over its foot, clipped to its corner (Home's "New from friends"). */
+  overlayOf?: (item: T, width: number) => ReactNode;
   onPressItem: (item: T) => void;
   /**
    * Let a cover wear the game's label (Must Play). Off for a row that is about
@@ -82,6 +84,7 @@ export function CoverRail<T>({
   gameOf,
   footOf,
   labelOf,
+  overlayOf,
   onPressItem,
   labelled = true,
   inset: insetProp,
@@ -123,10 +126,11 @@ export function CoverRail<T>({
         gameOf={gameOf}
         labelOf={labelOf}
         footOf={footOf}
+        overlayOf={overlayOf}
         onPressItem={onPressItem}
       />
     ),
-    [width, layout.gap, inset, labelled, driver, gameOf, labelOf, footOf, onPressItem]
+    [width, layout.gap, inset, labelled, driver, gameOf, labelOf, footOf, overlayOf, onPressItem]
   );
 
   return (
@@ -159,6 +163,7 @@ type RailItemProps<T> = {
   gameOf: (item: T) => CoverRailGame;
   labelOf?: (item: T) => string;
   footOf?: (item: T, width: number) => ReactNode;
+  overlayOf?: (item: T, width: number) => ReactNode;
   onPressItem: (item: T) => void;
 };
 
@@ -173,6 +178,7 @@ const RailItem = memo(function RailItem<T>({
   gameOf,
   labelOf,
   footOf,
+  overlayOf,
   onPressItem,
 }: RailItemProps<T>) {
   const game = gameOf(item);
@@ -192,6 +198,13 @@ const RailItem = memo(function RailItem<T>({
           gap={gap}
           labelled={labelled}
         />
+        {overlayOf && (
+          <View
+            pointerEvents="none"
+            style={[styles.overlay, { width, height: Math.round(width / PosterAspectRatio) }]}>
+            {overlayOf(item, width)}
+          </View>
+        )}
         {footOf && <View style={styles.foot}>{footOf(item, width)}</View>}
       </View>
     </PressableScale>
@@ -321,6 +334,15 @@ export function CoverRailSkeleton({
 
 const styles = StyleSheet.create({
   foot: { paddingTop: RAIL_FOOT.top },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    borderRadius: Radius.image,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+  },
   /* Held at one line whatever it says, so a row is one height. */
   line: { height: RAIL_FOOT.line },
   /* Clipped rather than scrolled: the covers run off the trailing edge as the

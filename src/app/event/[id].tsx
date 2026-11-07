@@ -22,7 +22,7 @@ import { SlideUpSheet } from '@/components/ui/slide-up-sheet';
 import { Text } from '@/components/ui/text';
 import { CoverGridWindow } from '@/constants/list-window';
 import { MaxContentWidth, Spacing, TapTarget, withAlpha } from '@/constants/theme';
-import { AccentProvider, useGameAccent } from '@/hooks/use-accent';
+import { AccentProvider, useGameAccent, DarkRoom } from '@/hooks/use-accent';
 import { useEventAttendance } from '@/hooks/use-event-attendance';
 import { useTheme } from '@/hooks/use-theme';
 import { getEventWatchers, type EventWatcher } from '@/lib/api';
@@ -105,7 +105,7 @@ function open(url: string) {
  * Opened from News's Events. Two IGDB requests (the event, then its games by
  * id — only when they will be shown) and two of ours (attendance, faces).
  */
-export default function EventScreen() {
+function EventScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -787,3 +787,12 @@ const styles = StyleSheet.create({
   footRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8 },
   notice: { textAlign: 'center' },
 });
+
+/** A game's room: dark in either setting (Settings → Appearance). */
+export default function EventScreenRoute() {
+  return (
+    <DarkRoom>
+      <EventScreen />
+    </DarkRoom>
+  );
+}

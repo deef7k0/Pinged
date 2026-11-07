@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <!-- A cartridge, top-right corner cut at 45deg, that is also a page: its label window holds three log lines. -->
-  <path fill="#000" fill-rule="evenodd" d="
-    M 60 24 H 166 L 212 70 V 216 Q 212 232 196 232 H 60 Q 44 232 44 216 V 40 Q 44 24 60 24 Z
-    M 76 92 H 180 V 108 H 76 Z
-    M 76 128 H 180 V 144 H 76 Z
-    M 76 164 H 144 V 180 H 76 Z"/>
-</svg>

@@ -1,5 +1,6 @@
 import { periodStart, type ChartPeriod, type MemberActivity } from '../discovery';
 import { resolvePreview, resolveStack, SUMMARY_ITEMS, type SummaryRow } from './lists';
+import { getEngagement } from './engagement';
 import { rememberLogs } from './seen-logs';
 import type { ListSummary } from './types';
 import type { CachedGame, LogStatus, LogWithRelations, Profile } from '../database.types';
@@ -506,6 +507,64 @@ export async function getGamePlayers(
     recent: ((recent.data ?? []) as unknown as PlayerRow[]).map(toPlayer),
     circleTotal: circle?.count ?? 0,
     circle: ((circle?.data ?? []) as unknown as PlayerRow[]).map(toPlayer),
+  };
+}
+
+/** At most this many friends' logs in the sheet: a circle, not a crowd. */
+const FRIENDS_PLAYED_LIMIT = 100;
+
+/** A friend's log of a game, with what the sheet prints under it. */
+export type FriendPlay = {
+  log: LogWithRelations;
+  likes: number;
+  likedByViewer: boolean;
+};
+
+export type FriendsPlayed = {
+  /** Every person in the viewer's circle who played it. */
+  total: number;
+  /** Their logs, newest first — written reviews and plain logs alike. */
+  plays: FriendPlay[];
+};
+
+/**
+ * Which of the viewer's friends played a game — the game page's "friends who
+ * played it" row and its sheet (the owner's, 2026-11-06, after Letterboxd's
+ * "Friends who watched").
+ *
+ * Friends are the viewer's circle (`getCircleIds`: follows and accepted
+ * friends), played is what "Played by" counts, and the viewer is not among
+ * them. A log with writing carries its likes (`getEngagement`).
+ */
+export async function getFriendsWhoPlayed(
+  gameId: string,
+  viewerId: string | null
+): Promise<FriendsPlayed> {
+  if (!viewerId) return { total: 0, plays: [] };
+  const circleIds = (await getCircleIds(viewerId)).filter((id) => id !== viewerId);
+  if (circleIds.length === 0) return { total: 0, plays: [] };
+
+  const { data, error, count } = await supabase
+    .from('logs')
+    .select(LOG_WITH_RELATIONS, { count: 'exact' })
+    .eq('game_id', gameId)
+    .in('status', PLAYED_STATUSES)
+    .in('user_id', circleIds)
+    .order('updated_at', { ascending: false })
+    .limit(FRIENDS_PLAYED_LIMIT);
+  if (error) throw new Error(error.message);
+
+  const logs = rememberLogs((data as LogWithRelations[] | null) ?? []);
+  const written = logs.filter(hasWriting).map((log) => log.id);
+  const engagement = await getEngagement('log', written, viewerId);
+
+  return {
+    total: count ?? logs.length,
+    plays: logs.map((log) => ({
+      log,
+      likes: engagement[log.id]?.likes ?? 0,
+      likedByViewer: engagement[log.id]?.likedByViewer ?? false,
+    })),
   };
 }
 

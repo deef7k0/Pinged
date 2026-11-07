@@ -14,6 +14,7 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useStudioCatalogue } from '@/hooks/use-studio-catalogue';
 import { gameSortOptions, sortGames, type GameSort } from '@/lib/games';
 import type { StudioGame } from '@/lib/games/igdb';
+import { DarkRoom } from '@/hooks/use-accent';
 
 const GAP = Spacing.x8;
 /** No "Default": IGDB answers a studio's games newest first, which is "Newest". */
@@ -28,7 +29,7 @@ const SORTS = gameSortOptions(['newest', 'oldest', 'rating', 'title']);
  * The catalogue is the studio page's own query (`useStudioCatalogue`), so
  * this opens on what that page already loaded.
  */
-export default function StudioGamesScreen() {
+function StudioGamesScreen() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const companyId = Number(id);
   const { width } = useWindowDimensions();
@@ -110,3 +111,12 @@ const styles = StyleSheet.create({
   sort: { paddingBottom: Spacing.x12 },
   skeleton: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
 });
+
+/** A game's room: dark in either setting (Settings → Appearance). */
+export default function StudioGamesScreenRoute() {
+  return (
+    <DarkRoom>
+      <StudioGamesScreen />
+    </DarkRoom>
+  );
+}

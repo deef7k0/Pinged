@@ -53,9 +53,9 @@ export function ProfileButton({
   accessibilityHint?: string;
 }) {
   const theme = useTheme();
-  const fill = filled ? theme.white : theme.controlFill;
-  /* The page's own near-black on the white: the button reads as cut out of it. */
-  const ink = filled ? theme.background : theme.text;
+  const fill = filled ? theme.primary : theme.controlFill;
+  /* The page's own colour on the primary: the button reads as cut out of it. */
+  const ink = filled ? theme.onPrimary : theme.text;
 
   return (
     <PressableScale

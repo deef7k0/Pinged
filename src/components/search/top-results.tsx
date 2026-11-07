@@ -18,7 +18,8 @@ import { Poster } from '@/components/ui/poster';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { EmptyState, ErrorState } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
-import { MaxContentWidth, Palette, Radius, Spacing, withAlpha } from '@/constants/theme';
+import { MaxContentWidth, Radius, Spacing, withAlpha } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { searchLists, searchProfiles, searchReviews } from '@/lib/api';
 import type { Profile } from '@/lib/database.types';
 import { displayNameFor } from '@/lib/format';
@@ -278,6 +279,7 @@ function Rail<T>({
  * thing it is under it.
  */
 function TopResultCard({ hit }: { hit: TopHit }) {
+  const theme = useTheme();
   let href;
   let art: ReactNode;
   let title: string;
@@ -324,7 +326,7 @@ function TopResultCard({ hit }: { hit: TopHit }) {
         accessibilityRole="button"
         accessibilityLabel={`Top result: ${title}, ${kind}`}
         scaleTo={0.98}
-        style={styles.top}>
+        style={StyleSheet.flatten([styles.top, { backgroundColor: withAlpha(theme.text, 0.07) }])}>
         <View pointerEvents="none">{art}</View>
         <View style={styles.topWords}>
           <Text variant="h3" numberOfLines={3}>
@@ -358,7 +360,6 @@ const styles = StyleSheet.create({
     padding: Spacing.x12,
     borderRadius: Radius.card,
     borderCurve: 'continuous',
-    backgroundColor: withAlpha(Palette.white, 0.07),
   },
   topWords: { flex: 1, gap: Spacing.x4 },
 });

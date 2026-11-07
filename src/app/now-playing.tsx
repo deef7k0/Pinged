@@ -22,6 +22,7 @@ import { Text } from '@/components/ui/text';
 import { Palette, Radius, Spacing, Typeface, withAlpha } from '@/constants/theme';
 import { clockOf, nextPlayable, noticeText, progressOf } from '@/lib/player-queue';
 import { player, useNowPlaying, usePlayer } from '@/store/player';
+import { DarkRoom } from '@/hooks/use-accent';
 
 /** The art's margin from the display's sides, Apple Music's. */
 const ART_SIDE = 32;
@@ -49,7 +50,7 @@ const QUIET = withAlpha(Palette.white, 0.6);
  * When the music stops while it is open — the queue ended, or Stop from
  * elsewhere — it closes itself.
  */
-export default function NowPlayingScreen() {
+function NowPlayingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -376,3 +377,12 @@ const styles = StyleSheet.create({
   keep: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
   keepTitle: { fontFamily: Typeface.semibold, fontSize: 15, lineHeight: 20, color: INK },
 });
+
+/** A game's room: dark in either setting (Settings → Appearance). */
+export default function NowPlayingScreenRoute() {
+  return (
+    <DarkRoom>
+      <NowPlayingScreen />
+    </DarkRoom>
+  );
+}

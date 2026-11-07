@@ -24,7 +24,7 @@ import Animated, {
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { Spacing, withAlpha } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { useColorScheme, useTheme } from '@/hooks/use-theme';
 
 /*
  * Apple's alert (the Apple pass, 2026-11-04; it was reacticx's dialog, a card
@@ -147,6 +147,7 @@ export function DialogHost() {
 
 function AlertDialog({ request }: { request: Request }) {
   const theme = useTheme();
+  const light = useColorScheme() === 'light';
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(0);
   const [leaving, setLeaving] = useState(false);
@@ -209,10 +210,17 @@ function AlertDialog({ request }: { request: Request }) {
       onRequestClose={() => close(cancel)}>
       <Animated.View style={[StyleSheet.absoluteFill, overlayStyle]}>
         {Platform.OS === 'ios' && (
-          <BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFill} />
+          <BlurView
+            intensity={35}
+            tint={light ? 'light' : 'dark'}
+            style={StyleSheet.absoluteFill}
+          />
         )}
         <View
-          style={[StyleSheet.absoluteFill, { backgroundColor: withAlpha(theme.shadowInk, 0.55) }]}
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: withAlpha(theme.shadowInk, light ? 0.25 : 0.55) },
+          ]}
         />
         <Pressable
           accessibilityRole="button"
@@ -231,7 +239,10 @@ function AlertDialog({ request }: { request: Request }) {
           accessibilityRole="alert"
           style={[
             styles.card,
-            { backgroundColor: theme.surfaceElevated, borderColor: theme.border },
+            {
+              backgroundColor: light ? theme.background : theme.surfaceElevated,
+              borderColor: theme.border,
+            },
             cardStyle,
           ]}>
           <View style={styles.header}>

@@ -82,6 +82,7 @@ export function ReportFlag({
   label,
   game,
   withWord = false,
+  onBeforeOpen,
 }: {
   target: ReportTarget;
   /** Who wrote it. Omit for a pick, which belongs to nobody. */
@@ -91,6 +92,8 @@ export function ReportFlag({
   game?: string;
   /** "⚑ Report", for a page with room for the word; a bare flag otherwise. */
   withWord?: boolean;
+  /** Called first — a sheet closing itself before the report form opens over it. */
+  onBeforeOpen?: () => void;
 }) {
   const theme = useTheme();
   const router = useRouter();
@@ -103,7 +106,10 @@ export function ReportFlag({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint="Opens the report form"
-      onPress={() => router.push(reportHref(target, game))}
+      onPress={() => {
+        onBeforeOpen?.();
+        router.push(reportHref(target, game));
+      }}
       hitSlop={FLAG_SLOP}
       scaleTo={0.9}
       style={StyleSheet.flatten(styles.flag)}>

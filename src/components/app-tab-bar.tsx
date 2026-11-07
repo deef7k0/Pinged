@@ -42,7 +42,7 @@ import { GlassSurface, useLiquidGlass } from '@/components/ui/liquid-glass';
 import type { LensTab } from '@/components/ui/liquid-lens';
 import { MINI_PLAYER_FOOTPRINT } from '@/constants/player';
 import { Typeface, MaxContentWidth, withAlpha } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { useColorScheme, useTheme } from '@/hooks/use-theme';
 import { useMiniPlayerActive } from '@/store/player';
 
 /*
@@ -224,6 +224,7 @@ export function useKeyboardShown(): boolean {
 export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
   const liquid = useLiquidGlass();
   const theme = useTheme();
+  const scheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const keyboardShown = useKeyboardShown();
@@ -251,14 +252,14 @@ export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
 
   const tints = useMemo(
     () => ({
-      active: theme.white,
-      /* Apple's unchosen tab: white at 55%, not a second grey. */
-      inactive: withAlpha(theme.white, 0.55),
-      highlight: withAlpha(theme.white, 0.14),
+      active: theme.text,
+      /* Apple's unchosen tab: the ink at 55%, not a second grey. */
+      inactive: withAlpha(theme.text, 0.55),
+      highlight: withAlpha(theme.text, scheme === 'light' ? 0.08 : 0.14),
       glass: withAlpha(theme.surface, 0.94),
       lit: withAlpha(theme.surfaceSelected, 0.97),
     }),
-    [theme]
+    [theme, scheme]
   );
 
   /* The tab in front moved — a tap, a back gesture, a deep link: the
@@ -460,12 +461,17 @@ export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
           FADE_LAYERS.map((height, index) => (
             <BlurView
               key={index}
-              tint="dark"
+              tint={scheme === 'light' ? 'light' : 'dark'}
               intensity={5}
               style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height }}
             />
           ))}
-        <View style={[StyleSheet.absoluteFill, { experimental_backgroundImage: FADE_RAMP }]} />
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { experimental_backgroundImage: fadeRamp(scheme, theme.background) },
+          ]}
+        />
       </View>
 
       <View
@@ -489,7 +495,7 @@ export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
                     ? { borderCurve: 'continuous' }
                     : {
                         backgroundColor: tints.glass,
-                        borderColor: withAlpha(theme.white, 0.08),
+                        borderColor: withAlpha(theme.text, 0.08),
                         borderWidth: StyleSheet.hairlineWidth,
                         borderCurve: 'continuous',
                       },
@@ -574,7 +580,7 @@ export function AppTabBar({ state, descriptors, navigation }: AppTabBarProps) {
               style={[
                 styles.search,
                 {
-                  borderColor: withAlpha(theme.white, 0.08),
+                  borderColor: withAlpha(theme.text, 0.08),
                   borderWidth: liquid ? 0 : StyleSheet.hairlineWidth,
                   borderCurve: 'continuous',
                 },
@@ -607,8 +613,13 @@ const FADE_LAYERS = [
   '22%',
   '16%',
 ] as const;
-const FADE_RAMP =
-  'linear-gradient(to top, rgba(0,0,0,0.70) 0%, rgba(0,0,0,0.32) 42%, rgba(0,0,0,0.08) 68%, rgba(0,0,0,0) 88%)';
+/* The soft ramp to the page under the bar: black in the dark room, the
+   page's white in the light one. */
+function fadeRamp(scheme: 'dark' | 'light', page: string): string {
+  const [a, b, c] = scheme === 'light' ? [0.85, 0.45, 0.12] : [0.7, 0.32, 0.08];
+  const at = (alpha: number) => withAlpha(scheme === 'light' ? page : '#000000', alpha);
+  return `linear-gradient(to top, ${at(a)} 0%, ${at(b)} 42%, ${at(c)} 68%, ${at(0)} 88%)`;
+}
 
 /** One tab: its glyph (lit as the highlight passes over it) and its word, which folds away when minimized. */
 function GlassTab({

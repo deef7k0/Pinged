@@ -40,6 +40,7 @@ import {
   useOnboarding,
 } from '@/store/onboarding';
 import { Loader } from '@/components/ui/loader';
+import { DarkRoom } from '@/hooks/use-accent';
 
 /**
  * Whether linking Steam would import anything yet.
@@ -87,7 +88,7 @@ type Flow = {
  * kept on the device as it goes (`saveResume`), and read back when it opens.
  * They are deleted when it finishes: the answers only ever chose six games.
  */
-export default function OnboardingScreen() {
+function OnboardingScreen() {
   const userId = useAuth((state) => state.session?.user.id ?? null);
   const status = useOnboarding((state) => state.status);
 
@@ -282,4 +283,13 @@ function handleFrom(name: string): string {
     .replace(/[^a-z0-9_]/g, '')
     .slice(0, 20);
   return guess.length >= 3 ? guess : '';
+}
+
+/** A game's room: dark in either setting (Settings → Appearance). */
+export default function OnboardingScreenRoute() {
+  return (
+    <DarkRoom>
+      <OnboardingScreen />
+    </DarkRoom>
+  );
 }

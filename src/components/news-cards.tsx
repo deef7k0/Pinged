@@ -1,17 +1,21 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Linking, StyleSheet, View } from 'react-native';
 
 import { EventRsvp } from '@/components/event-rsvp';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Card } from '@/components/ui/surface';
 import { Text } from '@/components/ui/text';
-import { HeroAspectRatio, Radius, Spacing } from '@/constants/theme';
+import { HeroAspectRatio, Palette, Radius, Spacing, withAlpha } from '@/constants/theme';
+import { DarkRoom } from '@/hooks/use-accent';
+import { useArtGround } from '@/hooks/use-key-color';
 import { useTheme } from '@/hooks/use-theme';
 import { timeAgo } from '@/lib/format';
 import type { LatestEvent } from '@/lib/games/browse';
 import type { Article, GameEvent } from '@/lib/news';
+import { smoothScrimStops } from '@/lib/scrim';
 
 /** Diameter of the play glyph centred on a trailer thumbnail. */
 const PLAY_BADGE = 52;
@@ -108,8 +112,17 @@ export const ARTICLE_ROW_HEIGHT = 80 + 24;
  * card opens `event/[id]`, whose games are shown now that it is over.
  */
 export function PastEventCard({ event }: { event: LatestEvent }) {
-  const theme = useTheme();
   const router = useRouter();
+  const ground = useArtGround(
+    event.bannerUrl,
+    { width: HeroAspectRatio, height: 1 },
+    { x: 0.5, y: 0.5 }
+  );
+  const fade = EVENT_RAMP.alphas.map((alpha) => withAlpha(ground, alpha)) as [
+    string,
+    string,
+    ...string[],
+  ];
   const date = new Date(event.startTime * 1000).toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'short',
@@ -120,34 +133,45 @@ export function PastEventCard({ event }: { event: LatestEvent }) {
       ? `See the ${event.gameCount} ${event.gameCount === 1 ? 'game' : 'games'} shown`
       : 'See the event';
 
+  /* The review card's look (the owner's, 2026-11-06, after Apple News): the
+     art at the top fading into its own key colour, and the story on that
+     colour, solid, in white — the dark room's inks in either room. */
   return (
     <PressableScale
       accessibilityRole="link"
       accessibilityLabel={`${event.name}, ${date}. ${action}.`}
       onPress={() => router.push({ pathname: '/event/[id]', params: { id: String(event.id) } })}
-      scaleTo={0.98}>
-      <Card padded={false}>
-        {event.bannerUrl && (
-          <Image
-            source={{ uri: event.bannerUrl }}
-            recyclingKey={String(event.id)}
-            cachePolicy="memory-disk"
-            style={[styles.storyImage, { backgroundColor: theme.surfaceElevated }]}
-            contentFit="cover"
-            transition={200}
-            accessibilityIgnoresInvertColors
+      scaleTo={0.98}
+      style={StyleSheet.flatten([styles.eventStory, { backgroundColor: ground }])}>
+      <DarkRoom>
+        <View style={styles.storyImage}>
+          {event.bannerUrl && (
+            <Image
+              source={{ uri: event.bannerUrl }}
+              recyclingKey={String(event.id)}
+              cachePolicy="memory-disk"
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              transition={200}
+              accessibilityIgnoresInvertColors
+            />
+          )}
+          <LinearGradient
+            colors={fade}
+            locations={EVENT_FADE_LOCATIONS}
+            style={StyleSheet.absoluteFill}
           />
-        )}
+        </View>
 
         <View style={styles.storyBody}>
           <View style={styles.bylineRow}>
-            <View style={[styles.outletBadge, { backgroundColor: theme.surfaceElevated }]}>
-              <Ionicons name="calendar-clear" size={12} color={theme.primary} />
+            <View style={[styles.outletBadge, { backgroundColor: withAlpha(Palette.white, 0.16) }]}>
+              <Ionicons name="calendar-clear" size={12} color={Palette.white} />
             </View>
             <Text variant="label" color="textSecondary" numberOfLines={1} style={styles.outlet}>
               {byline}
             </Text>
-            <Text variant="caption" color="textMuted">
+            <Text variant="caption" color="textSecondary">
               {date}
             </Text>
           </View>
@@ -162,14 +186,21 @@ export function PastEventCard({ event }: { event: LatestEvent }) {
             </Text>
           )}
 
-          <Text variant="label" style={[styles.readStory, { color: theme.text }]}>
+          <Text variant="label" style={[styles.readStory, { color: Palette.text }]}>
             {action}
           </Text>
         </View>
-      </Card>
+      </DarkRoom>
     </PressableScale>
   );
 }
+
+/* The art's foot melting into the card's colour, as the review card's does. */
+const EVENT_RAMP = smoothScrimStops();
+const EVENT_FADE_FROM = 0.4;
+const EVENT_FADE_LOCATIONS = EVENT_RAMP.locations.map(
+  (at) => EVENT_FADE_FROM + at * (1 - EVENT_FADE_FROM)
+) as [number, number, ...number[]];
 
 /*
  * There is deliberately no ChartRow here any more. The popularity chart is a
@@ -239,6 +270,7 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, minWidth: 0, gap: 2 },
   thumb: { width: 80, height: 80, borderRadius: Radius.image, borderCurve: 'continuous' },
   storyImage: { width: '100%', aspectRatio: HeroAspectRatio },
+  eventStory: { borderRadius: Radius.card, borderCurve: 'continuous', overflow: 'hidden' },
   /* 16 all round rather than the card's usual padding: this is a page of type,
      and type wants a margin. */
   storyBody: { padding: Spacing.x16, gap: Spacing.x12 },

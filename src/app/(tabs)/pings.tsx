@@ -5,8 +5,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { useTabBarClearance } from '@/components/app-tab-bar';
-import { PinYours } from '@/components/pings/pin-yours';
-import { PingPlate } from '@/components/pings/ping-plate';
+import { PingCard } from '@/components/pings/ping-card';
 import { PingSpotlight } from '@/components/pings/ping-spotlight';
 import { Button } from '@/components/ui/button';
 import { type DropdownOption } from '@/components/ui/dropdown-button';
@@ -75,7 +74,7 @@ const BOARD_HEAD: Record<Exclude<PingFeedMode, 'for_you'>, string> = {
  *     and a swipe or Next brings the next one, from somebody else.
  *   - **Latest** (every open request, newest first) and **Mine** (your own,
  *     with a dot on the tab while anything on them is new) are "The Board":
- *     plates (`<PingPlate>`) — the games as one picture, the asker's face
+ *     cards (`<PingCard>`, 2026-11-05; they were `<PingPlate>`) — the games as one picture, the asker's face
  *     pressed onto it with their name beside it — under "Pin yours".
  *
  * Each is a `useInfiniteQuery` of twenty, keyed apart so going from one to
@@ -95,6 +94,9 @@ export default function PingsScreen() {
   const userId = useAuth((state) => state.session?.user.id) ?? null;
   const [tab, setTab] = useState<PingFeedMode>('for_you');
   const [filters, setFilters] = useState<PingFilters>(NO_PING_FILTERS);
+  /* The board's view: a square a row, or compact rectangles two to a row. */
+  const [compact, setCompact] = useState(false);
+  const compactWidth = Math.floor((contentWidth - BOARD_GAP) / 2);
 
   const unseen = useQuery({
     queryKey: ['pings', 'unseen', userId],
@@ -125,14 +127,14 @@ export default function PingsScreen() {
   const rows = useMemo(() => flattenPages(feed.data?.pages ?? []), [feed.data]);
   const renderItem = useCallback(
     ({ item }: { item: PingFeedRow }) => (
-      <PingPlate
+      <PingCard
         ping={item}
         viewerId={userId}
-        showFamiliarity={tab !== 'mine'}
-        width={contentWidth}
+        width={compact ? compactWidth : contentWidth}
+        compact={compact}
       />
     ),
-    [tab, userId, contentWidth]
+    [userId, contentWidth, compact, compactWidth]
   );
 
   const filtered =
@@ -156,11 +158,24 @@ export default function PingsScreen() {
       <View style={styles.header}>
         {tabRow}
         <View style={[styles.boardHead, { borderBottomColor: theme.border }]}>
-          <Text variant="label" color="textMuted">
+          <Text variant="label" color="textMuted" style={styles.flex}>
             {BOARD_HEAD[tab]}
           </Text>
+          {/* The view, as a collection's layout key: big squares, or
+              compact cards two to a row. */}
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={compact ? 'Show pings as large cards' : 'Show pings compactly'}
+            onPress={() => setCompact((value) => !value)}
+            hitSlop={8}
+            scaleTo={0.9}>
+            <Ionicons
+              name={compact ? 'square-outline' : 'grid-outline'}
+              size={18}
+              color={theme.textSecondary}
+            />
+          </PressableScale>
         </View>
-        <PinYours />
         {tab !== 'mine' && <Filters value={filters} onChange={setFilters} />}
       </View>
     );
@@ -224,8 +239,11 @@ export default function PingsScreen() {
 
     return (
       <PageFlatList
-        /* A list per tab, so each mounts at its top and the bar learns it. */
-        key={tab}
+        /* A list per tab and view, so each mounts at its top and the bar
+           learns it — and `numColumns` cannot change on a mounted list. */
+        key={`${tab}-${compact ? 'grid' : 'cards'}`}
+        numColumns={compact ? 2 : 1}
+        columnWrapperStyle={compact ? styles.boardRow : undefined}
         data={rows}
         keyExtractor={keyOf}
         renderItem={renderItem}
@@ -452,21 +470,28 @@ function BoardSkeleton({ header, width }: { header: React.ReactElement; width: n
   return (
     <PageWithHeader header={header} contentContainerStyle={styles.content}>
       {[0, 1].map((index) => (
+        /* The card's own shape: a square with its corner. */
         <View key={index} style={styles.plateSkeleton}>
-          <Skeleton width={width} height={96} radius={0} />
-          <Skeleton width="45%" height={14} />
-          <Skeleton width="100%" height={42} />
-          <Skeleton width="100%" height={13} />
+          <Skeleton width={width} height={width} radius={18} />
         </View>
       ))}
     </PageWithHeader>
   );
 }
 
+/** Between two compact cards in a row. */
+const BOARD_GAP = Spacing.x12;
+
 const styles = StyleSheet.create({
   content: { paddingHorizontal: Spacing.x16, flexGrow: 1, gap: 0 },
   header: { gap: Spacing.x12, marginBottom: Spacing.x20 },
-  boardHead: { paddingBottom: Spacing.x8, borderBottomWidth: StyleSheet.hairlineWidth },
+  boardHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: Spacing.x8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  boardRow: { gap: BOARD_GAP },
   filters: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
   filterKey: {
     flexDirection: 'row',
@@ -482,8 +507,8 @@ const styles = StyleSheet.create({
   tray: { padding: Spacing.x16, gap: Spacing.x16 },
   trayTitle: { textAlign: 'center' },
   trayActions: { flexDirection: 'row', gap: Spacing.x12 },
-  gap: { height: Spacing.x32 },
+  gap: { height: Spacing.x16 },
   more: { paddingVertical: Spacing.x24, alignItems: 'center' },
   stageSkeleton: { alignItems: 'center', gap: Spacing.x16, paddingTop: Spacing.x12 },
-  plateSkeleton: { gap: Spacing.x12, marginBottom: Spacing.x32 },
+  plateSkeleton: { marginBottom: Spacing.x16 },
 });

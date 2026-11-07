@@ -1,16 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
+import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { Linking, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Animated, { cubicBezier, useReducedMotion } from 'react-native-reanimated';
 
-import { useCardMaterial } from '@/components/ui/card-material';
 import { InfoCard } from '@/components/ui/info-card';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
-import { Spacing, TapTarget, withAlpha } from '@/constants/theme';
+import { Palette, Spacing, TapTarget, withAlpha } from '@/constants/theme';
 import { useAccent } from '@/hooks/use-accent';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -31,8 +31,10 @@ const FOLDED = 400;
 /** Folding a graphic only a little taller than the fold hides a sliver behind a button. */
 const FOLD_SLACK = 96;
 
-/** How tall the fade over the fold is. */
-const FADE = 72;
+/** How tall the fade over the fold is: long, so the graphic dissolves rather than stops. */
+const FADE = 140;
+/** The mask's ink and its foot: only its alpha counts. */
+const MASK_FADE = [Palette.shadowInk, withAlpha(Palette.shadowInk, 0)] as const;
 
 /** Between two images, as Steam stacks them. */
 const IMAGE_GAP = Spacing.x8;
@@ -124,7 +126,6 @@ export function GameAwards({ appId, title }: { appId: string | null; title: stri
  */
 function AwardImages({ images, title }: { images: SteamAwardImage[]; title: string }) {
   const accent = useAccent();
-  const fill = useCardMaterial().fill;
   const reduceMotion = useReducedMotion();
   const [width, setWidth] = useState(0);
   const [open, setOpen] = useState(false);
@@ -143,6 +144,28 @@ function AwardImages({ images, title }: { images: SteamAwardImage[]; title: stri
   const total = sizes.reduce((sum, size) => sum + size.height, 0) + IMAGE_GAP * (images.length - 1);
   const folds = width > 0 && total > FOLDED + FOLD_SLACK;
   const height = folds && !open ? FOLDED : total;
+
+  const stack = (
+    <View style={styles.stack}>
+      {images.map((image, index) => (
+        <Image
+          key={image.url}
+          source={{ uri: image.url }}
+          style={sizes[index]}
+          contentFit="contain"
+          transition={200}
+          accessibilityIgnoresInvertColors
+          onLoad={(event) => {
+            if (image.width && image.height) return;
+            const { width: w, height: h } = event.source;
+            if (w > 0 && h > 0) {
+              setLoaded((known) => ({ ...known, [image.url]: { width: w, height: h } }));
+            }
+          }}
+        />
+      ))}
+    </View>
+  );
 
   const label = [
     images.length === 1
@@ -168,34 +191,25 @@ function AwardImages({ images, title }: { images: SteamAwardImage[]; title: stri
                 transitionTimingFunction: EASE,
               },
             ]}>
-            <View style={styles.stack}>
-              {images.map((image, index) => (
-                <Image
-                  key={image.url}
-                  source={{ uri: image.url }}
-                  style={sizes[index]}
-                  contentFit="contain"
-                  transition={200}
-                  accessibilityIgnoresInvertColors
-                  onLoad={(event) => {
-                    if (image.width && image.height) return;
-                    const { width: w, height: h } = event.source;
-                    if (w > 0 && h > 0) {
-                      setLoaded((known) => ({ ...known, [image.url]: { width: w, height: h } }));
-                    }
-                  }}
-                />
-              ))}
-            </View>
-
-            {folds && !open && (
-              /* Into the card's own colour, from the same colour at nothing —
-                 never `transparent`, which Android fades through black. */
-              <LinearGradient
-                pointerEvents="none"
-                colors={[withAlpha(fill, 0), fill]}
-                style={styles.fade}
-              />
+            {folds && !open ? (
+              /* The folded graphic dissolves into whatever is behind it — a
+                 mask, not a gradient of a colour: on the game page's
+                 Overview there is no card under it, and the page's colour
+                 is not a solid to fade to (it was 'transparent' to
+                 'transparent', so the logo stopped in a hard line over
+                 Show all). */
+              <MaskedView
+                style={styles.masked}
+                maskElement={
+                  <View style={styles.mask}>
+                    <View style={styles.maskWhole} />
+                    <LinearGradient colors={MASK_FADE} style={styles.maskFade} />
+                  </View>
+                }>
+                {stack}
+              </MaskedView>
+            ) : (
+              stack
             )}
           </Animated.View>
         )}
@@ -278,7 +292,10 @@ function SteamAward({ banner }: { banner: SteamAwardBanner }) {
 const styles = StyleSheet.create({
   window: { overflow: 'hidden' },
   stack: { alignItems: 'center', gap: IMAGE_GAP },
-  fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: FADE },
+  masked: { flex: 1 },
+  mask: { flex: 1 },
+  maskWhole: { flex: 1, backgroundColor: Palette.shadowInk },
+  maskFade: { height: FADE },
   toggle: {
     flexDirection: 'row',
     alignItems: 'center',

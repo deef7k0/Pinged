@@ -9,7 +9,7 @@ import {
   type ScrollView,
 } from 'react-native';
 
-import { ActivityRail } from '@/components/activity-rail';
+import { ActivityRail, ActivityRailSkeleton } from '@/components/activity-rail';
 import { CoverRailSkeleton, GameCoverRail } from '@/components/game-rail';
 import { BandError } from '@/components/home/band-error';
 import { HomeChips } from '@/components/home/home-chips';
@@ -21,7 +21,7 @@ import { DiscoverCarousel, DiscoverCarouselSkeleton } from '@/components/home/di
 import { HomeSection } from '@/components/home-section';
 import { ARTICLE_ROW_HEIGHT, ArticleCard, PastEventCard } from '@/components/news-cards';
 import { Arrive, stagger } from '@/components/ui/arrive';
-import { SurpriseEntry } from '@/components/surprise-entry';
+import { PickCards } from '@/components/home/pick-cards';
 import { Button } from '@/components/ui/button';
 import { PageLargeTitle, PageScrollView } from '@/components/ui/page-scroll';
 import { EmptyState, Screen } from '@/components/ui/screen';
@@ -29,11 +29,13 @@ import { Skeleton } from '@/components/ui/surface';
 import { useTabBarClearance } from '@/components/app-tab-bar';
 import { footHeight } from '@/constants/cover-rail';
 import { TOP_BAR_ROW } from '@/constants/top-bar';
-import { HeroAspectRatio, Spacing } from '@/constants/theme';
+import { HeroAspectRatio, Palette, Spacing } from '@/constants/theme';
 import { extractSeedColor } from '@/hooks/use-album-art-color';
 import { useGameColours } from '@/hooks/use-game-colours';
 import { useTopBarInset } from '@/hooks/use-header-height';
-import { useTheme } from '@/hooks/use-theme';
+import { useKeyColor } from '@/hooks/use-key-color';
+import { useColorScheme, useTheme } from '@/hooks/use-theme';
+import { mixOklab } from '@/lib/color';
 import { getHomeActivity, getUserLogs } from '@/lib/api';
 import { startNewRound, useAppRound } from '@/lib/app-round';
 import { recommendFromLogs } from '@/lib/games/recommend';
@@ -173,6 +175,7 @@ function newsCardHeight(width: number): number {
  */
 export default function HomeScreen() {
   const theme = useTheme();
+  const scheme = useColorScheme();
   const clearance = useTabBarClearance();
   const router = useRouter();
   const navigation = useNavigation();
@@ -367,32 +370,10 @@ export default function HomeScreen() {
     ...(upcoming.data ?? []).slice(0, RELEASES_PER_HALF),
   ];
 
-  /*
-   * The two covers behind Surprise Me's face-down card.
-   *
-   * Borrowed from bands this page has already fetched, so the deck is real box
-   * art for the price of a slice — a query of its own would spend a request to
-   * decorate a link. Recommendations first because they are this account's own
-   * games; releases are the fallback for a first run, where there are no
-   * recommendations and the deck would otherwise show two blanks.
-   *
-   * Keyed on the query data rather than on `recommendedGames`/`releaseRail`,
-   * which are fresh arrays every render and would defeat the memo — and with it
-   * `<SurpriseEntry>`'s own, which is the point of memoising here at all.
-   */
-  const deckCovers = useMemo(() => {
-    const pool = recommended.data?.games?.length ? recommended.data.games : (releases.data ?? []);
-    return pool
-      .filter((game) => game.coverUrl)
-      .slice(0, 2)
-      .map((game) => ({ coverUrl: game.coverUrl, heroUrl: game.heroUrl }));
-  }, [recommended.data, releases.data]);
-
   const activityLogs = activity.data?.logs ?? [];
   /* The heading is the row's claim about whose games these are. While the
      first answer is on its way it is the row's own name. */
   const activityTitle = activity.data?.scope === 'everyone' ? 'New on Pinged' : 'New from friends';
-  const personFoot = footHeight('person');
   const lineFoot = footHeight('line');
 
   /*
@@ -423,10 +404,23 @@ export default function HomeScreen() {
     retry: false,
     placeholderData: keepPreviousData,
   });
-  const tone = glowTone(seed.data ? generateDynamicTheme(seed.data, true).primary : null, {
-    gameColours: colours.on,
-    primary: theme.primary,
-  });
+  /* Apple Music's key colour of the same cover, as every game-coloured page
+     reads it now (the owner's, 2026-11-06); the M3 primary × 0.45 stands in
+     until it is read. In the light room the glow is a pale wash of that
+     colour on the white page, and none at all with game colours off. */
+  const glowKey = useKeyColor(seedCover, {});
+  const darkTone =
+    glowKey.bright ??
+    glowTone(seed.data ? generateDynamicTheme(seed.data, true).primary : null, {
+      gameColours: colours.on,
+      primary: Palette.primary,
+    });
+  const tone =
+    scheme === 'light'
+      ? colours.on && darkTone
+        ? mixOklab(darkTone, theme.homeBackground, 0.72)
+        : null
+      : darkTone;
 
   /*
    * The first block's height — the bar's room and the one block of content
@@ -512,7 +506,9 @@ export default function HomeScreen() {
                 this one needs you to already be somewhere. It works on a
                 brand-new account too, which none of the personal bands do.
               */}
-              <SurpriseEntry covers={deckCovers} />
+              {/* Surprise Me and the Top 1000 as BitChord's Top Picks
+                  cards (the owner's, 2026-11-05). */}
+              <PickCards />
             </>
           )}
         </View>
@@ -581,7 +577,7 @@ export default function HomeScreen() {
              */}
             {activity.isLoading ? (
               <HomeSection title={activityTitle}>
-                <CoverRailSkeleton foot={personFoot} inset={Spacing.x16} />
+                <ActivityRailSkeleton />
               </HomeSection>
             ) : activity.isLoadingError ? (
               <HomeSection title={activityTitle}>
@@ -595,7 +591,7 @@ export default function HomeScreen() {
             ) : activityLogs.length > 0 ? (
               <HomeSection title={activityTitle}>
                 <Arrive of={activity.data?.scope}>
-                  <ActivityRail logs={activityLogs} inset={Spacing.x16} />
+                  <ActivityRail logs={activityLogs} />
                 </Arrive>
               </HomeSection>
             ) : null}

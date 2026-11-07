@@ -25,10 +25,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { NavigationBar } from 'expo-navigation-bar';
-import { DarkTheme, Stack, ThemeProvider, router } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -40,6 +40,8 @@ import { Toaster } from '@/components/ui/toast';
 import { PlayerHost } from '@/components/player/player-host';
 import { GameColoursWarmup } from '@/hooks/use-game-colours';
 import { primeSteamArtwork } from '@/hooks/use-steam-artwork';
+import { useChosenColorScheme } from '@/hooks/use-theme';
+import { isColorSchemeLoaded, loadColorScheme, subscribeColorScheme } from '@/lib/color-scheme';
 import { queryClient } from '@/lib/query-client';
 import { forgetRetiredColourStores } from '@/lib/retired-colour-stores';
 import { forgetAppleMusicCache } from '@/lib/soundcloud/legacy';
@@ -54,6 +56,8 @@ import { takeAfterOnboarding, useOnboarding } from '@/store/onboarding';
 export { AppErrorBoundary as ErrorBoundary } from '@/components/app-error-boundary';
 
 SplashScreen.preventAutoHideAsync();
+/* Light or dark, read before the first frame (Settings → Appearance). */
+loadColorScheme();
 
 /** A form that opens over the page: a sheet on iOS, sliding up on Android. */
 const SHEET = { presentation: 'modal', animation: 'slide_from_bottom' } as const;
@@ -65,6 +69,12 @@ export default function RootLayout() {
   const isRestoring = useAuth((state) => state.isRestoring);
   const onboarding = useOnboarding((state) => state.status);
   const onboardingKnown = useOnboarding((state) => state.launchResolved);
+  const schemeKnown = useSyncExternalStore(
+    subscribeColorScheme,
+    isColorSchemeLoaded,
+    isColorSchemeLoaded
+  );
+  const scheme = useChosenColorScheme();
 
   /*
    * Preload the icon font.
@@ -104,7 +114,7 @@ export default function RootLayout() {
    * sign-in later on does not take the whole tree down while it is worked out:
    * the onboarding route draws a holding page for that moment instead.
    */
-  const ready = !isRestoring && onboardingKnown && (fontsLoaded || !!fontError);
+  const ready = !isRestoring && onboardingKnown && schemeKnown && (fontsLoaded || !!fontError);
 
   // Hold the splash screen until we know whether there is a session, otherwise
   // the sign-in screen flashes before the feed for an already-signed-in user.
@@ -163,8 +173,8 @@ export default function RootLayout() {
       */}
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
-          <ThemeProvider value={DarkTheme}>
-            <StatusBar style="light" />
+          <ThemeProvider value={scheme === 'light' ? DefaultTheme : DarkTheme}>
+            <StatusBar style={scheme === 'light' ? 'dark' : 'light'} />
             {/*
               Android's navigation bar: light keys, nothing behind them. The
               window is edge-to-edge, so the app already draws under the bar;
@@ -174,7 +184,7 @@ export default function RootLayout() {
               longer does (`<AppTabBar>` floats). Expo Go applies no config
               plugins, so there the system may still draw its scrim.
             */}
-            <NavigationBar style="light" />
+            <NavigationBar style={scheme === 'light' ? 'dark' : 'light'} />
 
             {/*
             No native header, anywhere.

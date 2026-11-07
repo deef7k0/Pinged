@@ -15,7 +15,7 @@ import { PageFlatList } from '@/components/ui/page-scroll';
 import { EmptyState, ErrorState, LoadingState, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
 import { Spacing } from '@/constants/theme';
-import { AccentProvider, useGameAccent } from '@/hooks/use-accent';
+import { AccentProvider, useGameAccent, DarkRoom } from '@/hooks/use-accent';
 import {
   cacheGameAchievements,
   getAchievementsForGame,
@@ -26,7 +26,7 @@ import { getGameById, isSteamAchievementSyncAvailable, parseGameId } from '@/lib
 import { useAuth } from '@/store/auth';
 import { toast } from '@/lib/toast';
 
-export default function AchievementsScreen() {
+function AchievementsScreen() {
   const queryClient = useQueryClient();
   const { id } = useLocalSearchParams<{ id: string }>();
   const userId = useAuth((state) => state.session?.user.id);
@@ -205,3 +205,12 @@ const styles = StyleSheet.create({
   emptyContent: { flexGrow: 1 },
   column: { gap: MEDALLION_GAP },
 });
+
+/** A game's room: dark in either setting (Settings → Appearance). */
+export default function AchievementsScreenRoute() {
+  return (
+    <DarkRoom>
+      <AchievementsScreen />
+    </DarkRoom>
+  );
+}

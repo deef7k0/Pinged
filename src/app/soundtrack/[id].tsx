@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/surface';
 import { Text } from '@/components/ui/text';
 import { ArtRowWindow } from '@/constants/list-window';
 import { Radius, Spacing } from '@/constants/theme';
-import { AccentProvider, useAccent } from '@/hooks/use-accent';
+import { AccentProvider, useAccent, DarkRoom } from '@/hooks/use-accent';
 import { useGameSoundtrack } from '@/hooks/use-game-soundtrack';
 import { useDiscRoom } from '@/hooks/use-header-height';
 import { useTheme } from '@/hooks/use-theme';
@@ -74,7 +74,7 @@ const ROW_KEY = 36;
  *
  * One game, so `<AccentProvider>`, like its page, its log form and its review.
  */
-export default function SoundtrackScreen() {
+function SoundtrackScreen() {
   const params = useLocalSearchParams<{ id: string; title?: string; play?: string }>();
   const id = params.id;
 
@@ -717,3 +717,12 @@ const styles = StyleSheet.create({
   },
   dimmed: { opacity: 0.45 },
 });
+
+/** A game's room: dark in either setting (Settings → Appearance). */
+export default function SoundtrackScreenRoute() {
+  return (
+    <DarkRoom>
+      <SoundtrackScreen />
+    </DarkRoom>
+  );
+}

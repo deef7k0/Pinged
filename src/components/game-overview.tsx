@@ -110,7 +110,6 @@ export function RatingsAndReviews({
           <ReviewBox
             log={top.log}
             likes={top.likes}
-            comments={top.comments}
             likedByViewer={top.likedByViewer}
             width={width - inset * 2}
           />
@@ -133,14 +132,12 @@ const TOP_CANDIDATES = 5;
 export function ReviewBox({
   log,
   likes = 0,
-  comments = 0,
   likedByViewer = false,
   width,
   showGame = false,
 }: {
   log: ReviewListItem['log'];
   likes?: number;
-  comments?: number;
   likedByViewer?: boolean;
   width: number;
   showGame?: boolean;
@@ -206,7 +203,7 @@ export function ReviewBox({
           )}
         </View>
 
-        {(likes > 0 || comments > 0) && (
+        {likes > 0 && (
           <View style={styles.boxFoot}>
             {likes > 0 && (
               <View style={styles.count}>
@@ -217,14 +214,6 @@ export function ReviewBox({
                 />
                 <Text variant="bodySmall" color="textSecondary">
                   {likes.toLocaleString()}
-                </Text>
-              </View>
-            )}
-            {comments > 0 && (
-              <View style={styles.count}>
-                <Ionicons name="chatbubble" size={12} color={theme.textSecondary} />
-                <Text variant="bodySmall" color="textSecondary">
-                  {comments.toLocaleString()}
                 </Text>
               </View>
             )}

@@ -1,36 +1,26 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { memo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
-import { AddToCollection } from '@/components/add-to-collection';
+import { PORTRAIT_COLUMNS, gridItemWidth } from '@/components/gaming/game-tile';
 import { ReportFlag } from '@/components/report-flag';
 import { Avatar } from '@/components/ui/avatar';
-import { cardShape, CARD_GAP, CARD_INSET, useCardMaterial } from '@/components/ui/card-material';
+import { showAlert } from '@/components/ui/dialog';
 import { Poster } from '@/components/ui/poster';
 import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Text } from '@/components/ui/text';
-import { KEY_GROUP_GAP, TonalKey, keyPosition } from '@/components/ui/tonal-key';
-import { Radius, Spacing } from '@/constants/theme';
+import { Tray } from '@/components/ui/tray';
+import { Spacing, Typeface } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import {
-  getListMembership,
-  setSuggestionInteresting,
-  toggleSingletonMembership,
-  withdrawSuggestion,
-  type PingSuggestion,
-} from '@/lib/api';
+import { setSuggestionInteresting, withdrawSuggestion, type PingSuggestion } from '@/lib/api';
 import { displayNameFor, timeAgoPosted } from '@/lib/format';
-import { getGameById, type Game } from '@/lib/games';
 import { suggestedBy, type SuggestionGroup } from '@/lib/pings';
+import { toast } from '@/lib/toast';
 import { useAuth } from '@/store/auth';
-import { showAlert } from '@/components/ui/dialog';
-import { listToastFor, toast } from '@/lib/toast';
 
-/** The suggested game's box, at the head of its card. */
-const COVER = 64;
 /** A suggester's face beside their words. */
 const FACE = 24;
 
@@ -49,39 +39,157 @@ const FACE = 24;
  * `set_ping_suggestion_interesting`); a suggester can take theirs back; and
  * anybody else can report one.
  */
-export const SuggestionGroupCard = memo(function SuggestionGroupCard({
-  group,
+/**
+ * A ping's suggestions as a grid of covers, three across — a collection's
+ * (the owner's, 2026-11-05): the answer and the owner's starred ones wear a
+ * mark in the corner, and a game suggested by several people says how many.
+ * A cover opens a small sheet (`<SuggestionSheet>`): the cover, the game's
+ * details beside it, and under them each person who suggested it and why.
+ * The game page's Wishlist · Favourite · Log · Collect keys that were under
+ * each card are gone — "those are from the old app style".
+ */
+export function SuggestionGrid({
+  groups,
   isOwner,
   pingId,
 }: {
-  group: SuggestionGroup<PingSuggestion>;
-  /** The viewer asked: they may star reasons. */
+  groups: readonly SuggestionGroup<PingSuggestion>[];
   isOwner: boolean;
   pingId: string;
 }) {
-  const theme = useTheme();
-  const router = useRouter();
-  const material = useCardMaterial();
-  const game = group.suggestions[0].game;
-  const title = game?.title ?? 'A game';
-  const names = group.suggestions.map((suggestion) => displayNameFor(suggestion.profile));
-  const meta = [game?.developer, game?.release_year].filter(Boolean).join(' · ');
-  const openGame = () => router.push({ pathname: '/game/[id]', params: { id: group.gameId } });
+  const { width } = useWindowDimensions();
+  const [open, setOpen] = useState<string | null>(null);
+  /* The page pads itself by the app's margin; three across inside it. */
+  const tile = gridItemWidth(width, PORTRAIT_COLUMNS, Spacing.x16, GRID_GAP);
+  const current = groups.find((group) => group.gameId === open) ?? null;
 
   return (
-    <View
-      style={[
-        cardShape,
-        styles.card,
-        { backgroundColor: material.fill, borderColor: material.edge },
-      ]}>
+    <>
+      <View style={styles.grid}>
+        {groups.map((group) => (
+          <SuggestionTile
+            key={group.gameId}
+            group={group}
+            width={tile}
+            onOpen={() => setOpen(group.gameId)}
+          />
+        ))}
+      </View>
+      <Tray visible={current !== null} onClose={() => setOpen(null)}>
+        {current && (
+          <SuggestionSheet
+            group={current}
+            isOwner={isOwner}
+            pingId={pingId}
+            onLeave={() => setOpen(null)}
+          />
+        )}
+      </Tray>
+    </>
+  );
+}
+
+const GRID_GAP = Spacing.x8;
+
+const SuggestionTile = memo(function SuggestionTile({
+  group,
+  width,
+  onOpen,
+}: {
+  group: SuggestionGroup<PingSuggestion>;
+  width: number;
+  onOpen: () => void;
+}) {
+  const theme = useTheme();
+  const game = group.suggestions[0].game;
+  const title = game?.title ?? 'A game';
+  const count = group.suggestions.length;
+  const names = group.suggestions.map((suggestion) => displayNameFor(suggestion.profile));
+
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel={[
+        title,
+        group.solved ? 'the answer' : group.interesting ? 'worth a look' : null,
+        suggestedBy(names),
+      ]
+        .filter(Boolean)
+        .join('. ')}
+      accessibilityHint="Shows who suggested it and why"
+      onPress={onOpen}
+      scaleTo={0.95}>
+      <Poster
+        coverUrl={game?.cover_url}
+        heroUrl={game?.hero_url}
+        title={title}
+        width={width}
+        rounded="image"
+        zoomable={false}
+      />
+      {(group.solved || group.interesting) && (
+        <View style={[styles.corner, styles.cornerStart, { backgroundColor: theme.background }]}>
+          <Ionicons
+            name={group.solved ? 'checkmark-circle' : 'star'}
+            size={16}
+            color={group.solved ? theme.primaryText : theme.scoreMid}
+          />
+        </View>
+      )}
+      {count > 1 && (
+        <View style={[styles.corner, styles.cornerEnd, { backgroundColor: theme.background }]}>
+          <Text variant="caption" style={styles.countText}>
+            ×{count}
+          </Text>
+        </View>
+      )}
+    </PressableScale>
+  );
+});
+
+/**
+ * One suggested game, small: its cover with what it is beside it — the
+ * answer or worth a look, the name, who made it and when — and a way to its
+ * page; under them, everybody who suggested it, with their reason.
+ */
+function SuggestionSheet({
+  group,
+  isOwner,
+  pingId,
+  onLeave,
+}: {
+  group: SuggestionGroup<PingSuggestion>;
+  isOwner: boolean;
+  pingId: string;
+  onLeave: () => void;
+}) {
+  const theme = useTheme();
+  const router = useRouter();
+  const game = group.suggestions[0].game;
+  const title = game?.title ?? 'A game';
+  const meta = [game?.developer, game?.release_year].filter(Boolean).join(' · ');
+  const names = group.suggestions.map((suggestion) => displayNameFor(suggestion.profile));
+  const openGame = () => {
+    onLeave();
+    router.push({ pathname: '/game/[id]', params: { id: group.gameId } });
+  };
+
+  return (
+    <ScrollView contentContainerStyle={styles.sheet} showsVerticalScrollIndicator={false}>
       <View style={styles.head}>
         <PressableScale
           accessibilityRole="link"
           accessibilityLabel={`Open ${title}`}
           onPress={openGame}
           scaleTo={0.96}>
-          <Poster coverUrl={game?.cover_url} heroUrl={game?.hero_url} title={title} width={COVER} />
+          <Poster
+            coverUrl={game?.cover_url}
+            heroUrl={game?.hero_url}
+            title={title}
+            width={SHEET_COVER}
+            rounded="image"
+            zoomable={false}
+          />
         </PressableScale>
         <View style={styles.billing}>
           {(group.solved || group.interesting) && (
@@ -94,32 +202,47 @@ export const SuggestionGroupCard = memo(function SuggestionGroupCard({
               )}
             </View>
           )}
-          <PressableScale accessibilityRole="link" onPress={openGame} scaleTo={0.98}>
-            <Text variant="h4" numberOfLines={2}>
-              {title}
-            </Text>
-          </PressableScale>
+          <Text variant="h3" numberOfLines={3}>
+            {title}
+          </Text>
           {meta ? (
-            <Text variant="bodySmall" color="textSecondary" numberOfLines={1}>
+            <Text variant="bodySmall" color="textSecondary" numberOfLines={2}>
               {meta}
             </Text>
           ) : null}
           <Text variant="caption" color="textMuted" numberOfLines={2}>
             {suggestedBy(names)}
           </Text>
+          <PressableScale
+            accessibilityRole="link"
+            onPress={openGame}
+            scaleTo={0.97}
+            style={StyleSheet.flatten(styles.openGame)}>
+            <Text variant="h5" style={{ color: theme.primaryText }}>
+              Open the game
+            </Text>
+            <Ionicons name="chevron-forward" size={14} color={theme.primaryText} />
+          </PressableScale>
         </View>
       </View>
 
       <View style={styles.reasons}>
         {group.suggestions.map((suggestion) => (
-          <Reason key={suggestion.id} suggestion={suggestion} isOwner={isOwner} pingId={pingId} />
+          <Reason
+            key={suggestion.id}
+            suggestion={suggestion}
+            isOwner={isOwner}
+            pingId={pingId}
+            onLeave={onLeave}
+          />
         ))}
       </View>
-
-      <GameActions gameId={group.gameId} title={title} />
-    </View>
+    </ScrollView>
   );
-});
+}
+
+/** The sheet's cover: a third of a phone, beside the game's details. */
+const SHEET_COVER = 112;
 
 function Badge({
   icon,
@@ -145,10 +268,13 @@ function Reason({
   suggestion,
   isOwner,
   pingId,
+  onLeave,
 }: {
   suggestion: PingSuggestion;
   isOwner: boolean;
   pingId: string;
+  /** The sheet it is in closing, before a screen or a dialog opens over it. */
+  onLeave?: () => void;
 }) {
   const theme = useTheme();
   const router = useRouter();
@@ -183,6 +309,7 @@ function Reason({
   });
 
   function askWithdraw() {
+    onLeave?.();
     showAlert(
       'Take back your suggestion?',
       `${suggestion.game?.title ?? 'It'} comes off this ping.`,
@@ -199,9 +326,10 @@ function Reason({
         <PressableScale
           accessibilityRole="link"
           accessibilityLabel={`${name}’s profile`}
-          onPress={() =>
-            router.push({ pathname: '/profile/[id]', params: { id: suggestion.user_id } })
-          }
+          onPress={() => {
+            onLeave?.();
+            router.push({ pathname: '/profile/[id]', params: { id: suggestion.user_id } });
+          }}
           hitSlop={8}
           scaleTo={0.96}
           style={StyleSheet.flatten(styles.who)}>
@@ -253,6 +381,7 @@ function Reason({
           }}
           authorId={suggestion.user_id}
           label={`Report ${name}’s suggestion`}
+          onBeforeOpen={onLeave}
         />
       </View>
       {message ? (
@@ -273,128 +402,23 @@ function Reason({
   );
 }
 
-/**
- * Wishlist · Favourite · Log · Collect — the game page's connected keys, for a
- * game the reader was just told about. The full game is fetched only when a
- * key needs it (`['game', id]`, the game page's own key, so a game already
- * opened costs nothing).
- */
-function GameActions({ gameId, title }: { gameId: string; title: string }) {
-  const theme = useTheme();
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const userId = useAuth((state) => state.session?.user.id) ?? null;
-  const [collecting, setCollecting] = useState<Game | null>(null);
-
-  const membership = useQuery({
-    queryKey: ['list-membership', userId, gameId],
-    queryFn: () => getListMembership(userId!, gameId),
-    enabled: !!userId,
-  });
-
-  const loadGame = async (): Promise<Game> => {
-    const game = await queryClient.fetchQuery({
-      queryKey: ['game', gameId],
-      queryFn: ({ signal }) => getGameById(gameId, signal),
-      staleTime: 30 * 60_000,
-    });
-    if (!game) throw new Error(`Could not load ${title}.`);
-    return game;
-  };
-
-  const toggle = useMutation({
-    mutationFn: async ({ kind, next }: { kind: 'favorites' | 'wishlist'; next: boolean }) => {
-      if (!userId) throw new Error('You must be signed in.');
-      await toggleSingletonMembership(userId, kind, await loadGame(), next);
-    },
-    onSuccess: (_result, { kind, next }) => {
-      toast.success(listToastFor(kind, next));
-      void queryClient.invalidateQueries({ queryKey: ['list-membership', userId, gameId] });
-      void queryClient.invalidateQueries({ queryKey: ['favorites', userId] });
-      void queryClient.invalidateQueries({ queryKey: ['lists', userId] });
-      void queryClient.invalidateQueries({ queryKey: ['game-audience', gameId] });
-    },
-  });
-
-  const collect = useMutation({
-    mutationFn: loadGame,
-    onSuccess: (game) => setCollecting(game),
-  });
-
-  if (!userId) return null;
-  const busyKind = toggle.isPending ? toggle.variables?.kind : undefined;
-  const wishlisted = membership.data?.wishlisted ?? false;
-  const favorited = membership.data?.favorited ?? false;
-
-  const keys = [
-    {
-      icon: 'bookmark' as const,
-      outline: 'bookmark-outline' as const,
-      label: 'Wishlist',
-      active: wishlisted,
-      busy: busyKind === 'wishlist' || membership.isLoading,
-      onPress: () => toggle.mutate({ kind: 'wishlist', next: !wishlisted }),
-    },
-    {
-      icon: 'star' as const,
-      outline: 'star-outline' as const,
-      label: 'Favourite',
-      active: favorited,
-      busy: busyKind === 'favorites' || membership.isLoading,
-      onPress: () => toggle.mutate({ kind: 'favorites', next: !favorited }),
-    },
-    {
-      icon: 'checkmark-circle' as const,
-      outline: 'checkmark-circle-outline' as const,
-      label: 'Log',
-      active: undefined,
-      busy: false,
-      onPress: () => router.push({ pathname: '/log/[id]', params: { id: gameId } }),
-    },
-    {
-      icon: 'albums' as const,
-      outline: 'albums-outline' as const,
-      label: 'Add to a collection',
-      active: undefined,
-      busy: collect.isPending,
-      onPress: () => collect.mutate(),
-    },
-  ];
-
-  const error = toggle.error ?? collect.error;
-
-  return (
-    <View style={styles.actions}>
-      <View style={styles.keys}>
-        {keys.map((key, index) => (
-          <View key={key.label} style={styles.key}>
-            <TonalKey
-              icon={key.icon}
-              outline={key.outline}
-              active={key.active}
-              busy={key.busy}
-              label={`${key.label}: ${title}`}
-              caption={key.label === 'Log' ? 'Log' : undefined}
-              onPress={key.onPress}
-              position={keyPosition(index, keys.length)}
-            />
-          </View>
-        ))}
-      </View>
-      {error && (
-        <Text variant="bodySmall" style={{ color: theme.danger }}>
-          {error instanceof Error ? error.message : 'That didn’t work. Try again.'}
-        </Text>
-      )}
-      {collecting && (
-        <AddToCollection game={collecting} visible onClose={() => setCollecting(null)} />
-      )}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  card: { padding: CARD_INSET, gap: CARD_GAP },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
+  corner: {
+    position: 'absolute',
+    top: 6,
+    minWidth: 24,
+    height: 24,
+    paddingHorizontal: 5,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cornerStart: { left: 6 },
+  cornerEnd: { right: 6 },
+  countText: { fontFamily: Typeface.semibold },
+  sheet: { padding: Spacing.x16, gap: Spacing.x16 },
+  openGame: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: Spacing.x8 },
   head: { flexDirection: 'row', gap: Spacing.x12, alignItems: 'flex-start' },
   billing: { flex: 1, minWidth: 0, gap: 3 },
   badges: { flexDirection: 'row', gap: Spacing.x8, marginBottom: 2 },
@@ -409,7 +433,4 @@ const styles = StyleSheet.create({
   who: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x8, flexShrink: 1, minWidth: 0 },
   name: { flexShrink: 1 },
   spacer: { flex: 1 },
-  actions: { gap: Spacing.x8 },
-  keys: { flexDirection: 'row', gap: KEY_GROUP_GAP, borderRadius: Radius.pill },
-  key: { flex: 1 },
 });

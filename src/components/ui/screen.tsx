@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { BlurTargetView } from 'expo-blur';
+import { StatusBar } from 'expo-status-bar';
 import { isValidElement, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
@@ -12,7 +13,7 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useHeaderHeight } from '@/hooks/use-header-height';
 import { ScreenChromeProvider, useScreenChrome } from '@/hooks/use-screen-chrome';
 import { useSharedValue } from 'react-native-reanimated';
-import { useTheme } from '@/hooks/use-theme';
+import { useColorScheme, useTheme } from '@/hooks/use-theme';
 import { useMiniPlayerActive } from '@/store/player';
 import { Loader } from '@/components/ui/loader';
 
@@ -111,6 +112,7 @@ export function Screen({
   miniPlayer = true,
 }: ScreenProps) {
   const theme = useTheme();
+  const scheme = useColorScheme();
   const headerHeight = useHeaderHeight(modal);
   const insets = useSafeAreaInsets();
 
@@ -171,6 +173,9 @@ export function Screen({
       largeSubtitle={largeTitle ? (barProps?.subtitle ?? null) : null}>
       {({ blurTargetRef }) => (
         <View style={styles.flex}>
+          {/* The status bar's keys for this page's room: a game's page is
+              dark in light mode too. The last mounted page wins. */}
+          {modal ? null : <StatusBar style={scheme === 'light' ? 'dark' : 'light'} />}
           {/*
             Everything the top bar is allowed to blur, and nothing else.
 

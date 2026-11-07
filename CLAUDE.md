@@ -2501,6 +2501,10 @@ screen too. The smoothnes of it"):
 
 ## Review cards
 
+> **Superseded for lists (2026-11-06)**: `<LogCard>` is the coloured card —
+> § The coloured review card. What follows about `<LogCard>`'s layout is
+> history; `<MemberReviewCard>` and the card material still hold.
+
 **Two styles, and where each goes is the rule.** A review in a *list of
 reviews about many games* is `<LogCard>`; a review on *a game's own screens* is
 `<MemberReviewCard>`.
@@ -2657,6 +2661,54 @@ reviews about many games* is `<LogCard>`; a review on *a game's own screens* is
   were measured pixel by pixel (their page is `#14171C` and their card
   `#1B1F28` exactly, which is where the owner's two hexes come from). Nothing
   about either has been judged on a device.
+
+## The coloured review card: the only one in lists (2026-11-06)
+
+The owner, after Apple News's cards: a review in a list is the game's
+landscape art at the top, fading into **the art's own key colour**
+(`useArtGround`, `hooks/use-key-color` — the game page's reader, the colour
+darkened until the quiet ink holds AA), with the review, the score and the
+writer in white on that colour (`<ReviewLandscapeCard>`, inside `<DarkRoom>`
+so its inks are the dark room's in either setting). `<LogCard>` draws it at
+its list's width; Home's and Explore's rails draw it directly. **The poster
+card (`review-poster-card`), the classic card and Settings → Review cards
+are deleted** ("only keep the new colored card"); `<PosterTitle>` lives in
+`components/poster-title` and has a `forCapture` mode (React Native's
+`<Image>`) for shared images. Home's "Latest events" cards
+(`<PastEventCard>`) are the same look. A non-IGDB picture, or game colours
+off, gives the dark card grey.
+
+**Friends who played it** (`<FriendsPlayedRow>`, `components/friends-played`,
+`getFriendsWhoPlayed`, `['friends-played', gameId, viewerId]` — a follow
+invalidates it): under "Developed by" in the game page's header, Letterboxd's
+"May and 12 other friends watched this" — faces, the sentence, a chevron —
+opening a sheet of every circle member's log, newest first: face, name, the
+score and its word, six lines of the review (a spoiler is a pill to tap),
+likes, replies, the date.
+
+**Two more shared images** (`components/review-share-art-cards`), first in
+the share sheet: **Colour** (the card above as an image: swatches, Title, My
+rating, The review, My profile) and **Poster**, Muvy's — the box art centred
+(or beside the words) in a frame of 9:16, 4:5, 1:1 or 16:9 (16:9 is always
+beside), the game's art over the top or the whole frame (Full background),
+under a Dynamic colour, Blur or Black overlay, with Intensity (the art's
+blur) and Opacity (the overlay's strength). Both are PNGs of the card alone,
+transparent round its rounded corners.
+
+**The friends sheet is one of the game page's `<GameSheets>`** (`'friends'`),
+opened by the row through `onOpenFriends`: mounted inside the header it was
+laid out there, scrolled with it, and nested its list in the page's scroller.
+
+**No comments on a collection's page or a review's page** (the owner's,
+2026-11-06): `<CommentSection>` and the docked `<ReplyComposer>` are gone
+from `list/[id]` and `review/[id]`, and **no reply count or reply glyph is
+drawn on a game's screens** — `<MemberReviewCard>` and `<ReviewBox>` lost
+their `comments` prop (the Overview's review, the reviews sheet, Surprise
+Me's, Explore's and Search's boxes), and the friends sheet shows likes only.
+The comment thread route and the components remain, and nothing was dropped
+from the database.
+
+**Not seen on a phone.** Types, lint, `npm test` pass.
 
 ## A review in one sentence, and its image
 
@@ -3986,10 +4038,11 @@ and the event page's foot bar are all for a device.
   progress sheet or Surprise Me invalidates `['pings', 'for_you']`, because
   what you have played is For You's ranking.
 - **Colours**: always `useTheme()`. Never hardcode a hex in a component; add the
-  token to `Colors.dark` in `constants/theme.ts` — that object is the entire
-  palette. There is no `Colors.light`: `APP_SCHEME` is `'dark'` and `useTheme()`
-  returns `Colors[APP_SCHEME]`. This app is a dark room by design and a light
-  counterpart would be a second product.
+  token to the dark palette in `constants/theme.ts`, and to `LIGHT` if it sits
+  on the page. There are two rooms now — § Light mode — and `useTheme()`
+  returns the one in force. `Palette` is the dark room as a constant: only for
+  what is drawn the same in both (type and scrims over artwork, the poster
+  screens, the share card, a game's room).
 - **The room is dark; the light comes from the games in it.** The chrome is a
   near-black and grey — surfaces, rules, body copy — and every control
   rests on it neutral; the house accent appears only on what is selected,
@@ -4898,10 +4951,8 @@ and the event page's foot bar are all for a device.
   reads the strip's query under the strip's key and arguments, so it is one
   request — diverge and it is two.
 - **The game page after its critique (2026-10-21)**, by the owner's answers:
-  - **The tabs pin under the bar** once the page has scrolled them up to it
-    (`<PinnedTabBar>`, `ui/pinned-tab-bar`): a second copy over the page,
-    shown from the in-flow tabs' measured top on the UI thread, hidden from
-    a screen reader. Choosing a tab there scrolls the new tab to its start.
+  - **The tabs no longer pin under the bar** (the owner's, 2026-11-05):
+    `<PinnedTabBar>` is deleted; the tabs scroll with the page.
   - **The progress key says "Log" until there is a log** (`TonalKey`'s
     `caption`) — the one printed word in the group, the owner's exception to
     the keys being glyphs alone. A key with no `active` (Collect) announces
@@ -6593,6 +6644,206 @@ stays, and a red row opening `showPrompt` for the username).
   profile.
 
 **Not seen on a phone.** Types, lint, `npm test` (1,100) pass.
+
+## Small rulings of 2026-11-05
+
+- **On Pinged is three squares**, as Where to buy draws its stores: a glyph
+  on the game's `primaryContainer`, and under it what it counts
+  ("Wishlisted", "Playing now", "Played") and how many people. A `<Section>`,
+  no longer a `<Panel>`.
+- **The Awards fold dissolves through a mask** (`MaskedView`, 140dp), not a
+  gradient to the card's fill: on the cardless Overview that fill is
+  `'transparent'`, so the old fade drew nothing and the graphic stopped in a
+  line over Show all.
+- **The game page's tabs no longer pin under the bar** — `<PinnedTabBar>`
+  and `<TabBar floating>` are deleted (the owner's, later the same day).
+- **Pin yours is gone from the Pings tab** (`<PinYours>` deleted); the bar's
+  + is the way to ask.
+- **Skia paths are built with `Skia.PathBuilder`** (`triangle()` in
+  `pick-art`): `SkPath`'s moveTo / lineTo / close warn as deprecated.
+- **A studio and a collection have the game page's blur**: `<PinnedHero
+  band>` from `BAND.lead` above the name to **the art's foot**, where the
+  solid part starts — the game page's (title off) length. For one build the
+  band ran on into half a tail of stretched art under the foot (`shownTail`,
+  deleted); the owner called it "the super long stretched one": "the one
+  like the game page without logo, small". No tail shows under their art.
+- The modal ✓'s store is `lib/confirm-slot.ts` (a require cycle between
+  `use-screen-chrome` and `use-bar-confirm` was the warning at launch); the
+  calendar's drag transform and its month's entering animation are on two
+  views (Reanimated warned a layout animation would overwrite the transform).
+
+- **Home's "New from friends" puts the writer on the cover**
+  (`<CoverRail overlayOf>`): a black fade over the cover's foot, the face,
+  the name and the score in its ramp. Nothing under the cover now.
+- **Explore's Popular reviews are `<ReviewLandscapeCard>`**: the poster
+  card as a smaller rectangle — 16:9 art with the logo on its foot, then on
+  the card three lines, the score and the writer. `<ReviewBox>` stays the
+  game page's.
+- **A ping on the board is `<PingCard>`** (`<PingPlate>` is deleted): the
+  Explore carousel card's layout, no parallax — the first game's landscape
+  art (`usePosterArt`) filling a square, a disc counting the games at the
+  top left, two small lines of the request and the asker at the foot; with
+  no games, a plain card of the request in large type. A key beside the
+  board's heading switches to compact cards, two to a row (1:1.32). Unplayed
+  reference games are no longer greyed on the board; the spotlight keeps it.
+
+- **A ping's suggestions are a grid of covers, three across**
+  (`<SuggestionGrid>`): a mark in the corner for the answer or a starred
+  one, "×3" when several people suggested it. A cover opens a tray — the
+  cover, the game's details and "Open the game" beside it, then each
+  suggester and their reason, with the owner's star, Take back and Report.
+  The Wishlist · Favourite · Log · Collect keys are gone. The tray closes
+  itself before anything opens over it (`ReportFlag onBeforeOpen`).
+- **Home's "New from friends" is `<ReviewLandscapeCard>`s** in a snapping
+  row (`<ActivityRail>`), as Explore's Popular reviews; the covers with the
+  writer on their foot are gone. `<CoverRail overlayOf>` has no caller now.
+- **Surprise Me and the Top 1000 are BitChord's Top Picks cards on Home**
+  (`<PickCards>`, `components/home/pick-art`, colours in
+  `constants/pick-art`; read from `TopPicksShelf.kt`): two 3:4 cards side by
+  side, a 12 corner and a rim, BitChord's caption (eyebrow, title, line).
+  Surprise Me draws the personal station — nested arrows folding — and the
+  Top 1000 the discovery station — a fan of shards sweeping — as Skia paths
+  on one nine-second UI-thread loop, still under Reduce Motion, off Home or
+  in the background; a build without Skia gets the station's gradient. They
+  replace `<SurpriseEntry>`'s deck on Home, and `<TopChartEntry>` left
+  Explore; both components have no caller now.
+- **A profile's Reviews tab has an order and a card**: a "Sort by" pull-down
+  (newest, oldest, highest, lowest score — unscored last — title; a view,
+  not written) and a key switching between the list card and
+  `<ReviewLandscapeCard>`. Neither is kept between visits.
+
+Not seen on a phone.
+
+## Apple Music's key colour: the game page's page (2026-11-05)
+
+The owner: "the apple music styled background color picker we used to have
+in the game page", tried beside Material 3 and then made the only one: "Keep
+the apple music by default and remove the material one." `lib/key-color.ts`,
+its test and fixtures and `hooks/use-key-color.ts` are restored from
+`c1a0e8f` (2026-10-23) — this reverses, for the game page's *page colour
+only*, § One colour method's "removed, and not to be rebuilt". The game
+page's `page` (`<Screen background>`, `<PageFill>`, the pinned hero's drain)
+is the cover's key colour (`keyPage`'s bright tone, read off the cover's
+`t_cover_small`, so a trailer does not repaint it); the controls, cards and
+inks stay the cover's M3 scheme, whose page stands in until the colour is
+read and with game colours off. There is no setting.
+
+- **Saturation is not capped.** A cap (`MAX_PAGE_CHROMA`, 0.08 Oklab chroma)
+  was tried for one build on 2026-11-05 and the owner had it taken back: "go
+  back to the old saturation". Only brightness is capped
+  (`MAX_BRIGHT_LUMINANCE`).
+- `immersive-color`'s Oklab helpers it needed live in `lib/color.ts`
+  (`toOklab`, `fromOklab`, `linearToOklab`, `towardBlack`).
+- The old scroll darkening (`<Screen tone>`) and `<KeyColorHero>` were not
+  restored.
+
+**The game page waits for its cover and blur** (the owner's: "doesnt load
+until the blur loads, and make that the very first thing that must load
+along with the portrait"). `<PinnedHero onReady>` fires once the art is in
+and, where Convx's blur is drawn, the blur has its picture (or the art
+failed). Until then and the key colour is read, the page shows the loader
+on its colour, the words are laid out unseen (the band is measured from
+them), the tabs are not mounted, and the trailer's autoplay does not count;
+after `HERO_WAIT_MS` (6 s) it shows anyway. **Then the rest** (the owner's,
+the same day: "the header loads first… show it and THEN load the remaining
+stuff in the overview tab"): the tabs, their content and `<GameSheets>`
+(the critics' lookup) mount only once the header has finished fading in
+(`PINNED_HERO.arriveMs`), a small loader under the tab row meanwhile; the
+animated cover is neither looked up nor decoded into the blur until the
+header is up. Not seen on a phone.
+
+## Light mode, and the key colour on every game's room (2026-11-06)
+
+The owner's: "make a Light mode for the app instead of black, with the
+setting to turn it on/off for dark or light" — and, the same message, "use
+the apple color picker in every part of the app that uses the game's color".
+This reverses "there is no `Colors.light`… a second product".
+
+- **Settings → Appearance**, Dark or Light (`<Segmented>`). Dark is the
+  default. Kept **per device**, not per account (`lib/color-scheme`, a module
+  store in AsyncStorage): the welcome screen is drawn signed out, and the root
+  layout holds the splash until it is read (`isColorSchemeLoaded`), so the
+  first frame is already in the chosen room.
+- **`useTheme()` is `Colors[useColorScheme()]`**, a store read
+  (`useSyncExternalStore`). `useColorScheme()` is a subtree's override, else
+  the setting; `useChosenColorScheme()` is the setting alone.
+- **The light room is iOS's light colours** (`LIGHT` in `constants/theme`):
+  page `#FFFFFF`, cards and grouped lists `#F2F2F7`, controls a step
+  *darker* (`#E5E5EA`, `#D9D9DE`), translucent fills of iOS's grey, black as
+  the primary (white type on it), and deeper twins of every meaning hue — the
+  dark room's pastels are under 3:1 on white. `white`, `shadowInk`, the scrim,
+  the poster and share colours are the dark room's: they are drawn over art
+  or into images. `theme-light.test.ts` holds every ink at AA on every step,
+  every meaning hue at 3:1, and the ladder darkening.
+- **A game's room stays dark in light mode**, as Apple TV's product pages
+  do: `<AccentProvider>` sets the dark scheme for its subtree, and the routes
+  that read the theme above their own provider are wrapped in `<DarkRoom>`
+  (`hooks/use-accent`) — the game page, a studio and its games, a collection,
+  a review, Surprise Me, a copy, an event, achievements, the log form, a
+  soundtrack, Now Playing, the Top 10, the scanner, welcome and onboarding.
+  **A new screen about one game is wrapped the same way.** The glass discs
+  and capsules over artwork are dark in either room (`SchemeProvider` in
+  `GlassGroup`, white glyphs on `GlassDisc`).
+- **`<Screen>` sets the status bar** for its room (the last mounted page
+  wins), so a dark game page pushed over the light app keeps light icons. The
+  root layout's `ThemeProvider` and navigation bar follow the setting.
+- **Chrome that assumed black, fixed**: the tab bar (its ink is `text`, its
+  fade ramps to the page's white, its iOS blur tint), dialogs (a white card,
+  a 25% scrim), the section chevron, the profile's big pill and the reply
+  send key (`primary` / `onPrimary`, not `white` / `background`), and boxes
+  that were white at 7% (now `text` at 7%). `accentRoles` takes a `scheme`
+  for the house accent; a game's (`tonal`) roles are always dark.
+- **Home's glow** is the first cover's key colour; in the light room a pale
+  wash of it (`mixOklab` 72% toward the page), and none with game colours
+  off — the old house-white glow would be a black smear on white.
+- **Not changed**: `app.json`'s `userInterfaceStyle` is still `dark`, so iOS
+  keyboards and native pickers stay dark in light mode (changing it is a
+  native build). Liquid glass (off by default) and the tab bar's liquid lens
+  were drawn for a dark page and were not retuned for light.
+
+**The key colour on every game's room.** `<AccentProvider>` and
+`useGameAccent` read Apple Music's key colour of their artwork
+(`useKeyColor`, whole picture — no frame — when the page does not say) and
+put it in `page`; the rest of the roles stay Material 3. So Surprise Me, a
+collection, a studio, a review, an event, a copy, achievements, the log form
+and a soundtrack all stand on it, as the game page does (which reads its own,
+framed to its cover: `useGameAccent(…, { keyColour: false })`). A collection
+reads its cover's *box art*, whose edges are not the square header's — the
+nearest picture the reader can decode. A non-IGDB picture (Steam, SteamGridDB)
+has no key colour and keeps the M3 page.
+
+**Not seen on a phone.** Types and `npm test` pass.
+
+## Liquid glass: react-native-liquid-glassmorphism (2026-11-06)
+
+The owner's pick of the four glass resources they sent. **First choice on
+both platforms** in `<GlassSurface>` (`ui/liquid-glass`), still behind
+Settings → Liquid glass (off by default): Apple's `UIGlassEffect` on iOS 26
+(a `UIBlurEffect` material below it), and on Android its own AGSL refraction
+shader from API 33, `RenderEffect` blur on 31–32, a tinted pane below that.
+MIT, `react-native-liquid-glassmorphism@1.2.1`, in `app.json`'s plugins
+(a pass-through; autolinking does the work).
+
+- **A Fabric view with no TurboModule**, so it is found with
+  `UIManager.hasViewManagerConfig('LiquidGlassmorphismView')` — React
+  Native's component registry — before its JavaScript is `require`d. Expo
+  Go and any APK built before it answer no and keep the old two engines:
+  `expo-liquid-glass-view` on iOS, the Podium-style glass on Android. Both
+  are kept as fallbacks; `expo-liquid-glass-view` could go once a build with
+  this one has been seen, to save its native size.
+- **It needs no blur target**: it captures the window itself, once a frame
+  for every glass view (`SharedBackdrop.kt`), and skips glass views while it
+  captures, so a glass key inside the page is safe — unlike expo-blur's,
+  which drew itself forever (§ reacticx, second batch).
+- **Its Android capture is a software draw of the whole window**, and a
+  software canvas cannot draw a hardware bitmap — which is what Glide hands
+  expo-image (§ A review in one sentence). Where a cover is behind the glass
+  the capture may fail (`BACKDROP_CAPTURE_FAILED`, reported to `onError`,
+  not wired) and the glass shows the last good backdrop or only its tint.
+  This is the first thing to look at on a phone. It is also a full-window
+  draw per frame while glass is on screen: watch scrolling.
+- Tint: the dark room's 12% of the accent, the light room's 30% of the page.
+- **Needs a new build** (dev client or APK). Not seen running anywhere.
 
 ## Store-release compliance (audited 2026-10-29)
 

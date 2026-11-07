@@ -12,6 +12,7 @@ import { SteamSection } from '@/components/gaming/steam-section';
 import { CollectionSeparator, ListTile } from '@/components/list-tile';
 import { ProfileActionRow, ProfileButton, ProfileKey } from '@/components/profile-actions';
 import { LogCard } from '@/components/log-card';
+import { SortBar, type SortOption } from '@/components/ui/sort-bar';
 import { GamesWidget, SHELF_LIMIT } from '@/components/games-widget';
 import { FavoritesWidget } from '@/components/profile-widgets';
 import { RatingsWidget } from '@/components/ratings-widget';
@@ -35,6 +36,7 @@ import { ArtRowWindow } from '@/constants/list-window';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ActivityRow, WallComposer, WallPostRow } from '@/components/wall';
+import type { LogWithRelations } from '@/lib/database.types';
 import {
   acceptFriendRequest,
   followUser,
@@ -226,6 +228,10 @@ export function ProfileView({ profileId, headerAction }: ProfileViewProps) {
   const viewerId = useAuth((state) => state.session?.user.id) ?? null;
   const isSelf = viewerId === profileId;
   const [tab, setTab] = useState<ProfileTab>('reviews');
+  /* The Reviews tab's order. Its card is the one every list uses. */
+  const [reviewSort, setReviewSort] = useState<ReviewSort>('newest');
+  const { width: windowWidth } = useWindowDimensions();
+  const cardWidth = windowWidth - PROFILE_MARGIN * 2;
 
   const profile = useQuery({
     queryKey: ['profile', profileId],
@@ -327,6 +333,7 @@ export function ProfileView({ profileId, headerAction }: ProfileViewProps) {
          friends" holds, both follow who is followed. */
       queryClient.invalidateQueries({ queryKey: ['home-activity'] });
       queryClient.invalidateQueries({ queryKey: ['game-players'] });
+      queryClient.invalidateQueries({ queryKey: ['friends-played'] });
     },
   });
 
@@ -341,11 +348,11 @@ export function ProfileView({ profileId, headerAction }: ProfileViewProps) {
   // Reviews are logs that carry writing — an article, its one sentence, or
   // both (0040) — not just a score.
   const reviews = useMemo(
-    () => (logs.data ?? []).filter(hasWriting),
+    () => sortReviews((logs.data ?? []).filter(hasWriting), reviewSort),
     // Keyed on the query's own data, not on a `?? []` expression: that fallback
     // is a fresh array on every render while the query is pending, which would
     // make the memo re-run every time and cost more than it saves.
-    [logs.data]
+    [logs.data, reviewSort]
   );
 
   /**
@@ -385,7 +392,7 @@ export function ProfileView({ profileId, headerAction }: ProfileViewProps) {
             /* The review card every list of reviews uses. It was a row of its
                own here — square art, the title, the score — until the owner
                had the Home card replace the rest. */
-            <LogCard log={item.log} />
+            <LogCard log={item.log} width={cardWidth} />
           ) : item.kind === 'list' ? (
             <ListTile list={item.list} />
           ) : item.item.type === 'post' ? (
@@ -395,7 +402,7 @@ export function ProfileView({ profileId, headerAction }: ProfileViewProps) {
           )}
         </View>
       ),
-    [ownerName]
+    [ownerName, cardWidth]
   );
 
   if (profile.isLoading) return <LoadingState />;
@@ -689,7 +696,20 @@ export function ProfileView({ profileId, headerAction }: ProfileViewProps) {
    * telling them to befriend someone they already had.
    */
   const tabHead =
-    tab === 'wall' ? (
+    tab === 'reviews' ? (
+      reviews.length > 1 ? (
+        <View style={[styles.tabHead, styles.reviewTools]}>
+          <View style={styles.reviewSort}>
+            <SortBar
+              options={REVIEW_SORTS}
+              value={reviewSort}
+              onChange={setReviewSort}
+              accessibilityLabel="Sort these reviews"
+            />
+          </View>
+        </View>
+      ) : null
+    ) : tab === 'wall' ? (
       viewerId && (isSelf || friendState.data === 'friends') ? (
         <View style={styles.tabHead}>
           <WallComposer wallOwnerId={profileId} authorId={viewerId} isOwnWall={isSelf} />
@@ -1010,9 +1030,45 @@ function CountRule() {
   );
 }
 
+type ReviewSort = 'newest' | 'oldest' | 'highest' | 'lowest' | 'title';
+
+const REVIEW_SORTS: readonly SortOption<ReviewSort>[] = [
+  { key: 'newest', label: 'Newest' },
+  { key: 'oldest', label: 'Oldest' },
+  { key: 'highest', label: 'Highest score' },
+  { key: 'lowest', label: 'Lowest score' },
+  { key: 'title', label: 'Title' },
+];
+
+/** A person's reviews in an order: a view, never written back. Unscored last either way. */
+function sortReviews<T extends LogWithRelations>(logs: T[], sort: ReviewSort): T[] {
+  const time = (log: T) => Date.parse(log.created_at) || 0;
+  const sorted = [...logs];
+  switch (sort) {
+    case 'oldest':
+      return sorted.sort((a, b) => time(a) - time(b));
+    case 'highest':
+    case 'lowest': {
+      const sign = sort === 'highest' ? -1 : 1;
+      return sorted.sort((a, b) => {
+        if (a.rating === null || b.rating === null) {
+          return a.rating === b.rating ? time(b) - time(a) : a.rating === null ? 1 : -1;
+        }
+        return sign * (a.rating - b.rating) || time(b) - time(a);
+      });
+    }
+    case 'title':
+      return sorted.sort((a, b) => (a.game?.title ?? '').localeCompare(b.game?.title ?? ''));
+    default:
+      return sorted.sort((a, b) => time(b) - time(a));
+  }
+}
+
 const styles = StyleSheet.create({
   content: { paddingBottom: Spacing.x48 },
   rowWrap: { paddingHorizontal: PROFILE_MARGIN },
+  reviewTools: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12 },
+  reviewSort: { flex: 1 },
   /* What a tab puts above its rows — the wall's composer, the Collections
      tab's button — and the space before the first of them. */
   tabHead: { paddingHorizontal: PROFILE_MARGIN, paddingBottom: Spacing.x16 },

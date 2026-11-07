@@ -60,20 +60,6 @@ const ProgressiveBlur = TurboModuleRegistry.get('RNSkiaModule')
  */
 export const HERO_ANIMATES = !!ProgressiveBlur;
 
-/**
- * How much of a pinned hero's mirrored tail a page leaves showing under the
- * art before its solid part begins — half of it, by when Convx's wash is
- * five sixths of the way to the page's colour and the page's lip takes it
- * the rest of the way. A studio's and a collection's (the owner's,
- * 2026-11-04: "Apply the convx's blur to the studio screen, review screen and
- * collection screen. The blur that act's as the fade for the header and
- * background"): their solid part began at the art's foot and covered the
- * tail. Nothing where the build cannot draw the tail.
- */
-export function shownTail(height: number): number {
-  return ProgressiveBlur ? Math.round(height * TAIL * 0.5) : 0;
-}
-
 /** expo-image's `contentPosition`, as the 0–1 anchors the blur's canvas draws by. */
 function anchorsOf(position: ImageContentPosition | undefined): { x: number; y: number } {
   const share = (value: unknown, fallback: number) =>
@@ -150,6 +136,14 @@ export type PinnedHeroProps = {
   veil?: number;
   /** The loaded image's size, for a caller that has to reject art it cannot use. */
   onLoad?: (size: { width: number; height: number }) => void;
+  /**
+   * The hero is drawn whole: the art has loaded and, where Convx's blur is
+   * drawn, the blur has its picture too — or the art failed, and there is
+   * nothing more to wait for. The game page holds itself back until then
+   * (the owner's, 2026-11-05: "the game page screen doesnt load until the
+   * blur loads").
+   */
+  onReady?: () => void;
   /**
    * Convx's foot (2026-10-31): the art running on into its own mirrored
    * reflection, and Convx's wash in place of `fade` — wherever the row-by-row
@@ -276,6 +270,7 @@ export const PinnedHero = memo(function PinnedHero({
   contentPosition,
   veil = 0,
   onLoad,
+  onReady,
   tail: withTail = false,
   blur = true,
   animation = null,
@@ -329,6 +324,18 @@ export const PinnedHero = memo(function PinnedHero({
       : 0;
   const reach = height + tail;
   const onSkiaFailed = useCallback(() => setSkiaFailed(true), []);
+
+  /* Whole: the art in (or failed), and the blur drawn where there is one. */
+  const [blurDrawn, setBlurDrawn] = useState<string | null>(null);
+  const [artFailed, setArtFailed] = useState<string | null>(null);
+  const onBlurDrawn = useCallback(() => setBlurDrawn(source), [source]);
+  const whole =
+    !source ||
+    artFailed === source ||
+    (loaded === source && (!progressive || blurDrawn === source));
+  useEffect(() => {
+    if (whole) onReady?.();
+  }, [whole, onReady]);
   const anchors = anchorsOf(contentPosition);
   /* How far the blur has climbed: the old copy's opacity, as the climb's progress. */
   const climb = useDerivedValue(() =>
@@ -427,7 +434,10 @@ export const PinnedHero = memo(function PinnedHero({
         onLoad?.({ width: event.source.width, height: event.source.height });
       }}
       onError={() => {
-        if (!steamSource) return;
+        if (!steamSource) {
+          setArtFailed(source);
+          return;
+        }
         steam?.onFailed();
         setSteamFailed(true);
       }}
@@ -489,6 +499,7 @@ export const PinnedHero = memo(function PinnedHero({
                     anchorY={anchors.y}
                     progress={climb}
                     onFail={onSkiaFailed}
+                    onReady={onBlurDrawn}
                     animatedUri={animation}
                     onAnimationFail={onAnimationFail}
                     long={withTail}

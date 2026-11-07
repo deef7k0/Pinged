@@ -131,7 +131,6 @@ export function TopReviewCard({
         display={log.review_display}
         score={log.rating}
         likes={review.likes}
-        comments={review.comments}
         likedByViewer={review.likedByViewer}
         lines={BODY_LINES}
         spoiler={!!log.spoilers}

@@ -22,6 +22,7 @@ import { INTRO_LINES, MIN_PASSWORD_LENGTH, typingDuration } from '@/lib/onboardi
 import { signInWithProvider, type OAuthProvider } from '@/lib/oauth';
 import { useAuth } from '@/store/auth';
 import { Loader } from '@/components/ui/loader';
+import { DarkRoom } from '@/hooks/use-accent';
 
 /** Longest a page waits for its headline before showing what is under it. */
 const REVEAL_CAP_MS = 900;
@@ -67,7 +68,7 @@ type Phase =
  * This one route replaces `welcome`, `sign-in-options`, `sign-in` and
  * `sign-up`, which were four screens in the app's own controls.
  */
-export default function WelcomeScreen() {
+function WelcomeScreen() {
   const [phase, setPhase] = useState<Phase>({ kind: 'intro', line: 0 });
   const [email, setEmail] = useState('');
 
@@ -544,3 +545,12 @@ const styles = StyleSheet.create({
   agreement: { textAlign: 'center' },
   agreementLink: { textDecorationLine: 'underline' },
 });
+
+/** A game's room: dark in either setting (Settings → Appearance). */
+export default function WelcomeScreenRoute() {
+  return (
+    <DarkRoom>
+      <WelcomeScreen />
+    </DarkRoom>
+  );
+}

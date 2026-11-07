@@ -45,6 +45,7 @@ import { getGameById } from '@/lib/games';
 import { useAuth } from '@/store/auth';
 import { Loader } from '@/components/ui/loader';
 import { toast } from '@/lib/toast';
+import { DarkRoom } from '@/hooks/use-accent';
 
 /** How long the "didn't read cleanly" hint stays up after a misread. */
 const MISREAD_MS = 1800;
@@ -81,7 +82,7 @@ const MISREAD_MS = 1800;
  * which, and each offers typing the digits under the bars instead. The scanner
  * is a convenience; the lookup must never depend on it.
  */
-export default function ScanScreen() {
+function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [code, setCode] = useState<string | null>(null);
   const [manual, setManual] = useState(Platform.OS === 'web');
@@ -834,3 +835,12 @@ const styles = StyleSheet.create({
   card: { flexDirection: 'row', alignItems: 'center', gap: Spacing.x12, padding: CARD_INSET },
   cardText: { flex: 1, gap: 2 },
 });
+
+/** A game's room: dark in either setting (Settings → Appearance). */
+export default function ScanScreenRoute() {
+  return (
+    <DarkRoom>
+      <ScanScreen />
+    </DarkRoom>
+  );
+}

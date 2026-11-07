@@ -8,7 +8,6 @@ import { HandoffTitle } from '@/components/ui/handoff-title';
 import { Avatar } from '@/components/ui/avatar';
 import { ExpandableText } from '@/components/ui/expandable-text';
 import { PressGlyph } from '@/components/ui/press-glyph';
-import { shownTail } from '@/components/ui/pinned-hero';
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { useSectionMetrics } from '@/components/ui/section';
 import { SmoothScrim } from '@/components/ui/smooth-scrim';
@@ -268,9 +267,7 @@ export function CollectionHeader({
       {/* The solid part's soft top edge, under the name: the art the name
           floats on gives way to the page here. First, so it is under it. */}
       {cover && (
-        <View
-          pointerEvents="none"
-          style={[styles.lip, { top: coverHeight + shownTail(coverHeight) - LIP }]}>
+        <View pointerEvents="none" style={[styles.lip, { top: coverHeight - LIP }]}>
           <LinearGradient
             colors={lipColours(page)}
             locations={LIP_STOPS.locations as unknown as readonly [number, number, ...number[]]}
@@ -305,8 +302,6 @@ export function CollectionHeader({
         */
         <>
           <View style={{ height: coverHeight }}>{titleBlock}</View>
-          {/* The blurred tail under the art, before the solid part. */}
-          <View style={{ height: shownTail(coverHeight) }} />
         </>
       ) : (
         /*

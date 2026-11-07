@@ -21,7 +21,7 @@ import { useAnimatedArtwork } from '@/hooks/use-animated-artwork';
 import { peekAnimatedCover, prefetchAnimatedCover } from '@/hooks/use-animated-cover';
 import { useDiscRoom, useTopBarInset } from '@/hooks/use-header-height';
 import { useReadingLanguages } from '@/hooks/use-reading-languages';
-import { AccentProvider, useGameAccent } from '@/hooks/use-accent';
+import { AccentProvider, useGameAccent, DarkRoom } from '@/hooks/use-accent';
 import { extractSeedColor } from '@/hooks/use-album-art-color';
 import { getTopGameReview, getUserLogs, setProgress } from '@/lib/api';
 import { readingKey } from '@/lib/discovery';
@@ -142,7 +142,7 @@ const PREFS_WRITE_MS = 600;
  * is twenty hues; one game filling the screen is the case the accent was built
  * for, and it is most of what separates this from a dice roll with a title on it.
  */
-export default function SurpriseScreen() {
+function SurpriseScreen() {
   const router = useRouter();
 
   const reduceMotion = useReducedMotion();
@@ -895,3 +895,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+
+/** A game's room: dark in either setting (Settings → Appearance). */
+export default function SurpriseScreenRoute() {
+  return (
+    <DarkRoom>
+      <SurpriseScreen />
+    </DarkRoom>
+  );
+}

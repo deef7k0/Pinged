@@ -1,10 +1,11 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 
 import { identityColorFor } from '@/constants/identity';
-import { accentRoles, type AccentRoles } from '@/constants/theme';
+import { accentRoles, Palette, type AccentRoles } from '@/constants/theme';
 import { useAlbumArtColor } from '@/hooks/use-album-art-color';
 import { useGameColours } from '@/hooks/use-game-colours';
-import { useTheme } from '@/hooks/use-theme';
+import { useKeyColor } from '@/hooks/use-key-color';
+import { SchemeProvider, useColorScheme, useTheme } from '@/hooks/use-theme';
 import { DynamicThemeValueProvider } from '@/theme/dynamic-theme-provider';
 
 /**
@@ -63,7 +64,9 @@ export function AccentProvider({
   color,
   neutral = false,
 }: AccentProviderProps) {
-  const theme = useTheme();
+  /* A game's room is the dark one whatever the app's setting (Settings →
+     Appearance): its page is the cover's key colour under white type. */
+  const theme = Palette;
   const colours = useGameColours();
   /* No artwork read while game colours are off. A review's own `neutral` still
      reads it, so its switch turns the colour back on in the same frame. */
@@ -74,7 +77,7 @@ export function AccentProvider({
      `accentRoles`. */
   /* A review's own `neutral` is the house white; game colours off is the
      owner's grey (`gameNeutral`). */
-  const roles = useMemo(
+  const scheme = useMemo(
     () =>
       !colours.on
         ? accentRoles(theme.gameNeutral)
@@ -83,6 +86,15 @@ export function AccentProvider({
           : accentRoles(hue, { tonal: true }),
     [hue, neutral, colours.on, theme.primary, theme.gameNeutral]
   );
+  /* The page is Apple Music's key colour — the colour the artwork's edges end
+     in (`useKeyColor`) — on every screen about one game, as on its own page
+     (the owner's, 2026-11-06). The rest of the roles stay the art's Material
+     3 scheme, whose page stands in until the colour is read. */
+  const key = useKeyColor(artwork, {
+    ink: scheme.quietInk,
+    enabled: scheme.tonal && !color,
+  });
+  const roles = useKeyPage(scheme, key.bright);
 
   /* Both contexts, from one extraction. `useAccent()` is what the app's own
      components read; `useDynamicTheme()` is the full M3 role set underneath it,
@@ -91,10 +103,26 @@ export function AccentProvider({
      they agree — two independent extractions of the same URI would agree only
      once the shared query cache had filled. */
   return (
-    <AccentContext.Provider value={roles}>
-      <DynamicThemeValueProvider colors={roles.m3}>{children}</DynamicThemeValueProvider>
-    </AccentContext.Provider>
+    <SchemeProvider scheme="dark">
+      <AccentContext.Provider value={roles}>
+        <DynamicThemeValueProvider colors={roles.m3}>{children}</DynamicThemeValueProvider>
+      </AccentContext.Provider>
+    </SchemeProvider>
   );
+}
+
+/** The roles with the key colour as their page, once it is read. */
+function useKeyPage(roles: AccentRoles, page: string | null): AccentRoles {
+  return useMemo(() => (page && roles.tonal ? { ...roles, page } : roles), [roles, page]);
+}
+
+/**
+ * A route that is a game's room — dark in either setting — and reads the
+ * theme above its own `<AccentProvider>`. `<AccentProvider>` darkens what is
+ * inside it; this darkens the route itself.
+ */
+export function DarkRoom({ children }: { children: ReactNode }) {
+  return <SchemeProvider scheme="dark">{children}</SchemeProvider>;
 }
 
 /**
@@ -118,7 +146,7 @@ function useArtworkHue({
   genres,
   color,
 }: Pick<AccentProviderProps, 'artwork' | 'genres' | 'color'>): string {
-  const theme = useTheme();
+  const theme = Palette;
   const fallback = color ?? identityColorFor(genres, theme);
 
   /*
@@ -152,6 +180,7 @@ function useArtworkHue({
  */
 export function useAccent(): AccentRoles {
   const theme = useTheme();
+  const scheme = useColorScheme();
   const provided = useContext(AccentContext);
   /*
    * A lookup, not a build: `accentRoles` caches by hue, so every control on
@@ -163,7 +192,7 @@ export function useAccent(): AccentRoles {
    * built it even under a game's provider, where it was thrown away. A screen
    * of twenty controls paid for twenty identical schemes during its push.
    */
-  return provided ?? accentRoles(theme.primary);
+  return provided ?? accentRoles(theme.primary, { scheme });
 }
 
 /**
@@ -176,13 +205,17 @@ export function useAccent(): AccentRoles {
  */
 export function useGameAccent(
   artwork: string | null | undefined,
-  genres: readonly string[] | null | undefined
+  genres: readonly string[] | null | undefined,
+  { keyColour = true }: { keyColour?: boolean } = {}
 ): AccentRoles {
-  const theme = useTheme();
   const colours = useGameColours();
   const hue = useArtworkHue({ artwork: colours.on ? artwork : null, genres });
-  return useMemo(
-    () => (colours.on ? accentRoles(hue, { tonal: true }) : accentRoles(theme.gameNeutral)),
-    [hue, colours.on, theme.gameNeutral]
+  const scheme = useMemo(
+    () => (colours.on ? accentRoles(hue, { tonal: true }) : accentRoles(Palette.gameNeutral)),
+    [hue, colours.on]
   );
+  /* The same key colour the provider below reads, from the same query. The
+     game page reads its own, framed to its cover (`keyColour: false`). */
+  const key = useKeyColor(artwork, { ink: scheme.quietInk, enabled: keyColour && scheme.tonal });
+  return useKeyPage(scheme, key.bright);
 }

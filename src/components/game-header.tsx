@@ -8,6 +8,7 @@ import { useState, type ReactNode } from 'react';
 import { StyleSheet, View, useWindowDimensions, type LayoutRectangle } from 'react-native';
 
 import { AddToCollection } from '@/components/add-to-collection';
+import { FriendsPlayedRow } from '@/components/friends-played';
 import { MustPlayStar } from '@/components/must-play-badge';
 import { AnchoredMenu, AnchoredMenuItem, useAnchoredMenu } from '@/components/ui/anchored-menu';
 import { HandoffTitle } from '@/components/ui/handoff-title';
@@ -77,6 +78,8 @@ export type GameHeaderWordsProps = {
   onOpenProgress: () => void;
   onOpenLists: () => void;
   onReadMore: () => void;
+  /** Opens the sheet of friends who played it, which the page owns. */
+  onOpenFriends: () => void;
   /**
    * Where the rows the blur's band is set by stand in the words: the genres,
    * the Log pill's row and the synopsis (`<PinnedHero band>`).
@@ -94,6 +97,7 @@ export function GameHeaderWords({
   onOpenProgress,
   onOpenLists,
   onReadMore,
+  onOpenFriends,
   onRows,
 }: GameHeaderWordsProps) {
   const unreleased = isUnreleased(game);
@@ -163,6 +167,10 @@ export function GameHeaderWords({
           <Text style={styles.developedName}>{game.developer}</Text>
         </Text>
       ) : null}
+
+      {/* Letterboxd's "friends who watched this": who in your circle played
+          it, and a sheet of what they made of it (the owner's, 2026-11-06). */}
+      <FriendsPlayedRow gameId={game.id} onOpen={onOpenFriends} />
     </View>
   );
 }

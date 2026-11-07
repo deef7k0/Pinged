@@ -18,10 +18,9 @@ import { useTabBarClearance } from '@/components/app-tab-bar';
 import { FeatureCards, type FeatureCardGame } from '@/components/explore/feature-cards';
 import { CoverRailSkeleton, GameCoverRail, useRailLayout } from '@/components/game-rail';
 import { HomeSection } from '@/components/home-section';
-import { ReviewBox } from '@/components/game-overview';
+import { ReviewLandscapeCard } from '@/components/review-landscape-card';
 import { CollectionShelfCard } from '@/components/list-tile';
 import { SpotlightSlider } from '@/components/search/spotlight-slider';
-import { TopChartEntry } from '@/components/search/top-chart-entry';
 import { GlassSurface, useLiquidGlass } from '@/components/ui/liquid-glass';
 import { PressGlyph } from '@/components/ui/press-glyph';
 import { PressableScale } from '@/components/ui/pressable-scale';
@@ -46,8 +45,8 @@ const RAIL_GAMES = 20;
 const RECOMMENDED_GAMES = 12;
 /** How many reviews and collections Explore's two rails hold before "See all". */
 const PREVIEW = 10;
-/** A review box on the rail: most of the display, so the next one peeks in. */
-const REVIEW_SHARE = 0.82;
+/** A review card on the rail: three quarters of the display, so the next one peeks in. */
+const REVIEW_SHARE = 0.74;
 /** A collection's square on its shelf: two and a bit in view, Apple Music's. */
 const SHELF_SHARE = 0.42;
 /** The slider has left the screen once this much of it has scrolled away. */
@@ -75,7 +74,8 @@ const PERIOD_WORDS: Record<BelovedPeriod, string> = {
  * (`<SpotlightSlider>`, no heading over it and page dots under it — the
  * Apple pass); Highly rated; Popular this month as Apple TV Home's big cards (`<FeatureCards>`);
  * then the rest of what Discover was — Similar to the game you reviewed last,
- * Beloved by the community, the Top 1000 — and the two charts the Reviews and
+ * Beloved by the community — the Top 1000's button moved to Home (2026-11-05)
+ * — and the two charts the Reviews and
  * Collections tabs led with untyped, as rails (the Apple pass, 2026-11-05):
  * reviews as the App Store's boxes, collections as Apple Music's shelf of
  * squares, ten of each and "See all".
@@ -326,11 +326,9 @@ export function DiscoverFeed() {
           </HomeSection>
         )}
 
-        <TopChartEntry />
-
         {reviews.length > 0 && (
           <HomeSection title="Popular reviews" seeAll="/reviews?period=month">
-            {/* The App Store's rail of review boxes, the game named in each. */}
+            {/* The poster card as a smaller rectangle: the art, then the words. */}
             <FlatList
               horizontal
               data={reviews}
@@ -342,7 +340,7 @@ export function DiscoverFeed() {
               decelerationRate="fast"
               style={styles.rail}
               contentContainerStyle={styles.railRow}
-              renderItem={({ item }) => <ReviewBox log={item} width={reviewWidth} showGame />}
+              renderItem={({ item }) => <ReviewLandscapeCard log={item} width={reviewWidth} />}
             />
           </HomeSection>
         )}

@@ -25,7 +25,8 @@ import {
 import { PressableScale } from '@/components/ui/pressable-scale';
 import { Reveal } from '@/components/ui/reveal';
 import { Text } from '@/components/ui/text';
-import { MaxContentWidth, TapTarget, Type } from '@/constants/theme';
+import { MaxContentWidth, TapTarget, Type, withAlpha } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 /**
  * The width SimpMusic's artist page was measured at: the owner's phone, 360dp
@@ -170,13 +171,14 @@ export function SectionHeader({
   moreSlot?: ReactNode;
 }) {
   const inset = useSectionInset();
+  const theme = useTheme();
 
   const words = (
     <>
       <Text variant="h2" accessibilityRole="header" numberOfLines={1} style={styles.tvTitle}>
         {title}
       </Text>
-      {more && <Ionicons name="chevron-forward" size={20} color={TV_CHEVRON} />}
+      {more && <Ionicons name="chevron-forward" size={20} color={withAlpha(theme.text, 0.6)} />}
     </>
   );
   return (
@@ -421,8 +423,6 @@ export function ArtRail<T>({
   );
 }
 
-/* Quiet, as Apple TV's: the heading's ink is the white, its chevron a step down. */
-const TV_CHEVRON = 'rgba(255,255,255,0.6)';
 const TV_SLOP = { top: 12, bottom: 12, left: 0, right: 0 };
 
 const styles = StyleSheet.create({

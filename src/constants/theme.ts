@@ -55,14 +55,15 @@ import { generateDynamicTheme, type DynamicThemeColors } from '@/theme/dynamic-c
 
 export { ensureContrast, readableInk, tint, withAlpha } from '@/lib/color';
 
-export const Colors = {
+/*
+ * Two rooms: dark (the default) and light — Settings → Appearance, the
+ * owner's (2026-11-06). `useTheme()` returns the one in force
+ * (`hooks/use-theme`). The screens about one game stay dark in light mode
+ * (`<AccentProvider>`, `<DarkRoom>`): they are built out of the game's art.
+ */
+const DARK = {
   /*
-   * Dark only.
-   *
-   * `light` exists so the `ThemeColor` type stays honest and so nothing has to
-   * branch, but it holds the same values: this app is a dark room by design and
-   * a light counterpart would be a second product. `APP_SCHEME` in
-   * `hooks/use-theme` is the single place that says so.
+   * The dark room: iOS's dark system colours over true black.
    */
   dark: {
     /*
@@ -579,11 +580,100 @@ export const Colors = {
   },
 } as const;
 
-/** Dark-only: the light palette is the dark one. See the note above. */
-export const Palette = Colors.dark;
+export type ThemeColor = keyof typeof DARK.dark;
+export type ThemePalette = { readonly [K in ThemeColor]: string };
 
-export type ThemeColor = keyof typeof Colors.dark;
-export type ThemePalette = typeof Colors.dark;
+/**
+ * The light room — iOS's light system colours, Apple Music's and Apple TV's
+ * own light mode: a white page, `secondarySystemBackground` (#F2F2F7) for
+ * cards and grouped lists, systemGray5 / systemGray4 for the steps above.
+ *
+ * **The ladder climbs by darkening here**: a control inside a card is a step
+ * *darker* than the card, as the dark ladder's is a step lighter. Every ink
+ * holds AA on every step up to `surfaceSelected` (`theme-light.test.ts`).
+ *
+ * The meaning hues (identity, score, status, rarity) are their deeper
+ * twins — the dark room's are pastels drawn for a black page and fall under
+ * 3:1 on white. Everything drawn as an *image* or over artwork — the poster
+ * screens, the share swatches, the scrim, `white`, the shadow — is the dark
+ * room's, unchanged: it does not sit on the page.
+ */
+const LIGHT: ThemePalette = {
+  ...DARK.dark,
+  text: '#0A0A0A',
+  textSecondary: '#48484C',
+  textMuted: '#5A5A5F',
+  background: '#FFFFFF',
+  homeBackground: '#FFFFFF',
+  surface: '#F2F2F7',
+  surfaceElevated: '#E5E5EA',
+  surfaceSelected: '#D9D9DE',
+  input: 'rgba(118, 118, 128, 0.12)',
+  controlFill: 'rgba(118, 118, 128, 0.12)',
+  controlPressed: 'rgba(118, 118, 128, 0.22)',
+  controlInk: '#1C1C1E',
+  segmentTrack: 'rgba(118, 118, 128, 0.12)',
+  segmentThumb: '#FFFFFF',
+  segmentPill: '#FFFFFF',
+  segmentPillInk: '#000000',
+  outline: 'rgba(0, 0, 0, 0.16)',
+  hover: 'rgba(0, 0, 0, 0.03)',
+  pressed: 'rgba(0, 0, 0, 0.06)',
+  border: 'rgba(60, 60, 67, 0.16)',
+  borderStrong: 'rgba(60, 60, 67, 0.29)',
+  primary: '#000000',
+  onPrimary: '#FFFFFF',
+  primaryText: '#000000',
+  primaryMuted: 'rgba(0, 0, 0, 0.1)',
+  gameNeutral: '#3A3A3C',
+  accent: '#000000',
+  identityEmber: '#C9560F',
+  identityCrimson: '#C8303F',
+  identityGold: '#9A720A',
+  identityLime: '#4F8414',
+  identityJade: '#12874F',
+  identityAqua: '#0B827C',
+  identitySky: '#1570C2',
+  identityCobalt: '#3F50D6',
+  identityViolet: '#7343CF',
+  identityMagenta: '#B8327F',
+  scoreHigh: '#18884A',
+  scoreMid: '#A86400',
+  scoreLow: '#C92A2A',
+  statusPlaying: '#12874F',
+  statusPlayed: '#1570C2',
+  statusBacklog: '#7343CF',
+  statusDropped: '#A8503A',
+  statusPaused: '#9A720A',
+  rarityCommon: '#636B75',
+  rarityUncommon: '#12874F',
+  rarityRare: '#1570C2',
+  rarityEpic: '#7343CF',
+  rarityLegendary: '#9A720A',
+  platinum: '#5E6C85',
+  proseInk: '#3F3B45',
+  liked: '#C95F00',
+  danger: '#C92A2A',
+  success: '#18884A',
+  glowEdge: '#C7C8CF',
+  logoPlate: '#F2F2F7',
+  skeleton: '#E5E5EA',
+  skeletonSweep: '#F7F7F9',
+  backgroundElement: '#F2F2F7',
+  backgroundSelected: '#E5E5EA',
+};
+
+export const Colors: { dark: ThemePalette; light: ThemePalette } = {
+  dark: DARK.dark,
+  light: LIGHT,
+};
+
+/**
+ * The dark room, as a constant — for what is drawn the same in both rooms:
+ * type and scrims over artwork (`white`, `shadowInk`), the poster screens,
+ * the share card, and the rooms built from a game. Never for the page.
+ */
+export const Palette = DARK.dark;
 
 /**
  * The identity ramp in order, as palette keys.
@@ -793,12 +883,17 @@ const TONAL_STATES = { wash: 0.14, edge: 0.45, ring: 0.22 } as const;
  * every control that reads `useAccent()` — so the result is cached, and callers
  * get the same object back. Treat it as immutable.
  */
-export function accentRoles(hue: string, { tonal = false }: { tonal?: boolean } = {}): AccentRoles {
-  const key = `${tonal ? 'tonal' : 'house'}:${hue}`;
+export function accentRoles(
+  hue: string,
+  { tonal = false, scheme = 'dark' }: { tonal?: boolean; scheme?: 'dark' | 'light' } = {}
+): AccentRoles {
+  /* A game's roles are always the dark room's: its screens stay dark. */
+  const room = tonal ? 'dark' : scheme;
+  const key = `${tonal ? 'tonal' : 'house'}:${room}:${hue}`;
   const cached = accentCache.get(key);
   if (cached) return cached;
 
-  const roles = buildAccentRoles(hue, tonal);
+  const roles = buildAccentRoles(hue, tonal, room);
   /* Oldest first out; a Map iterates in insertion order. A game's hue is read
      off its box art, so a long session would otherwise keep every one it saw. */
   if (accentCache.size >= ACCENT_CACHE_SIZE) {
@@ -812,8 +907,8 @@ const accentCache = new Map<string, AccentRoles>();
 const ACCENT_CACHE_SIZE = 64;
 
 /** Material 3's roles for an achromatic house colour, from the room's own ladder. */
-function neutralM3(hue: string, ink: string): DynamicThemeColors {
-  const c = Colors.dark;
+function neutralM3(hue: string, ink: string, scheme: 'dark' | 'light'): DynamicThemeColors {
+  const c = Colors[scheme];
   return {
     primary: hue,
     onPrimary: ink,
@@ -837,12 +932,13 @@ function neutralM3(hue: string, ink: string): DynamicThemeColors {
     surfaceContainerHigh: c.surfaceElevated,
     surfaceContainerHighest: c.surfaceSelected,
     outline: c.textMuted,
-    outlineVariant: '#2C2E36',
+    outlineVariant: scheme === 'dark' ? '#2C2E36' : '#D1D1D6',
   };
 }
 
-function buildAccentRoles(hue: string, tonal: boolean): AccentRoles {
+function buildAccentRoles(hue: string, tonal: boolean, scheme: 'dark' | 'light'): AccentRoles {
   if (!tonal) {
+    const c = Colors[scheme];
     /* The house blue. `primary` is a chosen brand colour sitting on a fixed
        `background`, not a measurement, so there is nothing for a tonal palette
        to derive — and running it through one would relight the forty screens
@@ -851,10 +947,7 @@ function buildAccentRoles(hue: string, tonal: boolean): AccentRoles {
     /* The house hue's type twin is a chosen value, `primaryText`, so the tab
        labels, links and selected states all say the same blue. Any other hue's
        is computed. */
-    const type =
-      hue === Colors.dark.primary
-        ? Colors.dark.primaryText
-        : ensureContrast(hue, Colors.dark.surfaceElevated, 4.5);
+    const type = hue === c.primary ? c.primaryText : ensureContrast(hue, c.surfaceElevated, 4.5);
     /* A white (or grey) house colour has no hue for Material to build a
        palette from — it falls back to cyan — so its M3 roles are the room's
        own neutrals instead. */
@@ -863,17 +956,19 @@ function buildAccentRoles(hue: string, tonal: boolean): AccentRoles {
       color: hue,
       onSurface: type,
       ink,
-      quietInk: neutral ? Colors.dark.textSecondary : mix('#FFFFFF', hue, 0.24),
+      quietInk: neutral
+        ? c.textSecondary
+        : mix(scheme === 'dark' ? '#FFFFFF' : '#000000', hue, 0.24),
       wash: withAlpha(type, HOUSE_STATES.wash),
       edge: withAlpha(type, HOUSE_STATES.edge),
-      pressed: mix(hue, Colors.dark.shadowInk, PRESSED_DEPTH),
+      pressed: mix(hue, c.shadowInk, PRESSED_DEPTH),
       ring: withAlpha(type, HOUSE_STATES.ring),
-      page: Colors.dark.background,
-      surface: tint(Colors.dark.surface, hue, SURFACE_TINT),
-      elevated: tint(Colors.dark.surfaceElevated, hue, SURFACE_TINT),
-      card: tint(Colors.dark.surfaceSelected, hue, SURFACE_TINT),
+      page: c.background,
+      surface: tint(c.surface, hue, SURFACE_TINT),
+      elevated: tint(c.surfaceElevated, hue, SURFACE_TINT),
+      card: tint(c.surfaceSelected, hue, SURFACE_TINT),
       glow: withAlpha(hue, 0.42),
-      m3: neutral ? neutralM3(hue, ink) : generateDynamicTheme(hue, true),
+      m3: neutral ? neutralM3(hue, ink, scheme) : generateDynamicTheme(hue, scheme === 'dark'),
       tonal: false,
     };
   }

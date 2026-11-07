@@ -113,10 +113,12 @@ export const LOGO_MAX_HEIGHT = 120;
 export function logoBox(
   aspect: number,
   maxWidth: number,
-  maxHeight: number = LOGO_MAX_HEIGHT
+  maxHeight: number = LOGO_MAX_HEIGHT,
+  /** The area every logo is drawn at — the game page's, unless a smaller card asks. */
+  area: number = LOGO_AREA
 ): { width: number; height: number } {
   const shape = Math.max(0.01, aspect);
-  let height = Math.sqrt(LOGO_AREA / shape);
+  let height = Math.sqrt(area / shape);
   height = Math.min(height, maxHeight, maxWidth / shape);
   return { width: Math.round(height * shape), height: Math.round(height) };
 }
