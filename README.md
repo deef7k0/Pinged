@@ -6,7 +6,7 @@
 
 # Pinged
 
-### Letterboxd for videogames — log what you play, review it, and ping it to people
+### Your new discovery app for video games. Find your next game, log where you're at, review it, and ping it to your friends.
 
 <br/>
 
@@ -17,12 +17,12 @@
 
 <br/>
 
-[**Features**](#features) · [**Running it**](#running-it) · [**How it is built**](#how-it-is-built) · [**Contributing**](#contributing) · [**Disclaimer**](#disclaimer)
+[**Features**](#features) · [**Releases**](#running-it) · [**Contributing**](#contributing) · [**Disclaimer**](#disclaimer)
 
 </div>
 
 > [!IMPORTANT]
-> Pinged is a work in progress and is not released yet. It is not affiliated with, endorsed by or connected to IGDB, Twitch, Valve, SoundCloud, Steam, PlayStation, Xbox, Nintendo, GOG or anyone else whose data it reads. The repository, the package id and the Expo slug still say `gamelog` on purpose — renaming them would install a second app and break sign-in redirects.
+> Pinged is a work in progress app for android. It is not affiliated with, endorsed by or connected to IGDB, Twitch, Valve, SoundCloud, Steam, PlayStation, Xbox, Nintendo, GOG or anyone else whose data it reads.
 
 ---
 
@@ -34,43 +34,40 @@
   <tr>
     <td width="50%" valign="top">
 
+#### Discovery
+- **Find any game** across multiple options to choose from. Scroll through a carousel of games tailored to your taste, or manually look for games with specific genres, themes, platforms, camera perspectives, game engines, and more.
+- **Home by mood or genre** — Select any of ten moods and genres in your home page, each with its own categories.
+- **Charts** — See what users love, read popular reviews, collections, and a top 1000 games across the app and critics.
+- **Release calendar** — Stay up to date with the most anticipated releases in the upcoming months.
+- **Studio pages** — Every game from the studio, including DLCs, remakes and remasters, and special editions.
+- **Where to buy** — Direct links for buying a game, with prices and discounts.
+
 #### Logging and reviewing
 - **Log any game** with a status, how far you got, hours, solo or co-op, platform and a 0–100 score.
 - **Playthroughs** — several runs of one game under one log.
-- **Reviews** with bold/italic text, spoiler flags, and **a review in one sentence** between drawn quote marks.
+- **Write reviews** with spoiler flags, and many customization options.
 - **Share a review as an image** — four card styles, with a highlighter for picking the words that go on it.
-- **A weighted community score** — ratings that rarely vary carry a little less influence, computed in Postgres and explained to the reader.
+- **A weighted community score** to prevent malicious intents.
 - **Collections** — lists, ranked lists, tier lists, captioned boards and award shows with a real ballot.
 
 #### Pings
-- **Ping a game, review, collection, event or soundtrack to someone**, with a line, into their inbox.
+- **Ping a game, review, collection, or event**, right into their inbox.
 - **Ping the community** — ask for a game based on up to three you have played, and get suggestions with reasons.
 - **Who may ping you** is your setting: followers, mutuals or friends only.
 
 #### Physical copies
 - **Scan a barcode** and add the box to your collection, with region, completeness and condition.
-- **A copy stands on a stage of its own** — a case you turn, open and take the disc out of, under a lamp your phone's tilt moves, in 3D where the build can draw it.
+- **Keep your physical games** — See your games on a 3D case you turn, open and take the disc out.
 - **Real back covers and disc labels** from GameTDB and ScreenScraper.
 
     </td>
     <td width="50%" valign="top">
 
-#### Discovery
-- **IGDB is the one catalogue** — every game has one identity, one cover, one id.
-- **Home by mood or genre** — ten moods as real catalogue queries, each with its own shelves, quick picks and studio.
-- **Games for you** — a new round of recommendations every time you open the app, drawn from your own logs, with no repeats.
-- **Surprise Me** — one dealt game, one song from it, with filters you can combine.
-- **Charts with a period** — popular reviews, people and collections, counted inside a window, and the same count among your circle.
-- **A Top 1000**, Pinged's own or the critics'.
-- **A release calendar**, a platform directory, studio pages and facet search by genre, theme, engine, series or language.
-- **Where to buy** — the official stores IGDB links, priced by IsThereAnyDeal where it can.
 
 #### Experience
-- **Material 3 colour from the artwork** plus Apple Music's key colour for the page — every screen about one game wears that game.
-- **A pinned hero with a row-by-row blur** that climbs as you scroll and drains into the page.
-- **Animated covers** where a game has one, and silent trailers under the artwork.
-- **Soundtracks from SoundCloud** in the app's own player, with a mini player and Now Playing.
-- **Dark and light rooms**, liquid glass chrome, and a reduced-motion path for everything that moves.
+- **Artwork-driven theming** — Apple Music's inspired artist page for Pinged's game page and other places.
+- **Animated covers** where a game has one.
+- **Trailers** play a trailer from any game available in Steam.
 
     </td>
   </tr>
@@ -80,41 +77,6 @@
 
 ---
 
-<div align="center">
-
-<h1><a id="running-it"></a>Running it</h1>
-
-</div>
-
-There is no release build yet — you run it from source with Expo Go or a dev client.
-
-```bash
-npm install
-cp .env.example .env     # fill in the Supabase URL and anon key
-npm start                # scan the QR code with Expo Go
-```
-
-Then, in order:
-
-1. **Run every migration** in `supabase/migrations/` in the Supabase SQL editor. Nothing works before this — there are no tables and every query 404s. A few files add an enum value and must run alone; their headers say so.
-2. **Deploy the IGDB Edge Function** — it is the app's only game source:
-   ```bash
-   supabase secrets set TWITCH_CLIENT_ID=… TWITCH_CLIENT_SECRET=…
-   supabase functions deploy igdb
-   ```
-3. **Optional functions**, each adding one feature and degrading cleanly without it: `itad` (prices), `opencritic` (critic quotes), `soundcloud` (soundtracks), `steam-store` (awards and news), `scandex` (barcodes), `copy-art` (back covers and discs), `game-accounts` (PlayStation, Xbox and GOG by username).
-
-Environment variables are inlined at build time, so restart with `npx expo start --clear` after editing `.env`.
-
-```bash
-npx tsc --noEmit    # typecheck
-npx eslint src      # lint
-npm test            # the pure modules: geometry, colour, rules, SQL contracts
-```
-
-`CLAUDE.md` is the long-form engineering log — every convention, every ruling and every trap this codebase has already fallen into. Read it before changing anything structural. `PROJECT.md` is the product scope and `DESIGN.md` the normative design layer.
-
----
 
 <div align="center">
 
@@ -138,12 +100,6 @@ npm test            # the pure modules: geometry, colour, rules, SQL contracts
 
 Issues and pull requests are welcome.
 
-</div>
-
-Two things to know before you open one:
-
-- **The physical game case feature is protected.** Its components, tokens and dimensions must not be modified; `copy/[id]` is the one screen allowed its own case, in its own files.
-- **Design decisions in `CLAUDE.md` are rulings, not suggestions.** Many of them reverse an earlier version of themselves after being seen on a phone. If a change contradicts one, say so in the pull request rather than quietly undoing it.
 
 ---
 
